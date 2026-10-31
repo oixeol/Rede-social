@@ -1,8 +1,36 @@
 'use strict';
 
 /**
- * Vibra - rede social local com descoberta de afinidades.
- * Servidor HTTP + API JSON + SQLite nativo do Node (sem dependencias externas).
+ * VIBE - rede social local (tipo Instagram) com foco em comunidade,
+ * conteúdo de fotos/vídeos, feed, histórias, mensagens e área de namoro.
+ *
+ * Arquitetura do módulo:
+ * - O servidor HTTP nativo é criado por `http.createServer()` no final do arquivo.
+ * - O callback normaliza `req.url`, separa API, uploads e arquivos estáticos.
+ * - `handleApi()` despacha as rotas sequencialmente por método e `pathname`;
+ *   `matchRoute()` interpreta parâmetros como `:id` e `:username`.
+ * - O estado persistente fica em SQLite, acessado de forma síncrona por
+ *   `node:sqlite`; não há dependências npm externas.
+ *
+ * Persistência e arquivos:
+ * - `VIBRA_DATA_DIR` define `DATA_DIR`; por padrão, `./data`.
+ * - O banco SQLite é `DATA_DIR/vibra.db`.
+ * - Uploads são gravados em `DATA_DIR/uploads` e expostos por `/uploads/`.
+ * - O frontend estático é servido de `./public`.
+ *
+ * Mapa aproximado das seções:
+ * - 20-120: configuração, ambiente e validação de inicialização.
+ * - 120-410: banco SQLite, esquema e migrações aditivas.
+ * - 410-1210: helpers, segurança, privacidade, DTOs e uploads.
+ * - 1210-1330: consultas e transformation de publicações.
+ * - 1330-2740: roteador e handlers da API.
+ * - 2740-2780: arquivos estáticos e proteção contra path traversal.
+ * - 2780-3370: seed de demonstração e dados sintéticos.
+ * - 3370-3460: ciclo de vida do servidor HTTP.
+ *
+ * Aviso de migração: este módulo monolítico será substituído por Django/DRF
+ * durante a migração para stack em Python. A API deve permanecer compatível
+ * com o frontend durante essa transição.
  */
 
 const http = require('node:http');
@@ -12,6 +40,10 @@ const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const APP = require('./app.config');
 const dating = require('./lib/dating');
+
+/* ------------------------------------------------------------------ */
+/* Configuração e inicialização                                        */
+/* ------------------------------------------------------------------ */
 
 const PORT = Number(process.env.PORT) || 4173;
 /* O padrão é loopback. Expor a rede exige HOST explícito. */
@@ -107,9 +139,16 @@ if (IS_PRODUCTION && IDENTITY_MODE === 'disabled') {
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const db = new DatabaseSync(DB_PATH);
+/* WAL permite leituras concorrentes ao backend síncrono sem bloquear cada escrita. */
 db.exec('PRAGMA journal_mode = WAL');
+/* Foreign keys são desativadas por padrão no SQLite; este PRAGMA garante cascatas. */
 db.exec('PRAGMA foreign_keys = ON');
 
+/* ------------------------------------------------------------------ */
+/* Schema SQLite                                                       */
+/* ------------------------------------------------------------------ */
+
+/* Cria ou atualiza todas as tabelas e índices usados pela API e pelo seed. */
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -374,6 +413,7 @@ db.exec(`
 `);
 
 /* Colunas adicionadas em versões novas, sem recriar tabelas existentes. */
+// Verifica a metatable antes de aplicar uma migração aditiva idempotente.
 function ensureColumn(table, column, definition) {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all();
   if (!columns.some((item) => item.name === column)) {
@@ -397,6 +437,7 @@ ensureColumn('stories', 'mentions', "TEXT NOT NULL DEFAULT '[]'");
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
+// Erro de domínio com status HTTP, código estável e detalhes opcionais.
 class HttpError extends Error {
   constructor(status, message, code = null, details = null) {
     super(message);
@@ -406,8 +447,15 @@ class HttpError extends Error {
   }
 }
 
+/* Relógio centralizado: toda a API grava timestamps em milissegundos Unix. */
 const now = () => Date.now();
 
+/**
+ * Catálogo de interesses da plataforma.
+ * Cada item tem `id` (chave estável persistida no banco), `label` (exibição) e
+ * `group` (usado na UI para agrupar chips). Alterar um `id` aqui invalida os
+ * registros já gravados, pois `INTEREST_IDS` filtra o que é aceito na entrada.
+ */
 const INTERESTS = [
   { id: 'games', label: 'Games', group: 'Cultura digital' },
   { id: 'musica', label: 'Música', group: 'Cultura' },
@@ -435,10 +483,14 @@ const INTERESTS = [
   { id: 'musica-ao-vivo', label: 'Shows', group: 'Cultura' },
 ];
 
+/* Conjunto de IDs válidos: usado para validar entrada de interesses. */
 const INTEREST_IDS = new Set(INTERESTS.map((item) => item.id));
+/* Tópicos aceitos na tag de uma publicação. */
 const POST_TOPICS = ['cotidiano', 'fotografia', 'natureza', 'arte', 'gastronomia', 'tecnologia', 'viagens', 'esportes'];
+/* Idade máxima aceita. Acima disso a data de nascimento é tratada como inválida. */
 const MAX_AGE_PLATFORM = 120;
 
+// Converte um campo JSON em lista de strings únicas e opcionalmente filtra IDs permitidos.
 function parseJsonArray(value, allowed = null) {
   let parsed;
   try {
@@ -451,6 +503,7 @@ function parseJsonArray(value, allowed = null) {
   return allowed ? list.filter((item) => allowed.has(item)) : list;
 }
 
+// Calcula a idade válida pela data de nascimento, rejeitando datas ou faixas implausíveis.
 function ageFromBirthDate(birthDate) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(birthDate || ''))) return null;
   const [year, month, day] = birthDate.split('-').map(Number);
@@ -465,20 +518,35 @@ function ageFromBirthDate(birthDate) {
   return age;
 }
 
+// Indica se a data de nascimento comprova idade mínima.
 function isAdult(birthDate, minimum = 18) {
   const age = ageFromBirthDate(birthDate);
   return age !== null && age >= minimum;
 }
 
+/**
+ * Idade exibida publicamente no perfil.
+ * Retorna `null` quando a data é ausente ou inconsistente — a UI trata como
+ * "idade não informada" em vez de expor um número inventado.
+ */
 function publicAge(birthDate) {
   return ageFromBirthDate(birthDate);
 }
 
+/**
+ * Converte IDs de interesse em rótulos legíveis.
+ * IDs desconhecidos são descartados silenciosamente para não quebrar a renderização.
+ */
 function interestLabels(ids) {
   const map = new Map(INTERESTS.map((item) => [item.id, item.label]));
   return ids.map((id) => map.get(id)).filter(Boolean);
 }
 
+/**
+ * Verifica se existe bloqueio em QUALQUER direção entre dois usuários.
+ * O bloqueio é bilateral por definição: se A bloqueou B, B também deixa de
+ * ver A. A query checa as duas permutas de uma vez.
+ */
 function isBlocked(a, b) {
   return !!db
     .prepare(
@@ -488,6 +556,10 @@ function isBlocked(a, b) {
     .get(a, b, b, a);
 }
 
+/**
+ * Indica se já existe uma conversa social entre dois usuários.
+ * Usado para decidir se um usuário que "segue" pode iniciar a primeira mensagem.
+ */
 function hasConversationBetween(a, b) {
   return !!db
     .prepare(
@@ -500,6 +572,14 @@ function hasConversationBetween(a, b) {
     .get(a, b);
 }
 
+/**
+ * Regra de visibilidade do botão "Enviar mensagem" na UI.
+ * `message_policy` do alvo controla:
+ *  - `everyone`  → qualquer usuário pode falar com o alvo;
+ *  - `nobody`    → ninguém inicia conversa;
+ *  - `connections` (padrão) → exige seguidores mútuos OU conversa já existente.
+ * Bloqueio em qualquer direção sempre impede.
+ */
 function canMessageTarget(me, target) {
   if (!me || !target || me.id === target.id || isBlocked(me.id, target.id)) return false;
   const policy = target.message_policy || 'connections';
@@ -508,6 +588,12 @@ function canMessageTarget(me, target) {
   return (isFollowing(me.id, target.id) && isFollowing(target.id, me.id)) || hasConversationBetween(me.id, target.id);
 }
 
+/**
+ * Regra de envio de mensagem social já em andamento (API).
+ * Mais restritiva que `canMessageTarget`: aqui exigir seguidores mútuos,
+ * sem a exceção da conversa pré-existente, porque abrir uma conversa nova
+ * acontece por outra rota que valida `canMessageTarget`.
+ */
 function socialSendAllowed(me, target) {
   if (!me || !target || me.id === target.id || isBlocked(me.id, target.id)) return false;
   const policy = target.message_policy || 'connections';
@@ -516,6 +602,11 @@ function socialSendAllowed(me, target) {
   return isFollowing(me.id, target.id) && isFollowing(target.id, me.id);
 }
 
+/**
+ * Autorização das rotas administrativas (fila de moderação).
+ * - Sem `ADMIN_TOKEN` configurado a rota simplesmente não existe (404).
+ * - A comparação usa `timingSafeEqual` para não vazar o token por timing.
+ */
 function requireAdmin(req) {
   if (!ADMIN_TOKEN) throw new HttpError(404, 'Rota não encontrada.');
   const provided = String(req.headers['x-admin-token'] || '');
@@ -545,6 +636,42 @@ function rawBody(req, limit = 1024 * 1024) {
   });
 }
 
+/**
+ * Lê o corpo bruto da requisição como Buffer, com limite de tamanho.
+ * Usado pelo webhook de identidade porque a assinatura HMAC é calculada
+ * sobre os bytes exatos recebidos — não sobre o JSON re-serializado.
+ */
+async function rawBody(req, limit = 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new HttpError(413, 'Corpo muito grande.'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+/**
+ * Webhook do provedor externo de verificação de identidade.
+ *
+ * Fluxo:
+ *  1. Exige `IDENTITY_MODE=webhook` e segredo configurado (503 caso contrário).
+ *  2. Valida a assinatura HMAC-SHA256 do header `x-vibra-signature`
+ *     sobre o corpo bruto, em tempo constante (401 se inválida).
+ *  3. Valida o payload: `userId` inteiro e `status` na lista permitida.
+ *  4. Recusa aprovação de quem não comprove idade mínima (403).
+ *  5. Faz upsert em `identity_verifications` e notifica o usuário.
+ *
+ * Nota: `is_simulation` é zerado aqui — somente o modo `dev` cria simulação.
+ */
 async function handleIdentityWebhook(req, res) {
   if (IDENTITY_MODE !== 'webhook' || !IDENTITY_WEBHOOK_SECRET) {
     throw new HttpError(503, 'Integração de verificação não configurada.', 'provider_disabled');
@@ -599,6 +726,12 @@ async function handleIdentityWebhook(req, res) {
   return json(res, 200, { ok: true });
 }
 
+/**
+ * Contexto injetado em `lib/dating.js`.
+ * O módulo de namoro é isolado do monólito: recebe por injeção tudo que
+ * precisa (banco, helpers de JSON, upload, DTO, notificações, etc.).
+ * Ao migrar para Django este contexto será substituído por serviços do app.
+ */
 const datingContext = {
   db,
   json,
@@ -628,6 +761,11 @@ const datingContext = {
   HttpError,
 };
 
+/**
+ * Cria uma notificação persistida para o usuário.
+ * `kind` categoriza o evento (like, follow, message, verification...) e
+ * `link` é uma rota interna usada pelo frontend para navegar ao click.
+ */
 function notify(userId, kind, text, link = null) {
   if (!userId) return;
   db.prepare('INSERT INTO notifications (user_id, kind, text, link, created_at) VALUES (?, ?, ?, ?, ?)').run(
@@ -639,12 +777,17 @@ function notify(userId, kind, text, link = null) {
   );
 }
 
+/** Quantidade de notificações ainda não lidas pelo usuário. */
 function unreadNotifications(userId) {
   return db
     .prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL')
     .get(userId).n;
 }
 
+/**
+ * Obtém (ou cria) a conversa associada a um match de namoro.
+ * O índice UNIQUE em `conversations.match_id` garante 1:1 entre match e conversa.
+ */
 function conversationForMatch(matchId) {
   const found = db.prepare('SELECT * FROM conversations WHERE match_id = ?').get(matchId);
   if (found) return found;
@@ -655,12 +798,17 @@ function conversationForMatch(matchId) {
   return db.prepare('SELECT * FROM conversations WHERE id = ?').get(Number(result.lastInsertRowid));
 }
 
+/**
+ * Adiciona um participante à conversa. `INSERT OR IGNORE` torna a operação
+ * idempotente. `last_read_at` começa em 0, ou seja, "nada lido ainda".
+ */
 function addConversationMember(conversationId, userId) {
   db.prepare(
     'INSERT OR IGNORE INTO conversation_members (conversation_id, user_id, last_read_at, created_at) VALUES (?, ?, 0, ?)'
   ).run(conversationId, userId, now());
 }
 
+/** Lista os participantes da conversa com dados básicos do usuário. */
 function conversationMembers(conversationId) {
   return db
     .prepare(
@@ -671,12 +819,19 @@ function conversationMembers(conversationId) {
     .all(conversationId);
 }
 
+/** Verifica se o usuário participa da conversa — base da autorização de leitura. */
 function isConversationMember(conversationId, userId) {
   return !!db
     .prepare('SELECT 1 AS ok FROM conversation_members WHERE conversation_id = ? AND user_id = ?')
     .get(conversationId, userId);
 }
 
+/**
+ * Quebra todos os vínculos ao bloquear alguém.
+ * Remove seguimentos (nos dois sentidos), solicitações pendentes e encerra
+ * matches ativos, além de apagar os consentimentos de localização do match.
+ * Isso garante que o bloqueio encerra também o Radar e as conversas de match.
+ */
 function blockRelationships(blockerId, blockedId) {
   db.prepare('DELETE FROM follows WHERE (follower_id = ? AND following_id = ?) OR (follower_id = ? AND following_id = ?)').run(
     blockerId,
@@ -700,12 +855,28 @@ function blockRelationships(blockerId, blockedId) {
   }
 }
 
+/**
+ * Limitador de requisições em memória.
+ * `bucket` separa categorias (ex.: 'register', 'login', 'dating'),
+ * `max` é o número permitido e `windowMs` a janela deslizante.
+ *
+ * ATENÇÃO: a chave é `bucket + endereço IP`. Como o servidor escuta apenas em
+ * 127.0.0.1 por padrão, todos os usuários locais compartilham o mesmo balde.
+ * Na migração para Django/PostgreSQL isso deve virar um contador persistido
+ * por usuário + IP.
+ */
 const RATE_BUCKETS = new Map();
 
+/** Identificador do cliente para fins de rate limit (endereço remoto). */
 function clientKey(req) {
   return req.socket.remoteAddress || 'unknown';
 }
 
+/**
+ * Aplica o limite de requisições. Lança `HttpError(429)` quando excedido.
+ * Quando o mapa cresce demais, remove entradas expiradas para conter o consumo
+ * de memória (a limpeza só roda acima de 5000 chaves).
+ */
 function rateLimit(req, bucket, max, windowMs) {
   const key = `${bucket}:${clientKey(req)}`;
   const timestamp = now();
@@ -726,6 +897,14 @@ function rateLimit(req, bucket, max, windowMs) {
   }
 }
 
+/**
+ * Proteção CSRF baseada em Same-Origin.
+ * Compara o host do header `Origin` com o header `Host` da requisição.
+ *
+ * ATENÇÃO: requisições SEM header `Origin` são liberadas (`if (!origin) return`).
+ * Navegadores modernos enviam `Origin` em POST, mas clientes não-browser
+ * (curl, scripts) não. Na migração, usar token CSRF do Django/DRF.
+ */
 function assertSameOrigin(req) {
   const origin = req.headers.origin;
   if (!origin) return;

@@ -1,4 +1,28 @@
 /* Vibra - núcleo do cliente: estado, helpers, navegação e componentes comuns. */
+/**
+ * Vibra – núcleo do cliente.
+ *
+ * Este arquivo exporta:
+ *  • `state` – objeto global de aplicação contendo configuração, usuário, dados
+ *  de navegação e timings.
+ *  • helpers de DOM (`$`, `$$`).
+ *  • SVGs (`icon`, `hydrateIcons`).
+ *  • utilitários de dados (`esc`, `formatCount`, …).
+ *  • API wrapper (`api`).
+ *  • notificações (`toast`).
+ *  • gerenciamento de modal e diálogo (`openModal`, `closeModal`, `confirmDialog`).
+ *  • temática e regras de UI (`applyTheme`, `toggleTheme`, `initTheme`).
+ *  • navegação (`registerView`, `navigate`, …).
+ *
+ * O fluxo normal é:
+ *   1. `state` inicia com valores padrão.
+ *   2. `api` carrega dados de backend.
+ *   3. `enterApp` mostra a shell e carrega a primeira view.
+ *   4. `navigate` troca views e re-hidrata SVGs.
+ *
+ * Os outros módulos (`social.js`, `messages.js`, `dating.js`) são registrados
+ * via `registerView` em `main.js`.
+ */
 
 export const $ = (selector, root = document) => root.querySelector(selector);
 export const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -88,10 +112,25 @@ const ICONS = {
   filter: '<path d="M3.5 5.5h17l-6.5 7.5v5.5l-4 1.5v-7z"/>',
 };
 
+/**
+ * Cria um elemento SVG inline a partir do mapa de ícones.
+ *
+ * @param {string} name - Nome do ícone presente em `ICONS`.
+ * @param {number} [size=24] - Largura e altura a serem aplicadas ao SVG.
+ * @returns {string} Markup SVG pronto para inserção em innerHTML.
+ */
 export function icon(name, size = 24) {
   return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ICONS.info}</svg>`;
 }
 
+/**
+ * Substitui elementos com `data-icon` pelo SVG correspondente.
+ *
+ * O mapa `ICONS` guarda apenas o conteúdo interno dos SVGs; este helper
+ * cria o elemento completo e injeta o resultado no lugar de cada placeholder.
+ *
+ * @param {ParentNode} [root=document] - Raiz onde os placeholders serão procurados.
+ */
 export function hydrateIcons(root = document) {
   $$('[data-icon]', root).forEach((element) => {
     element.innerHTML = icon(element.dataset.icon);
@@ -102,6 +141,15 @@ export function hydrateIcons(root = document) {
 /* Utilidades                                                         */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Escapa texto destinado à interpolação em `innerHTML`.
+ *
+ * Converte `&`, `<`, `>`, `"` e `'` nas entidades HTML correspondentes para
+ * impedir que conteúdo vindo da API seja interpretado como marcação.
+ *
+ * @param {*} value - Valor a ser normalizado em string e escapado.
+ * @returns {string} String segura para inserção em HTML.
+ */
 export function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({
     '&': '&amp;',
@@ -112,6 +160,12 @@ export function esc(value) {
   }[character]));
 }
 
+/**
+ * Formata números grandes de forma compacta para a interface.
+ *
+ * @param {*} value - Quantidade numérica recebida do backend.
+ * @returns {string} Número abreviado em português ou seu valor textual.
+ */
 export function formatCount(value) {
   const number = Number(value) || 0;
   if (number >= 1000000) return `${(number / 1000000).toFixed(1).replace('.', ',')} mi`;
@@ -119,10 +173,24 @@ export function formatCount(value) {
   return String(number);
 }
 
+/**
+ * Escolhe a forma singular ou plural de um rótulo.
+ *
+ * @param {*} value - Valor usado para decidir a concordância.
+ * @param {string} singular - Forma no singular.
+ * @param {string} pluralForm - Forma no plural.
+ * @returns {string} A forma correspondente ao valor.
+ */
 export function plural(value, singular, pluralForm) {
   return Number(value) === 1 ? singular : pluralForm;
 }
 
+/**
+ * Converte timestamp em texto relativo ("agora", "5 min", "2 d", etc).
+ *
+ * @param {number} timestamp - Marca de tempo em milissegundos.
+ * @returns {string} Texto relativamente ao momento atual, em português.
+ */
 export function relTime(timestamp) {
   if (!timestamp) return '';
   const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
@@ -136,16 +204,36 @@ export function relTime(timestamp) {
   return new Date(timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 
+/**
+ * Formata uma data completa no padrão brasileiro.
+ *
+ * @param {number} timestamp - Marca de tempo em milissegundos.
+ * @returns {string} Data por extenso com dia, mês e ano.
+ */
 export function longDate(timestamp) {
   if (!timestamp) return '';
   return new Date(timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
+/**
+ * Extrai até duas iniciais do nome ou usuário informado.
+ *
+ * @param {Object} user - Usuário com `name` ou `username`.
+ * @returns {string} Iniciais em letras maiúsculas.
+ */
 export function initialsFor(user) {
   const source = (user.name || user.username || '?').trim();
   return source.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
+/**
+ * Gera o markup do avatar, usando imagem ou iniciais como fallback.
+ *
+ * @param {Object|null} user - Usuário cujo avatar será renderizado.
+ * @param {number} [size=36] - Tamanho quadrado em pixels.
+ * @param {string} [className=''] - Classes CSS adicionais.
+ * @returns {string} Markup de imagem ou span com as iniciais.
+ */
 export function avatar(user, size = 36, className = '') {
   if (!user) return '';
   if (user.avatar) {
@@ -154,16 +242,36 @@ export function avatar(user, size = 36, className = '') {
   return `<span class="avatar avatar-fallback ${className}" style="width:${size}px;height:${size}px;font-size:${Math.max(10, Math.round(size * 0.38))}px" aria-hidden="true">${esc(initialsFor(user))}</span>`;
 }
 
+/**
+ * Obtém o rótulo de um interesse a partir do identificador.
+ *
+ * @param {string} id - Identificador do interesse.
+ * @returns {string} Rótulo configurado ou o próprio identificador.
+ */
 export function interestLabel(id) {
   return state.config.interests.find((item) => item.id === id)?.label || id;
 }
 
+/**
+ * Renderiza uma lista de interesses como chips estáticos.
+ *
+ * @param {string[]} ids - Identificadores dos interesses.
+ * @param {string} [className=''] - Classes CSS adicionais.
+ * @returns {string} Markup dos chips ou string vazia.
+ */
 export function interestChips(ids, className = '') {
   const list = (ids || []).map((id) => interestLabel(id)).filter(Boolean);
   if (!list.length) return '';
   return `<div class="chips ${className}">${list.map((label) => `<span class="chip chip-static">${esc(label)}</span>`).join('')}</div>`;
 }
 
+/**
+ * Gera markup de mídia para uma publicação (imagem ou vídeo).
+ *
+ * @param {Object} post - Objeto contendo `image` e `mediaType`.
+ * @param {string} [alt=''] - Texto alternativo.
+ * @returns {string} Tag `<img>` ou `<video>` apropriada.
+ */
 export function mediaMarkup(post, alt = '') {
   const label = esc(alt || post.caption || 'Publicação');
   if (post.mediaType === 'video') {
@@ -172,6 +280,12 @@ export function mediaMarkup(post, alt = '') {
   return `<img src="${esc(post.image)}" alt="${label}" loading="lazy" />`;
 }
 
+/**
+ * Cria um estado vazio reutilizável para listas e áreas sem conteúdo.
+ *
+ * @param {Object} options - Opções de título, texto, ícone e ação.
+ * @returns {string} Markup do estado vazio.
+ */
 export function emptyState({ iconName = 'compass', title, text, action = '' }) {
   return `<div class="empty-state">
     <div class="empty-icon">${icon(iconName, 30)}</div>
@@ -181,6 +295,12 @@ export function emptyState({ iconName = 'compass', title, text, action = '' }) {
   </div>`;
 }
 
+/**
+ * Retorna um bloco de carregamento genérico.
+ *
+ * @param {string} [label='Carregando...'] - Texto exibido no spinner.
+ * @returns {string} Markup HTML do bloco de carga.
+ */
 export function loadingBlock(label = 'Carregando...') {
   return `<div class="page-loading" role="status">
     <span class="spinner" aria-hidden="true"></span>
@@ -188,6 +308,12 @@ export function loadingBlock(label = 'Carregando...') {
   </div>`;
 }
 
+/**
+ * Controla estado visual e acessível de um botão durante uma operação.
+ *
+ * @param {HTMLButtonElement|null} button - Botão a ser atualizado.
+ * @param {boolean} isBusy - Indica início ou fim da operação.
+ */
 export function setBusy(button, isBusy) {
   if (!button) return;
   if (isBusy) {
