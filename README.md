@@ -6,9 +6,23 @@ O escopo completo e o histórico de cada alteração ficam em [`FUNCIONALIDADES.
 
 ![Início do Vibra](qa/final-feed.png)
 
-## Como rodar
+Repositório: [`github.com/oixeol/Rede-social`](https://github.com/oixeol/Rede-social)
 
-Requisitos: **Node.js 22.5 ou superior**. O projeto não tem dependências externas e usa o SQLite nativo do Node (`node:sqlite`).
+## Estado atual
+
+> **A aplicação funcional hoje é a implementação em Node.js, com SQLite nativo.** O PostgreSQL já está preparado no Docker e o backend em Django/DRF está em fase de migração; ele ainda não substitui a API Node em execução.
+
+| Componente | Estado | Observações |
+| --- | --- | --- |
+| Aplicação web e API Node.js | **Funcional** | Servidor HTTP, API JSON, frontend HTML/CSS/JavaScript e SQLite nativo. |
+| PostgreSQL 18.6 | **Pronto para uso local** | Container com healthcheck e volume persistente `vibra_postgres_data`. |
+| Backend Django 5.2 + DRF | **Em preparação** | Configuração inicial criada; apps, modelos, rotas e migrações ainda serão implementados. |
+| Testes automatizados | **Disponíveis** | Suítes de fumaça, configuração, Namoro e retenção executadas pelo Node. |
+| Documentação do código | **Atualizada** | Comentários em português e JSDoc nas funções principais do backend e do frontend. |
+
+## Como rodar a aplicação atual
+
+Requisitos: **Node.js 22.5 ou superior**. A implementação atual do servidor não tem dependências npm externas e usa o SQLite nativo do Node (`node:sqlite`).
 
 ```powershell
 cd C:\Vibe
@@ -32,6 +46,94 @@ $env:PORT=8080; npm start
 ```
 
 > O Node pode exibir um aviso de que `node:sqlite` é experimental. Isso é esperado e não impede o funcionamento.
+
+### Executar em segundo plano no Windows
+
+Para manter o servidor disponível depois que o terminal for fechado, abra um novo PowerShell e execute:
+
+```powershell
+cd C:\Vibe
+Start-Process node -ArgumentList 'server.js'
+```
+
+Verifique se a porta está ativa:
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:4173/ -UseBasicParsing
+```
+
+Para encerrar o processo nessa máquina:
+
+```powershell
+Get-NetTCPConnection -LocalPort 4173 -State Listen |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess }
+```
+
+## Banco PostgreSQL local
+
+O projeto inclui uma configuração do **PostgreSQL 18.6** para a futura API Django. Ela é orquestrada pelo Docker Compose e os dados ficam no volume persistente `vibra_postgres_data`.
+
+Requisitos: Docker Desktop ou Docker Engine com suporte ao Compose v2.
+
+```powershell
+cd C:\Vibe
+docker compose up -d postgres
+docker compose ps
+```
+
+Quando o healthcheck estiver saudável, o banco estará disponível com os seguintes valores padrão:
+
+| Configuração | Valor padrão |
+| --- | --- |
+| Host | `127.0.0.1` |
+| Porta | `5432` |
+| Banco | `vibra` |
+| Usuário | `vibra` |
+| Senha | `vibra_dev_password` |
+
+A URL usada pelo Django é:
+
+```text
+postgresql://vibra:vibra_dev_password@127.0.0.1:5432/vibra
+```
+
+Os valores podem ser alterados com `VIBRA_DB_NAME`, `VIBRA_DB_USER`, `VIBRA_DB_PASSWORD` e `VIBRA_DB_PORT`. Esses dados são apenas para desenvolvimento; use segredos próprios fora da máquina local.
+
+Comandos úteis:
+
+```powershell
+docker compose ps                 # estado e healthcheck
+docker compose logs -f postgres  # logs do banco
+docker compose stop postgres     # parar, preservando o volume
+docker compose down              # remover o container, preservando o volume
+docker compose down -v           # remover container e dados persistidos
+```
+
+> `docker compose down -v` apaga o banco. Use apenas quando quiser começar do zero.
+
+## Backend Django em preparação
+
+A pasta `backend/` contém a base do futuro backend com Django 5.2 e Django REST Framework. As dependências já estão declaradas em `backend/requirements.txt` e o ambiente virtual local pode ser criado assim:
+
+```powershell
+cd C:\Vibe
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+```
+
+A configuração inicial está em `backend/vibra/settings.py`. Ela já contempla:
+
+- sessão e cookies seguros;
+- CORS restrito aos frontends locais;
+- autenticação por sessão do Django;
+- arquivos estáticos e uploads em `backend/staticfiles/` e `backend/media/`;
+- PostgreSQL por `DATABASE_URL`, com SQLite como fallback local;
+- isolamento por idioma `pt-br` e fuso horário configurável.
+
+**Status:** a migração ainda está em andamento. Os apps `accounts`, `social`, `messaging` e `dating`, o modelo de usuário, as URLs, os serializers e as migrations ainda precisam ser criados. Portanto, `python backend/manage.py runserver` ainda não representa a API disponível.
+
+A direção planejada é portar o contrato do `server.js` para Django/DRF e usar o PostgreSQL como persistência principal, mantendo a interface web compatível durante a transição.
 
 ## As cinco áreas
 
