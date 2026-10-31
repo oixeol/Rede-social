@@ -1,0 +1,23 @@
+# Normalização de fim de linha. O projeto usa LF em todos os arquivos.
+* text=auto eol=lf
+
+# Arquivos Windows que devem manter CRLF nativo.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binários: nunca converter.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.svg text eol=lf
+*.mp4 binary
+*.webm binary
+*.woff binary
+*.woff2 binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
