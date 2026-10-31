@@ -1,4 +1,15 @@
 /* Vibra - Namoro: verificação, descoberta, curtidas e matches. */
+/**
+ * Sistema de Namoro do Vibra.
+ *
+ * Propósito: orchestrar a experiência de encontros verificados, incluindo o gate
+ * obrigatório de verificação de identidade e idade 18+, a descoberta de candidatos,
+ * as curtidas, os matches confirmados e as ações de perfil.
+ *
+ * Abas disponíveis: Descobrir, Matches, Perfil e Radar. A renderização de Perfil e
+ * Radar é delegada a `dating-profile.js`, que também controla o questionário parcial
+ * e o compartilhamento bilateral de localização.
+ */
 
 import {
   $,
@@ -29,6 +40,7 @@ import {
   handleSubmit as handleProfileSubmit,
 } from './dating-profile.js';
 
+/* Textos de exibição para cada status de verificação. */
 const STATUS_COPY = {
   not_started: {
     label: 'Não verificado',
@@ -53,10 +65,21 @@ const STATUS_COPY = {
   },
 };
 
+/**
+ * Obtém textos amigáveis para um status de verificação.
+ *
+ * @param {string} status Código do status.
+ * @returns {{label: string, text: string}} Rótulo e descrição.
+ */
 function statusInfo(status) {
   return STATUS_COPY[status] || STATUS_COPY.not_started;
 }
 
+/**
+ * Exibe aviso quando a verificação está em modo de simulação.
+ *
+ * @returns {string} Markup do badge ou string vazia.
+ */
 function simulationBadge() {
   if (!state.config.identity.simulation && state.config.identity.mode !== 'dev') return '';
   return `<span class="dating-sim-badge">${icon('alert', 13)} Simulação de desenvolvimento</span>`;
@@ -66,6 +89,15 @@ function simulationBadge() {
 /* Entrada da área                                                    */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Renderiza a área de Namoro.
+ *
+ * Aplica o gate de verificação 18+/identidade antes de exibir as abas.
+ * Delega Perfil e Radar para `dating-profile.js`.
+ *
+ * @param {HTMLElement} viewElement Elemento da página.
+ * @param {Object} params Parâmetros de navegação, incluindo `tab`.
+ */
 export async function renderDating(viewElement, params = {}) {
   if (params.tab) state.dating.tab = params.tab;
   const status = await api('/api/dating/status');
@@ -138,6 +170,15 @@ export async function renderDating(viewElement, params = {}) {
 /* Verificação                                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Renderiza o gate obrigatório de verificação de identidade e idade 18+.
+ *
+ * `not_started`, `rejected`, `needs_review` e `expired` permitem reenvio;
+ * `in_review` mostra aguardo; `approved` libera o acesso normal.
+ *
+ * @param {HTMLElement} viewElement Elemento da página.
+ * @param {object} status Estado de verificação devolvido pelo backend.
+ */
 function renderGate(viewElement, status) {
   const verification = status.verification;
   const info = statusInfo(verification.status);
@@ -276,6 +317,15 @@ function onboardingCard(status, reason = '') {
   </section>`;
 }
 
+/**
+ * Renderiza a aba "Descobrir" com perfis recomendados.
+ *
+ * Exibe o onboarding se o perfil não estiver completo ou o questionário requerido.
+ * Caso contrário, faz a chamada API `/api/dating/discover` e monta a grade de cards.
+ *
+ * @param {HTMLElement} container Elemento onde a lista será montada.
+ * @param {object} status Estado atual de namoro.
+ */
 export async function renderDiscover(container, status) {
   if (!status.profileComplete) {
     container.innerHTML = onboardingCard(status, status.profile && status.profile.paused ? 'paused' : '');
@@ -329,6 +379,15 @@ export async function renderDiscover(container, status) {
   hydrateIcons(container);
 }
 
+/**
+ * Renderiza um card de candidato em Descobrir.
+ *
+ * Mostra foto, idade, interesses em comum e barra de afinidade estimada.
+ * Não representa um match confirmado; a reciprocidade só existe após o like.
+ *
+ * @param {object} profile Candidato retornado por `/api/dating/discover`.
+ * @returns {string} Markup HTML do card.
+ */
 function datingCard(profile) {
   const photo = profile.photos && profile.photos.length ? profile.photos[0] : null;
   const age = profile.age ? `${profile.age} anos` : '';
@@ -374,6 +433,11 @@ function datingCard(profile) {
 /* Matches                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Exibe a aba "Matches" mostrando os matches confirmados.
+ *
+ * @param {HTMLElement} container Elemento onde os cards serão montados.
+ */
 export async function renderMatchesTab(container) {
   container.innerHTML = `<div class="dating-loading">${icon('heart', 24)}<span>Carregando matches...</span></div>`;
   const data = await api('/api/dating/matches');
@@ -389,6 +453,15 @@ export async function renderMatchesTab(container) {
   hydrateIcons(container);
 }
 
+/**
+ * Renderiza um card de match confirmado.
+ *
+ * Diferente de `datingCard`, exibe ações de conversa, Radar, denúncia, bloqueio e
+ * desfazimento porque existe reciprocidade entre as duas pessoas.
+ *
+ * @param {object} match Match confirmado.
+ * @returns {string} Markup HTML do card.
+ */
 function matchCard(match) {
   const photo = match.profile && match.profile.photos && match.profile.photos.length
     ? match.profile.photos[0]
@@ -431,6 +504,11 @@ function matchCard(match) {
 /* Ações                                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Remove um card de candidato da grade após uma ação.
+ *
+ * @param {string} username Usuário do candidato.
+ */
 function removeDatingCard(username) {
   const card = $(`[data-dating-card="${window.CSS && CSS.escape ? CSS.escape(username) : username}"]`);
   if (card) card.remove();
@@ -452,12 +530,27 @@ function removeDatingCard(username) {
   }
 }
 
+/**
+ * Localiza um candidato na lista de descoberta carregada no estado.
+ *
+ * @param {string} username Nome de usuário do candidato.
+ * @returns {object|undefined} Perfil encontrado, se houver.
+ */
 function findProfile(username) {
   return (state.dating.discover?.profiles || []).find(
     (profile) => profile.user.username.toLowerCase() === username.toLowerCase()
   );
 }
 
+/**
+ * Registra like ou pass em um candidato.
+ *
+ * Um like pode gerar match implícito quando a outra pessoa também demonstrou
+ * interesse; nesse caso a modal de match é exibida.
+ *
+ * @param {string} username Nome de usuário do candidato.
+ * @param {'like'|'pass'} action Ação escolhida.
+ */
 async function datingInterest(username, action) {
   const profile = findProfile(username);
   const card = $(`[data-dating-card="${window.CSS && CSS.escape ? CSS.escape(username) : username}"]`);
@@ -487,6 +580,12 @@ async function datingInterest(username, action) {
   }
 }
 
+/**
+ * Exibe a modal quando o match é confirmado.
+ *
+ * @param {object} match Dados do match.
+ * @param {object} profile Dados do perfil do match.
+ */
 function openMatchModal(match, profile) {
   const name = profile ? profile.user.name : 'Você';
   const photo = profile ? (profile.photos[0] || profile.user.avatar) : null;
@@ -511,6 +610,14 @@ function openMatchModal(match, profile) {
   });
 }
 
+/**
+ * Desfaz um match após confirmação explícita.
+ *
+ * Encerrar o match impede novas mensagens na conversa e cancela o compartilhamento
+ * de Radar; o histórico da conversa é preservado.
+ *
+ * @param {number} matchId ID do match.
+ */
 async function unmatch(matchId) {
   const confirmed = await confirmDialog({
     title: 'Desfazer este match?',

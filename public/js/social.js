@@ -1,5 +1,19 @@
 /* Vibra - rede social: início, explorar, perfis, publicações e stories. */
 
+/**
+ * Módulo social.js – renderiza as três telas principais: Início, Explorar e Perfil.
+ * As requisições são feitas por `api()` e o HTML é montado por modelos de string.
+ *
+ * Exports:
+ *   * `renderHome`, `renderExplore` e `renderProfile`: telas renderizadas pelo roteador.
+ *   * Helpers de publicação, carrossel, curtidas e comentários, consumidos por `social-actions.js`.
+ *   * Helpers de stories e cards, também reutilizados por `messages.js` ao montar conteúdo social.
+ *
+ * Dependências de `core.js`: o estado compartilhado `state`, o cliente `api()`, a navegação `navigate()`,
+ * os modais `openModal()`/`closeModal()` e avisos `toast()`. Açõesdelegadas usam `data-action` para que
+ * `social-actions.js` aplique os efeitos; conteúdo vindo de usuários é escapado com `esc()` para evitar XSS.
+ */
+
 import {
   $,
   $$,
@@ -29,10 +43,27 @@ import {
   addTimer,
 } from './core.js';
 
+/**
+ * Converte uma legenda em HTML seguro, preservando as quebras de linha.
+ * `esc()` neutraliza caracteres especiais antes da inserção no DOM para impedir XSS.
+ *
+ * @param {string} text Texto da legenda.
+ * @returns {string} HTML com quebras de linha representedas por `<br />`.
+ */
 function captionHtml(text) {
   return esc(text).replace(/\n/g, '<br />');
 }
 
+/**
+ * Cria o botão de seguir para os estados de relacionamento possíveis.
+ * O rótulo e a classe CSS refletem quatro situações: seguindo, solicitação enviada,
+ * perfil privado (solicitar) e perfil público normal (seguir). Os atributos `data-*`
+ * permitem que `social-actions.js` interprete a ação sem consultar novamente a API.
+ *
+ * @param {Object} user Usuário alvo.
+ * @param {string} [extra] Classes CSS adicionais.
+ * @returns {string} Markup do botão de seguir.
+ */
 export function followButton(user, extra = '') {
   const following = !!user.isFollowing;
   const requested = !!user.followRequested;
@@ -48,12 +79,28 @@ export function followButton(user, extra = '') {
   return `<button type="button" class="btn ${style}${extra ? ` ${extra}` : ''}" data-action="follow" data-username="${esc(user.username)}" data-following="${following}" data-requested="${requested}" data-private="${isPrivate}">${label}</button>`;
 }
 
+/**
+ * Normaliza a coleção de mídias de uma publicação.
+ * Publicações legadas podem ter apenas `image`; nesse caso, cria uma lista sintética
+ * para que os demais helpers tratem imagens e vídeos de maneira uniforme.
+ *
+ * @param {Object} post Publicação recebida da API.
+ * @returns {Array<Object>} Lista de itens com `url` e `mediaType`.
+ */
 function postMedia(post) {
   return Array.isArray(post.media) && post.media.length
     ? post.media
     : [{ url: post.image, mediaType: post.mediaType || 'image' }];
 }
 
+/**
+ * Gera a miniatura usada nos grids de Explorar e Perfil.
+ * Vídeos são renderizados sem controles e imagens recebem `loading="lazy"` para
+ * adiar o carregamento de conteúdo fora da viewport.
+ *
+ * @param {Object} post Publicação de origem.
+ * @returns {string} Markup da miniatura.
+ */
 function thumbMarkup(post) {
   const [cover] = postMedia(post);
   if (cover.mediaType === 'video') {
@@ -62,6 +109,18 @@ function thumbMarkup(post) {
   return `<img src="${esc(cover.url)}" alt="${esc(post.caption || 'Publicação')}" loading="lazy" />`;
 }
 
+/**
+ * Monta o carrossel de mídias de uma publicação.
+ * Cada item vira um slide; a primeira imagem usa `loading="eager"` para aparecer
+ * imediatamente, enquanto as demais são preguiçosas. Indicadores (`dots`) refletem
+ * o slide inicial. A opção `modal: true` adiciona a classe de variante para o modal
+ * e habilita controles nos vídeos; `modal: false` mantém o vídeo silencioso e inline.
+ *
+ * @param {Object} post Publicização que pode conter várias mídias.
+ * @param {Object} [options] Opções de renderização.
+ * @param {boolean} [options.modal=false] Indica renderização dentro de modal.
+ * @returns {string} Markup do carrossel ou string vazia se houver menos de duas mídias.
+ */
 export function carouselMarkup(post, { modal = false } = {}) {
   const media = postMedia(post);
   if (media.length < 2) return '';
@@ -81,6 +140,14 @@ export function carouselMarkup(post, { modal = false } = {}) {
   </div>`;
 }
 
+/**
+ * Sincroniza o estado visual do carrossel com o índice informado.
+ * Atualiza o contador e os dots ativos, além de desabilitar a navegação nas
+ * extremidades, de modo que o slide ativo e seus indicadores permaneçam coerentes.
+ *
+ * @param {HTMLElement} carousel Elemento raiz `[data-carousel]`.
+ * @param {number} index Índice desejado do slide.
+ */
 function updateCarousel(carousel, index) {
   const slides = [...carousel.querySelectorAll('[data-carousel-slide]')];
   if (!slides.length) return;
@@ -100,6 +167,14 @@ function updateCarousel(carousel, index) {
   if (next) next.disabled = safe === slides.length - 1;
 }
 
+/**
+ * Move o carrossel para o slide anterior ou seguinte.
+ * O deslocamento horizontal é calculado pela largura da trilha e a transição
+ * é suave, exceto quando o usuário pediu movimento reduzido no sistema.
+ *
+ * @param {HTMLElement} target Elemento que originou a ação.
+ * @param {number} direction Deslocamento: `-1` para voltar e `1` para avançar.
+ */
 export function carouselStep(target, direction) {
   const carousel = target.closest('[data-carousel]');
   const track = carousel?.querySelector('[data-carousel-track]');
@@ -152,7 +227,17 @@ function feedVideoMarkup(post) {
   </div>`;
 }
 
+/**
+ * Renderiza um card de publicação completo, usado no feed.
+ * Escolhe entre carrossel, vídeo ou imagem e conecta as ações de curtir,
+ * comentar, compartilhar, abrir e denunciar por atributos `data-action`.
+ *
+ * @param {Object} post Publicação retornada pela API.
+ * @returns {string} Markup HTML do card.
+ */
 function postCard(post) {
+  // O conteúdo editorial é inserido diretamente no template; por isso todo texto,
+  // nome e atributo proveniente do usuário precisa passar por `esc()`.
   const mine = state.me && post.user.id === state.me.id;
   const media = postMedia(post);
   const cover = media.length > 1
@@ -231,6 +316,15 @@ function exploreCard(post) {
     </button>`;
 }
 
+/**
+ * Monta a linha visual de um comentário.
+ * O botão de remoção aparece apenas quando `canDelete` é verdadeiro; o texto,
+ * o nome de usuário e os atributos interleados são escapados para evitar XSS.
+ *
+ * @param {Object} comment Comentário retornado pela API.
+ * @param {boolean} canDelete Indica se o botão de apagar pode ser exibido.
+ * @returns {string} Markup HTML da linha de comentário.
+ */
 export function commentRow(comment, canDelete) {
   return `
     <div class="comment-bubble" data-comment-id="${comment.id}">
@@ -279,6 +373,14 @@ export async function toggleLike(postId) {
   }
 }
 
+/**
+ * Atualiza os contadores de comentários exibidos no ticker do post.
+ * Garante que a UI esteja sincronizada com o estado interno e re‑renderiza
+ * os botões de “ver comentários”.
+ *
+ * @param {number|string} postId Identificador da publicação.
+ * @param {number} total Número atual de comentários.
+ */
 export function adjustCommentTotals(postId, total) {
   $$(`[data-comment-count="${postId}"]`).forEach((element) => {
     element.textContent = formatCount(total);
@@ -297,6 +399,20 @@ export function adjustCommentTotals(postId, total) {
 /* Início                                                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Renderiza a tela inicial (feed) do social.
+ *
+ * Operações realizadas:
+ *   1. Constrói o layout do "mural" (header, spinner, grid).
+ *   2. Recupera o feed via `/api/feed` (padrão) – paginado/segmentado.
+ *   3. Trata pré‑renderização de loading e espera a resposta.
+ *   4. Atualiza a contagem de likes, comentários, e chama `fetchMoreFeed`
+ *      quando o usuário scrollear (não há scroll por conta de `window.scroll`)
+ *      então apenas chama o fetch do feed.
+ *
+ * A estrutura do markup corresponde ao template usado por `postCard`.
+ * @param {HTMLElement} viewElement elemento onde o conteúdo será injetado.
+ */
 export async function renderHome(viewElement) {
   const rawToday = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
   const today = rawToday.charAt(0).toUpperCase() + rawToday.slice(1);

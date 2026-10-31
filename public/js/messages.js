@@ -1,4 +1,15 @@
 /* Vibra - mensagens sociais e conversas de match. */
+/**
+ * Sistema de mensagens do Vibra.
+ *
+ * Trata de conversas sociais e de matches de namoro.
+ *
+ * Endpoints utilizados:
+ *   - GET /api/conversations           → lista de conversas
+ *   - GET /api/conversations/:id      → thread completa
+ *   - POST /api/conversations/:id/messages
+ * Polling: a cada 10 segundos, se a quantidade de mensagens mudou a thread é atualizada
+ */
 
 import {
   $,
@@ -22,18 +33,44 @@ import {
 } from './core.js';
 import { openReportModal, blockUser, openPost } from './social-actions.js';
 
+/**
+ * Retorna rótulo de conversa.
+ *
+ * @param {string} kind Tipo de conversa: 'dating' ou 'social'.
+ * @returns {string} Rótulo exibido na UI.
+ */
 function kindLabel(kind) {
   return kind === 'dating' ? 'Match' : 'Social';
 }
 
+/**
+ * Resume a última mensagem de uma conversa.
+ *
+ * @param {object} conversation Conversa do estado.
+ * @returns {string} Texto, aviso de post compartilhado ou mensagem padrão.
+ */
 function lastMessageText(conversation) {
+  // Sem histórico: a prévia convida a iniciar uma conversa.
   if (!conversation.lastMessage) return 'Comece a conversa.';
+  // Caso normal: mostra o corpo textual da última mensagem.
   if (conversation.lastMessage.body) return conversation.lastMessage.body;
+  // Caso de post compartilhado: não há corpo, mas há referência a uma publicação.
   if (conversation.lastMessage.sharedPostId) return 'Compartilhou uma publicação.';
+  // Fallback para mensagens sem corpo textual nem post compartilhado.
   return 'Mensagem';
 }
 
+/**
+ * Renderiza a linha de conversa na lista.
+ *
+ * Inclui avatar, nome, horário, pré-visualização, contador de não lidas e destaque de conversa ativa.
+ *
+ * @param {object} conversation Dados da conversa.
+ * @param {number|null} activeId ID do ID da conversa ativa.
+ * @returns {string} Markup HTML.
+ */
 function conversationItem(conversation, activeId) {
+  // A conversa ativa recebe a classe "active" para destacar a seleção atual.
   const active = conversation.id === activeId;
   return `
     <button type="button" class="conversation-item ${active ? 'active' : ''}" data-action="open-conversation" data-id="${conversation.id}">
@@ -52,6 +89,14 @@ function conversationItem(conversation, activeId) {
     </button>`;
 }
 
+/**
+ * Exibe uma etiqueta de data para um carimbo de tempo.
+ *
+ * Se for hoje retorna "Hoje", ontem "Ontem" ou uma data formatada.
+ *
+ * @param {number} timestamp DataUTC em milissegundos.
+ * @returns {string}
+ */
 function dayLabel(timestamp) {
   const date = new Date(timestamp);
   const today = new Date();
@@ -63,6 +108,12 @@ function dayLabel(timestamp) {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
 }
 
+/**
+ * Desenha uma bolha de mensagem.
+ *
+ * @param {object} message Objeto da mensagem com texto, post compartilhado e metadados.
+ * @returns {string} Markup HTML da bolha.
+ */
 function messageBubble(message) {
   const shared = message.sharedPost;
   return `
@@ -82,6 +133,12 @@ function messageBubble(message) {
     </div>`;
 }
 
+/**
+ * Monta a lista de mensagens com separadores de dia.
+ *
+ * @param {Array<object>} messages Mensagens ordenadas da thread.
+ * @returns {string} Markup HTML da lista.
+ */
 function messagesList(messages) {
   let lastDay = '';
   const rows = [];
@@ -96,6 +153,16 @@ function messagesList(messages) {
   return rows.join('');
 }
 
+/**
+ * Monta a marcação completa da thread.
+ *
+ * @param {object} conversation Dados da conversa.
+ * @param {object} other Usuário pelo outro lado da conversa.
+ * @param {Array<object>} messages Mensagens da thread.
+ * @param {boolean} canSend Se pode enviar novas mensagens.
+ * @param {string|null} reason Motivo para bloqueio, se houver.
+ * @returns {string} Markup HTML da thread.
+ */
 function threadMarkup(conversation, other, messages, canSend, reason) {
   const reasonText = reason === 'match_ended'
     ? 'Este match foi encerrado. O histórico continua visível, mas novas mensagens estão desativadas.'
@@ -132,6 +199,14 @@ function threadMarkup(conversation, other, messages, canSend, reason) {
   `;
 }
 
+/**
+ * Renderiza a página de mensagens.
+ *
+ * Gerencia a lista de conversas, a thread aberta, polling e atualizações de não lidas.
+ *
+ * @param {HTMLElement} viewElement Elemento container da página.
+ * @param {Object} params Parâmetros de navegação, pode conter `conversation`.
+ */
 export async function renderMessages(viewElement, params = {}) {
   const activeId = params.conversation ? Number(params.conversation) : null;
   state.activeConversation = activeId;
@@ -249,6 +324,7 @@ async function refreshUnread() {
   }
 }
 
+/* Atualiza a thread adicionando uma nova mensagem sem recarregar */
 function appendMessage(message) {
   const container = $('#thread-messages');
   if (!container) return;
@@ -258,6 +334,7 @@ function appendMessage(message) {
   container.scrollTop = container.scrollHeight;
 }
 
+/* Atualiza a prévia da conversa sem recarregar a lista inteira */
 function updateConversationPreview(conversationId, text) {
   const conversation = state.conversations.find((item) => item.id === conversationId);
   if (!conversation) return;
@@ -273,6 +350,7 @@ function updateConversationPreview(conversationId, text) {
   }
 }
 
+// Gerencia ações de UI na página de mensagens, como abrir chat, reportar e bloquear usuários.
 export async function handleAction(action, target) {
   if (action === 'open-conversation') {
     await navigate('messages', { conversation: Number(target.dataset.id) });
@@ -310,6 +388,7 @@ export async function handleAction(action, target) {
   return false;
 }
 
+// Envia o formulário de mensagem para a conversa associated.
 export async function handleSubmit(form, event) {
   if (form.id !== 'message-form') return false;
   event.preventDefault();

@@ -1,4 +1,28 @@
 /* Vibra - rede social: modais, ações e formulários. */
+/*
+ * @module social-actions
+ * Este arquivo concentra as ações e os modais da área social do Vibra.
+ *
+ * Ações e modais implementados:
+ *  - Player de vídeo no feed: reproduzir, pausar, silenciar e sincronizar vídeos.
+ *  - Publicação aberta: exibir mídia, legenda, comentários, curtidas e compartilhamento.
+ *  - Criar publicação / story: selecionar, validar, pré-visualizar e enviar mídias.
+ *  - Editar perfil: atualizar avatar, dados, interesses, privacidade e política de mensagens.
+ *  - Menu de perfil, denúncia e bloqueio: denunciar, bloquear, desbloquear e listar bloqueados.
+ *  - Solicitações de seguimento: consultar, aceitar e recusar pedidos.
+ *  - Melhores amigos: buscar, adicionar e remover pessoas da lista exclusiva.
+ *  - Seguidores e seguindo: abrir e navegar pelas duas listas.
+ *  - Interações com stories: reagir e consultar visualizações.
+ *  - Notificações: listar, agrupar, marcar como lidas e abrir destinos.
+ *  - Compartilhamento: copiar links e enviar publicações em conversas.
+ *
+ * Contrato de `handleAction(action, target)`: recebe a ação declarada em `data-action` e o elemento DOM alvo, vindos da delegação de eventos em main.js.
+ * Contrato de `handleSubmit(form, event)`: recebe o formulário identificado por `form.id` e o evento de submissão, também vindos da delegação em main.js.
+ *
+ * Dependências:
+ *  - core.js: helper de API, estado global, modais, ícones, escape, upload e utilitários compartilhados.
+ *  - social.js: renderers de feed, stories, comentários, curtidas e controles de carrossel.
+ */
 
 import {
   $,
@@ -46,6 +70,15 @@ import {
 /* Player de vídeo no feed                                            */
 /* ------------------------------------------------------------------ */
 
+/* Seção: Player de vídeo no feed - sincroniza controles e estado do player inline */
+
+/**
+ * Sincroniza o estado visual do player de vídeo no feed.
+ * Atualiza o ícone de play/pause e o estado do botão de mutar conforme o vídeo está reproduzindo.
+ * @param {HTMLElement} player Contêiner do player contendo os botões de controle.
+ * @param {HTMLVideoElement} video Elemento de vídeo sendo reproduzido.
+ * @returns {void}
+ */
 function syncInlineVideo(player, video) {
   if (!player || !video) return;
   const playing = !video.paused && !video.ended;
@@ -64,6 +97,11 @@ function syncInlineVideo(player, video) {
   }
 }
 
+/**
+ * Pausa os vídeos inline do feed, preservando opcionalmente o vídeo em reprodução.
+ * @param {HTMLVideoElement} [except] Vídeo que não deve ser pausado.
+ * @returns {void}
+ */
 function pauseInlineVideos(except) {
   $$('[data-video-player] video').forEach((video) => {
     if (video !== except && !video.paused) video.pause();
@@ -91,7 +129,7 @@ for (const type of ['play', 'pause', 'ended', 'volumechange']) {
 /* Publicação aberta                                                  */
 /* ------------------------------------------------------------------ */
 
-export async function openPost(postId) {
+export async function openPost(postId) { /* openPost: abre modal completo da publicação, carrega dados via API e monta interface*/
   pauseInlineVideos();
   const data = await api(`/api/posts/${postId}`);
   const post = data.post;
@@ -166,13 +204,13 @@ const MAX_VIDEO_BYTES = 1024 * 1024 * 1024;
 const MAX_VIDEO_DURATION = 60 * 60;
 const MAX_MEDIA_PAYLOAD = 32 * 1024 * 1024;
 
-function releasePendingMedia(items) {
+function releasePendingMedia(items) { /* Revoga Object URLs criados por médias pendentes, liberando memória */
   for (const item of items || []) {
     if (item && item.previewUrl) URL.revokeObjectURL(item.previewUrl);
   }
 }
 
-function formatDuration(seconds) {
+function formatDuration(seconds) { /* Converte segundos em string legível (ex: 5min 12s) */
   const total = Math.max(0, Math.round(seconds));
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);

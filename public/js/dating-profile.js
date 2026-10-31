@@ -1,4 +1,10 @@
-/* Vibra - Namoro: perfil próprio, questionário parcial e Radar. */
+/**
+ * Sistema de perfil de namoro do Vibra.
+ *
+ * Gerencia foto, biografia, intervalo de idade, questionário parcial e Radar.
+ *
+ * Gatilhos de UI e API.
+ */
 
 import {
   $,
@@ -19,9 +25,13 @@ import {
   fileToDataUrl,
 } from './core.js';
 
+// Limita o número de fotos para proteger armazenamento e tempo de upload.
 const MAX_PHOTOS = 6;
+// Distância mínima para evitar Correspondência excessivamente ampla.
 const MIN_DISTANCE = 10;
+// Distância máxima para proteger a privacidade e a segurança do usuário.
 const MAX_DISTANCE = 400;
+// Precisão máxima aceita em metros; acima disso o Radar fica sem distância confiável.
 const ACCURACY_LIMIT = 2000;
 
 let quizAnswers = {};
@@ -125,6 +135,12 @@ function radarReasonLabel(reason) {
 /* Perfil de namoro                                                   */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Renderiza a aba "Perfil" do Namoro.
+ *
+ * @param {HTMLElement} container Elemento onde o perfil será montado.
+ * @param {object} status Estado de namoro vindo da API.
+ */
 export async function renderDatingProfileTab(container, status) {
   const [profileData, answersData, photoOptionsData] = await Promise.all([
     api('/api/dating/profile').catch(() => ({ profile: status.profile, questions: status.questions })),
@@ -257,6 +273,7 @@ export async function renderDatingProfileTab(container, status) {
   bindQuizForm();
 }
 
+/* Lida com mudanças e autosave do questionário de afinidade. */
 function bindQuizForm() {
   const form = $('#dating-quiz-form');
   if (!form) return;
@@ -291,6 +308,7 @@ function bindQuizForm() {
   });
 }
 
+/* Serializa as respostas atuais do formulário de questionário. */
 function collectQuizAnswers() {
   const form = $('#dating-quiz-form');
   if (!form) return {};
@@ -368,6 +386,14 @@ async function saveQuiz(form, { silent = false } = {}) {
 /* Radar                                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Renderiza a aba "Radar" do Namoro.
+ *
+ * Busca dados de localização e matches permissões.
+ *
+ * @param {HTMLElement} container Elemento onde o radar será montado.
+ * @param {object} status Estado de namoro.
+ */
 export async function renderRadarTab(container, status) {
   const data = await api('/api/dating/radar');
   if (state.view !== 'dating') return;

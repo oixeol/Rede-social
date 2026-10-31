@@ -1,3 +1,15 @@
+/*
+ * App.js – cliente Vanilla da rede social local.
+ *
+ * Estrutura:
+ *  - `state` mantém o usuário autenticado (`me`), a view atual, usuários envolvidos e o filtro de pesquisa.
+ *  - Funções auxiliares de DOM (`$`, `$$`) e utilitários de UI (`toast`, `setBusy`).
+ *  - `api()` consome a API `/api/*` do backend, sempre usando `credentials: 'same-origin'`.
+ *  - Modais e vídeo‑player são renderizados em `#modal-root` e `#story-root`.
+ *  - Roteiro de navegação (`navigate`, `enterApp`) controla as 5 abas da aplicação (feed, explorar, namoro, mensagens, perfil).
+ *  - `setAuthTab`/`showAuth` coordenam a tela de login/registro.
+ *  - `applyTheme`/`toggleTheme` gerenciam o tema claro/escuro com persitência em localStorage.
+ */
 /* Vibe - cliente da rede social local */
 (() => {
   'use strict';
@@ -6,9 +18,12 @@
   /* Helpers                                                          */
   /* ---------------------------------------------------------------- */
 
+  /** Seleciona um único elemento via CSS. */
   const $ = (selector, root = document) => root.querySelector(selector);
+  /** Seleciona todos os elementos via CSS como array. */
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
+  /* Estado global da aplicação: usuário logado, view ativa e dados em cache. */
   const state = {
     me: null,
     view: 'feed',
@@ -18,6 +33,10 @@
     storyGroups: [],
   };
 
+  /**
+   * Catálogo de ícones SVG (path data) usados pela UI.
+   * `icon()` monta o `<svg>` final; nomes ausentes renderizam vazio.
+   */
   const ICONS = {
     home: '<path d="M3.5 10.5 12 3.5l8.5 7v9.2a1.3 1.3 0 0 1-1.3 1.3h-4.7v-6.6H9.5V21H4.8a1.3 1.3 0 0 1-1.3-1.3z"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="m16.2 16.2 4.3 4.3"/>',
@@ -38,16 +57,23 @@
     more: '<circle cx="5.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
   };
 
+  /** Gera o markup SVG de um ícone do catálogo `ICONS`. */
   function icon(name, size = 24) {
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
   }
 
+  /** Substitui o conteúdo de todo `[data-icon]` pelo SVG correspondente. */
   function hydrateIcons(root = document) {
     $$('[data-icon]', root).forEach((element) => {
       element.innerHTML = icon(element.dataset.icon);
     });
   }
 
+  /**
+   * Escapa caracteres especiais de HTML.
+   * Obrigatório antes de interpolar qualquer valor vindo do usuário ou da API
+   * em templates de string — é a barreira contra XSS do lado do cliente.
+   */
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (character) => ({
       '&': '&amp;',
@@ -94,6 +120,11 @@
     return `<span class="avatar avatar-fallback ${className}" style="width:${size}px;height:${size}px;font-size:${Math.max(10, Math.round(size * 0.38))}px" aria-hidden="true">${esc(initialsFor(user))}</span>`;
   }
 
+  /**
+   * Chama a API `/api/*`.
+   * Envia `credentials: 'same-origin'` para incluir o cookie de sessão.
+   * Em resposta 401 com usuário logado, força o retorno à tela de autenticação.
+   */
   async function api(path, options = {}) {
     const response = await fetch(path, {
       credentials: 'same-origin',
@@ -119,6 +150,7 @@
     return data;
   }
 
+  /** Exibe uma mensagem temporária (2,8 s) na área de toasts. */
   function toast(message, kind = '') {
     const root = $('#toast-root');
     const element = document.createElement('div');
@@ -131,6 +163,10 @@
     }, 2800);
   }
 
+  /**
+   * Liga/desliga o estado "carregando" de um botão.
+   * Preserva o rótulo original em `dataset.idleLabel` para restaurá-lo depois.
+   */
   function setBusy(button, isBusy) {
     if (!button) return;
     if (isBusy) {
@@ -148,6 +184,11 @@
   /* Theme                                                            */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * Aplica o tema (claro/escuro) no documento e persiste a escolha.
+   * O atributo `data-theme` no `<html>` é o gatilho de todas as variantes
+   * visuais definidas em `public/styles.css`.
+   */
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('vibe-theme', theme);
@@ -160,10 +201,14 @@
     });
   }
 
+  /** Alterna entre tema claro e escuro. */
   function toggleTheme() {
     applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   }
 
+  /**
+   * Define o tema inicial: preferência salva > preferência do sistema operacional.
+   */
   function initTheme() {
     const saved = localStorage.getItem('vibe-theme');
     const preferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -174,6 +219,10 @@
   /* Auth                                                             */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * Alterna entre as abas "entrar" e "criar conta".
+   * Atualiza títulos, mensagens de erro e move o foco para o primeiro campo.
+   */
   function setAuthTab(tab) {
     const isLogin = tab === 'login';
     $('#login-form').classList.toggle('hidden', !isLogin);
@@ -191,6 +240,7 @@
     if (focusField) setTimeout(() => focusField.focus(), 30);
   }
 
+  /** Exibe a tela de autenticação e descarta o estado de sessão em memória. */
   function showAuth(tab = 'login') {
     state.me = null;
     state.profile = null;
@@ -199,6 +249,7 @@
     setAuthTab(tab);
   }
 
+  /** Atualiza o avatar exibido na topbar e na navegação inferior. */
   function refreshNavAvatar() {
     const markup = state.me ? avatar(state.me, 30) : icon('user');
     const top = $('#top-avatar');
@@ -207,6 +258,7 @@
     if (bottom) bottom.innerHTML = markup;
   }
 
+  /** Troca da tela de auth para o shell da aplicação e abre a view inicial. */
   async function enterApp() {
     $('#auth-screen').classList.add('hidden');
     $('#app-shell').classList.remove('hidden');
@@ -214,6 +266,10 @@
     await navigate('feed');
   }
 
+  /**
+   * Autentica via `POST /api/login` e entra no app.
+   * O botão fica em estado "carregando" durante a requisição.
+   */
   async function login(username, password, button) {
     setBusy(button, true);
     try {
@@ -234,6 +290,10 @@
   /* Modal / story shell                                              */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * Abre um modal genérico.
+   * O markup é injetado em `#modal-root`; o caller é responsável por sanitizar.
+   */
   function openModal(markup, className = '') {
     const root = $('#modal-root');
     root.innerHTML = `<div class="modal-backdrop"><div class="modal ${className}" role="dialog" aria-modal="true">${markup}</div></div>`;
