@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Vibra - rede social e descoberta de afinidades para adultos, com privacidade por padrão." />
+    <meta name="theme-color" content="#f7f2ea" />
+    <title>Vibra</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <!-- ---------------------------------------------------------------- -->
+    <!-- Autenticacao                                                     -->
+    <!-- ---------------------------------------------------------------- -->
+    <div id="auth-screen" class="auth-screen">
+      <section class="auth-visual">
+        <div class="auth-brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-word"><span data-brand-name>vibra</span><span class="brand-dot">.</span></span>
+        </div>
+
+        <div class="auth-copy">
+          <p class="eyebrow light">Rede social com intenção</p>
+          <h1 data-brand-tagline>Conexões que fazem sentido.</h1>
+          <p>Compartilhe o que te move, descubra pessoas por interesses e, se quiser, explore o Namoro com privacidade e segurança.</p>
+        </div>
+
+        <div class="auth-collage" aria-hidden="true">
+          <div class="collage-card cc1">
+            <div class="collage-photo ph1"></div>
+            <span>ana.souza</span>
+          </div>
+          <div class="collage-card cc2">
+            <div class="collage-photo ph2"></div>
+            <span>bruno.dev</span>
+          </div>
+          <div class="collage-card cc3">
+            <div class="collage-photo ph3"></div>
+            <span>carla.arte</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="auth-panel">
+        <div class="auth-box">
+          <div class="auth-mobile-brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-word"><span data-brand-name>vibra</span><span class="brand-dot">.</span></span>
+          </div>
+
+          <p class="eyebrow">Sua conta</p>
+          <h2 class="auth-title" id="auth-title">Bem-vindo de volta</h2>
+          <p class="auth-subtitle" id="auth-subtitle">Entre para acompanhar as pessoas e os interesses que você escolheu.</p>
+
+          <form id="login-form" class="auth-form" autocomplete="on">
+            <label class="field">
+              <span>Usuário</span>
+              <input name="username" type="text" autocomplete="username" placeholder="seu.usuário" minlength="3" maxlength="24" required />
+            </label>
+            <label class="field">
+              <span>Senha</span>
+              <input name="password" type="password" autocomplete="current-password" placeholder="Sua senha" minlength="6" required />
+            </label>
+            <p id="auth-error" class="form-error" role="alert"></p>
+            <button class="btn primary btn-block" type="submit">Entrar</button>
+          </form>
+
+          <form id="register-form" class="auth-form hidden" autocomplete="on">
+            <label class="field">
+              <span>Nome</span>
+              <input name="name" type="text" autocomplete="name" placeholder="Seu nome" maxlength="40" required />
+            </label>
+            <label class="field">
+              <span>Usuário</span>
+              <input name="username" type="text" autocomplete="username" placeholder="seu.usuário" minlength="3" maxlength="24" pattern="[A-Za-z0-9._]+" title="Use letras, números, ponto e underline." required />
+            </label>
+            <label class="field">
+              <span>Data de nascimento</span>
+              <input name="birthDate" type="date" autocomplete="bday" required />
+              <small class="field-hint">A rede social é para maiores de 13 anos. O Namoro exige 18+ e verificação de identidade.</small>
+            </label>
+            <label class="field">
+              <span>Senha</span>
+              <input name="password" type="password" autocomplete="new-password" placeholder="Mínimo de 6 caracteres" minlength="6" required />
+            </label>
+            <p class="form-error" role="alert"></p>
+            <button class="btn primary btn-block" type="submit">Criar conta</button>
+          </form>
+
+          <div class="auth-switch">
+            <span data-when="login">Não tem uma conta? <button type="button" data-action="auth-tab" data-tab="register">Criar conta</button></span>
+            <span data-when="register" class="hidden">Já tem uma conta? <button type="button" data-action="auth-tab" data-tab="login">Entrar</button></span>
+          </div>
+        </div>
+
+        <p class="auth-foot">Projeto local e original. O Namoro é exclusivo para adultos verificados.</p>
+      </section>
+    </div>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- Aplicacao                                                        -->
+    <!-- ---------------------------------------------------------------- -->
+    <div id="app-shell" class="shell hidden">
+      <a class="skip-link" href="#view">Pular para o conteúdo</a>
+
+      <header class="topbar">
+        <div class="topbar-inner">
+          <button class="brand" type="button" data-action="nav" data-view="home" aria-label="Ir para o início">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-word"><span data-brand-name>vibra</span><span class="brand-dot">.</span></span>
+          </button>
+
+          <nav class="topnav" aria-label="Navegação principal">
+            <button type="button" class="topnav-item" data-action="nav" data-view="home" data-nav="home">
+              <span data-icon="home"></span><span>Início</span>
+            </button>
+            <button type="button" class="topnav-item" data-action="nav" data-view="explore" data-nav="explore">
+              <span data-icon="compass"></span><span>Explorar</span>
+            </button>
+            <button type="button" class="topnav-item" data-action="nav" data-view="dating" data-nav="dating">
+              <span data-icon="spark"></span><span>Namoro</span>
+            </button>
+            <button type="button" class="topnav-item" data-action="nav" data-view="messages" data-nav="messages">
+              <span data-icon="message"></span><span>Mensagens</span>
+              <span class="nav-badge" data-badge="messages" hidden></span>
+            </button>
+            <button type="button" class="topnav-item" data-action="nav-self" data-nav="profile">
+              <span data-icon="user"></span><span>Perfil</span>
+            </button>
+          </nav>
+
+          <div class="top-actions">
+            <button type="button" class="icon-btn notification-btn" data-action="open-notifications" aria-label="Notificações">
+              <span data-icon="bell"></span>
+              <span class="nav-badge" data-badge="notifications" hidden></span>
+            </button>
+            <button type="button" class="icon-btn" data-action="theme" aria-label="Alternar tema">
+              <span data-theme-icon></span>
+            </button>
+            <button type="button" class="btn primary publish-btn" data-action="new-post">
+              <span data-icon="plus" class="publish-icon"></span>
+              <span class="publish-label">Publicar</span>
+            </button>
+            <button type="button" class="top-avatar" data-action="nav-self" aria-label="Abrir seu perfil">
+              <span id="top-avatar"></span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="main">
+        <div id="view" class="view" aria-live="polite" tabindex="-1"></div>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Navegação principal">
+        <button type="button" class="bottom-item" data-action="nav" data-view="home" data-nav="home">
+          <span data-icon="home"></span><span>Início</span>
+        </button>
+        <button type="button" class="bottom-item" data-action="nav" data-view="explore" data-nav="explore">
+          <span data-icon="compass"></span><span>Explorar</span>
+        </button>
+        <button type="button" class="bottom-item bottom-dating" data-action="nav" data-view="dating" data-nav="dating">
+          <span data-icon="spark"></span><span>Namoro</span>
+        </button>
+        <button type="button" class="bottom-item" data-action="nav" data-view="messages" data-nav="messages">
+          <span data-icon="message"></span><span>Mensagens</span>
+          <span class="nav-badge" data-badge="messages" hidden></span>
+        </button>
+        <button type="button" class="bottom-item" data-action="nav-self" data-nav="profile">
+          <span id="bottom-avatar"></span><span>Perfil</span>
+        </button>
+      </nav>
+    </div>
+
+    <div id="modal-root"></div>
+    <div id="story-root"></div>
+    <div id="toast-root" class="toast-root" aria-live="polite"></div>
+    <noscript><p class="noscript">Este aplicativo precisa de JavaScript para funcionar.</p></noscript>
+
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>

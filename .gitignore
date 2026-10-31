@@ -1,0 +1,29 @@
+node_modules/
+.next/
+out/
+
+# Ambiente virtual Python do backend Django.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Banco e uploads são dados de execução, nunca versionados.
+data/
+backend/staticfiles/
+backend/media/
+
+# Segredos locais.
+.env
+.env.*
+!.env.example
+
+# Logs.
+*.log
+
+# Capturas transitórias de QA. As finais (qa/final-*.png) são versionadas.
+qa/*.png
+!qa/final-*.png
+
+.DS_Store
+Thumbs.db
