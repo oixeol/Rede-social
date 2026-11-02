@@ -401,39 +401,42 @@ export function adjustCommentTotals(postId, total) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Renderiza a tela inicial (feed) do social.
+ * Renderiza a tela inicial (feed) do social - estilo X/Twitter.
  *
- * Operações realizadas:
- *   1. Constrói o layout do "mural" (header, spinner, grid).
- *   2. Recupera o feed via `/api/feed` (padrão) – paginado/segmentado.
- *   3. Trata pré‑renderização de loading e espera a resposta.
- *   4. Atualiza a contagem de likes, comentários, e chama `fetchMoreFeed`
- *      quando o usuário scrollear (não há scroll por conta de `window.scroll`)
- *      então apenas chama o fetch do feed.
+ * Layout:
+ * - Coluna central: Caixa de criação rápida + Timeline contínua
+ * - Lateral direita: 3 caixas (Namoro, Turbo Vibra, Sugestões/Assuntos)
  *
- * A estrutura do markup corresponde ao template usado por `postCard`.
  * @param {HTMLElement} viewElement elemento onde o conteúdo será injetado.
  */
 export async function renderHome(viewElement) {
-  const rawToday = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
-  const today = rawToday.charAt(0).toUpperCase() + rawToday.slice(1);
   viewElement.innerHTML = `
-    <div class="mural-layout">
-      <div class="mural-main">
-        <header class="mural-head">
-          <div>
-            <p class="eyebrow">Início</p>
-            <h1>O que está acontecendo</h1>
-          </div>
-          <p class="mural-date">${esc(today)}</p>
-        </header>
-        <section class="agora" id="agora" aria-label="Momentos de agora"></section>
-        <div class="feed-grid" id="feed-list">
-          ${Array.from({ length: 3 }).map(() => '<div class="skeleton-post"><div class="skeleton-cover"></div><div class="skeleton-body"></div></div>').join('')}
+    <div class="home-layout">
+      <!-- Coluna Central - Feed estilo X -->
+      <main class="home-main" id="home-main">
+        <!-- Caixa de criação rápida (estilo X) -->
+        <section class="quick-post" id="quick-post" aria-label="Criar publicação rápida">
+          ${renderQuickPostBox()}
+        </section>
+
+        <!-- Divisor "Mostrar posts" -->
+        <div class="feed-divider" id="feed-divider">
+          <span>Mostrar publicações</span>
         </div>
-        <div id="feed-more-wrap"></div>
-      </div>
-      <aside class="rail" id="rail"></aside>
+
+        <!-- Timeline vertical contínua -->
+        <section class="timeline" id="timeline" aria-label="Linha do tempo">
+          <div class="feed-grid" id="feed-list">
+            ${Array.from({ length: 3 }).map(() => '<div class="skeleton-post"><div class="skeleton-cover"></div><div class="skeleton-body"></div></div>').join('')}
+          </div>
+          <div id="feed-more-wrap"></div>
+        </section>
+      </main>
+
+      <!-- Lateral Direita - 3 Caixas -->
+      <aside class="home-rail" id="home-rail" aria-label="Recursos e sugestões">
+        ${renderRailBoxes()}
+      </aside>
     </div>`;
 
   const [feed, stories, suggestions] = await Promise.all([
@@ -446,8 +449,13 @@ export async function renderHome(viewElement) {
   state.storyGroups = stories.groups || [];
   if (state.view !== 'home') return;
 
+  // Renderiza stories (Agora) no topo da timeline se houver
   renderAgora();
-  renderRail(suggestions.users || []);
+
+  // Renderiza as 3 caixas da lateral
+  renderRailBoxesContent(suggestions.users || []);
+
+  // Renderiza o feed
   const list = $('#feed-list');
   list.innerHTML = feed.posts.length
     ? feed.posts.map((post) => postCard(post)).join('')
@@ -459,6 +467,846 @@ export async function renderHome(viewElement) {
       });
   renderFeedMore();
   hydrateIcons(viewElement);
+}
+
+/**
+ * Renderiza a caixa de criação rápida estilo X/Twitter.
+ */
+function renderQuickPostBox() {
+  const me = state.me;
+  if (!me) return '';
+
+  return `
+    <form id="quick-post-form" class="quick-post-form" data-action="quick-post-submit">
+      <div class="quick-post-header">
+        ${avatar(me, 40)}
+        <div class="quick-post-input-wrapper">
+          <textarea
+            name="caption"
+            class="quick-post-input"
+            placeholder="O que está acontecendo?"
+            maxlength="2200"
+            rows="1"
+            aria-label="O que está acontecendo?"
+          ></textarea>
+          <div class="quick-post-hint" hidden>Máximo 2200 caracteres</div>
+        </div>
+      </div>
+
+      <div class="quick-post-media-preview" id="quick-post-media-preview" hidden></div>
+
+      <div class="quick-post-toolbar">
+        <div class="quick-post-tools">
+          <button type="button" class="quick-post-tool" data-action="quick-post-media" aria-label="Adicionar foto ou vídeo">
+            ${icon('image', 20)}
+          </button>
+          <button type="button" class="quick-post-tool" data-action="quick-post-gif" aria-label="Adicionar GIF">
+            ${icon('gif', 20)}
+          </button>
+          <button type="button" class="quick-post-tool" data-action="quick-post-poll" aria-label="Criar enquete">
+            ${icon('chart', 20)}
+          </button>
+          <button type="button" class="quick-post-tool" data-action="quick-post-emoji" aria-label="Adicionar emoji">
+            ${icon('smile', 20)}
+          </button>
+          <button type="button" class="quick-post-tool" data-action="quick-post-schedule" aria-label="Agendar publicação">
+            ${icon('calendar', 20)}
+          </button>
+          <button type="button" class="quick-post-tool" data-action="quick-post-location" aria-label="Adicionar localização">
+            ${icon('mapPin', 20)}
+          </button>
+        </div>
+        <div class="quick-post-actions">
+          <button type="button" class="btn ghost quick-post-cancel" data-action="quick-post-cancel" hidden>Cancelar</button>
+          <button type="submit" class="btn primary quick-post-submit-btn" disabled>
+            <span data-icon="send" class="quick-post-send-icon"></span>
+            <span>Postar</span>
+          </button>
+        </div>
+      </div>
+
+      <input type="file" id="quick-post-media-input" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" multiple hidden />
+    </form>`;
+}
+
+/**
+ * Renderiza as 3 caixas da lateral direita.
+ */
+function renderRailBoxes() {
+  return `
+    <!-- Caixa 1: Sistema de Namoro -->
+    <section class="rail-box rail-box-dating" id="rail-box-dating">
+      <div class="rail-box-content">
+        <div class="rail-box-icon dating">
+          ${icon('spark', 28)}
+        </div>
+        <div class="rail-box-text">
+          <h3>Namoro no Vibra</h3>
+          <p>Conheça pessoas com intenção. Verificação de identidade, quiz de afinidade e Radar consensual para conexões seguras e reais.</p>
+        </div>
+        <button type="button" class="btn primary rail-box-cta" data-action="nav" data-view="dating">
+          <span data-icon="spark" class="rail-box-cta-icon"></span>
+          Conhecer o Namoro
+        </button>
+        <small class="rail-box-note">Apenas para maiores de 18 anos com verificação aprovada.</small>
+      </div>
+    </section>
+
+    <!-- Caixa 2: Turbo Vibra -->
+    <section class="rail-box rail-box-turbo" id="rail-box-turbo">
+      <div class="rail-box-content">
+        <div class="rail-box-icon turbo">
+          ${icon('bolt', 28)}
+        </div>
+        <div class="rail-box-text">
+          <h3>Turbo Vibra</h3>
+          <p>Desbloqueie vantagens exclusivas: curtidas ilimitadas, personalização completa do perfil com fotos e banners em GIF, e mais visibilidade.</p>
+        </div>
+        <button type="button" class="btn primary rail-box-cta" data-action="open-turbo">
+          <span data-icon="bolt" class="rail-box-cta-icon"></span>
+          Ativar Turbo
+        </button>
+        <small class="rail-box-note">Assinatura mensal. Cancele quando quiser.</small>
+      </div>
+    </section>
+
+    <!-- Caixa 3: Sugestões Personalizadas / Assuntos de Interesse -->
+    <section class="rail-box rail-box-topics" id="rail-box-topics">
+      <div class="rail-box-content">
+        <div class="rail-box-icon topics">
+          ${icon('hashtag', 28)}
+        </div>
+        <div class="rail-box-text">
+          <h3>Assuntos do seu interesse</h3>
+          <p>Descubra publicações e pessoas baseadas nos temas que você curte. Personalize seus interesses no perfil para recomendações melhores.</p>
+        </div>
+        <button type="button" class="btn ghost rail-box-cta" data-action="nav" data-view="explore">
+          <span data-icon="compass" class="rail-box-cta-icon"></span>
+          Explorar assuntos
+        </button>
+        <div class="rail-box-topics-list" id="rail-box-topics-list"></div>
+      </div>
+    </section>`;
+}
+
+/**
+ * Preenche o conteúdo dinâmico das caixas da lateral (tópicos de interesse).
+ */
+async function renderRailBoxesContent(suggestedUsers) {
+  // Preenche tópicos de interesse na Caixa 3
+  const topicsList = $('#rail-box-topics-list');
+  if (topicsList && state.config.interests && state.config.interests.length) {
+    const userInterests = state.me?.interests || [];
+    const displayInterests = userInterests.length
+      ? state.config.interests.filter(i => userInterests.includes(i.id)).slice(0, 5)
+      : state.config.interests.slice(0, 5);
+
+    if (displayInterests.length) {
+      topicsList.innerHTML = `
+        <p class="rail-box-topics-label">Seus interesses:</p>
+        <div class="chips">
+          ${displayInterests.map(interest => `
+            <span class="chip chip-static" data-action="nav" data-view="explore" data-interest="${esc(interest.id)}">
+              ${esc(interest.label)}
+            </span>
+          `).join('')}
+        </div>`;
+    }
+  }
+
+  // Preenche sugestões de usuários na Caixa 1 (opcional - pessoas para seguir no Namoro)
+  // Mantemos a renderização original de sugestões se necessário
+}
+
+/**
+ * Configura os event listeners da caixa de criação rápida.
+ */
+export function setupQuickPostListeners() {
+  const form = $('#quick-post-form');
+  if (!form) return;
+
+  const textarea = form.querySelector('.quick-post-input');
+  const submitBtn = form.querySelector('.quick-post-submit-btn');
+  const cancelBtn = form.querySelector('.quick-post-cancel');
+  const mediaInput = $('#quick-post-media-input');
+  const mediaPreview = $('#quick-post-media-preview');
+  const hint = form.querySelector('.quick-post-hint');
+
+  if (!textarea || !submitBtn || !mediaInput || !mediaPreview) return;
+
+  // Auto-resize textarea
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+
+    const length = textarea.value.length;
+    submitBtn.disabled = length === 0 && !mediaPreview.querySelector('img, video');
+    hint.hidden = length < 2000;
+    if (length > 2000) hint.textContent = `Excedido em ${length - 2200} caracteres`;
+  });
+
+  // Cancel button
+  cancelBtn?.addEventListener('click', () => {
+    resetQuickPostForm();
+  });
+
+  // Media selection (Foto/Vídeo)
+  const mediaTools = form.querySelector('[data-action="quick-post-media"]');
+  mediaTools?.addEventListener('click', () => mediaInput.click());
+
+  mediaInput.addEventListener('change', async () => {
+    const files = [...(mediaInput.files || [])];
+    if (!files.length) return;
+
+    if (files.length > 10) {
+      toast('Escolha no máximo 10 fotos por publicação.', 'error');
+      mediaInput.value = '';
+      return;
+    }
+
+    const hasVideo = files.some(f => f.type.startsWith('video/'));
+    if (hasVideo && files.length > 1) {
+      toast('Para publicar vídeo, selecione apenas um arquivo.', 'error');
+      mediaInput.value = '';
+      return;
+    }
+
+    try {
+      mediaPreview.innerHTML = '';
+      mediaPreview.hidden = false;
+      cancelBtn.hidden = false;
+
+      if (hasVideo) {
+        const file = files[0];
+        if (file.size > 1024 * 1024 * 1024) {
+          toast('O vídeo pode ter no máximo 1 GB.', 'error');
+          mediaInput.value = '';
+          return;
+        }
+        const duration = await readVideoDuration(file);
+        if (duration > 60 * 60) {
+          toast('O vídeo pode ter no máximo 60 minutos.', 'error');
+          mediaInput.value = '';
+          return;
+        }
+        const url = URL.createObjectURL(file);
+        mediaPreview.innerHTML = `
+          <video src="${url}" controls playsinline class="quick-post-media-item"></video>
+          <button type="button" class="quick-post-media-remove" data-action="quick-post-remove-media" aria-label="Remover vídeo">${icon('close', 16)}</button>
+        `;
+      } else {
+        for (const file of files) {
+          if (file.size > 8 * 1024 * 1024) {
+            toast('A imagem pode ter no máximo 8 MB.', 'error');
+            mediaInput.value = '';
+            return;
+          }
+          const dataUrl = await fileToDataUrl(file);
+          mediaPreview.insertAdjacentHTML('beforeend', `
+            <figure class="quick-post-media-item">
+              <img src="${dataUrl}" alt="Prévia da foto" />
+              <button type="button" class="quick-post-media-remove" data-action="quick-post-remove-media" aria-label="Remover foto">${icon('close', 16)}</button>
+            </figure>
+          `);
+        }
+      }
+      submitBtn.disabled = false;
+      mediaInput.value = '';
+    } catch (error) {
+      toast(error.message, 'error');
+      mediaInput.value = '';
+    }
+  });
+
+  // GIF Selection
+  const gifTool = form.querySelector('[data-action="quick-post-gif"]');
+  gifTool?.addEventListener('click', () => openGifModal());
+
+  // Poll Creation
+  const pollTool = form.querySelector('[data-action="quick-post-poll"]');
+  pollTool?.addEventListener('click', () => togglePollFields());
+
+  // Emoji Picker
+  const emojiTool = form.querySelector('[data-action="quick-post-emoji"]');
+  emojiTool?.addEventListener('click', (e) => openEmojiPicker(e, textarea));
+
+  // Schedule Post
+  const scheduleTool = form.querySelector('[data-action="quick-post-schedule"]');
+  scheduleTool?.addEventListener('click', () => openSchedulePicker());
+
+  // Location
+  const locationTool = form.querySelector('[data-action="quick-post-location"]');
+  locationTool?.addEventListener('click', () => addLocation());
+
+  // Remove media
+  mediaPreview.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('[data-action="quick-post-remove-media"]');
+    if (removeBtn) {
+      const item = removeBtn.closest('.quick-post-media-item');
+      item?.remove();
+      if (!mediaPreview.querySelector('.quick-post-media-item')) {
+        mediaPreview.hidden = true;
+        cancelBtn.hidden = true;
+        submitBtn.disabled = textarea.value.trim().length === 0;
+      }
+    }
+  });
+
+  // Submit
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await handleQuickPostSubmit(form);
+  });
+}
+
+/**
+ * Reseta o formulário de postagem rápida.
+ */
+function resetQuickPostForm() {
+  const form = $('#quick-post-form');
+  if (!form) return;
+
+  const textarea = form.querySelector('.quick-post-input');
+  const mediaPreview = $('#quick-post-media-preview');
+  const cancelBtn = form.querySelector('.quick-post-cancel');
+  const submitBtn = form.querySelector('.quick-post-submit-btn');
+  const hint = form.querySelector('.quick-post-hint');
+
+  if (textarea) {
+    textarea.value = '';
+    textarea.style.height = 'auto';
+  }
+  if (mediaPreview) {
+    mediaPreview.innerHTML = '';
+    mediaPreview.hidden = true;
+  }
+  if (cancelBtn) cancelBtn.hidden = true;
+  if (submitBtn) submitBtn.disabled = true;
+  if (hint) hint.hidden = true;
+}
+
+/**
+ * Lê a duração de um arquivo de vídeo.
+ */
+function readVideoDuration(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+      callback(value);
+    };
+    const timer = setTimeout(() => finish(reject, new Error('Não foi possível verificar a duração.')), 10000);
+    video.preload = 'metadata';
+    video.muted = true;
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      if (Number.isFinite(duration) && duration > 0) finish(resolve, duration);
+      else finish(reject, new Error('Não foi possível verificar a duração.'));
+    };
+    video.onerror = () => finish(reject, new Error('Não foi possível ler o vídeo.'));
+    video.src = url;
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Quick Post Toolbar Actions                                         */
+/* ------------------------------------------------------------------ */
+
+// Estado para controles da quick post
+let quickPostState = {
+  pollOptions: ['', ''],
+  pollDuration: 7, // dias
+  scheduledDate: null,
+  location: null,
+  gifUrl: null
+};
+
+/** Abre modal de busca de GIFs (simulado com Giphy-like search) */
+function openGifModal() {
+  const trendingGifs = [
+    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3aWQ9Zw/l0MYt5jPR6QX5pnqM/giphy.gif',
+    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3aWQ9Zw/3oEjI6SIIHBdRxXI40/giphy.gif',
+    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3aWQ9Zw/l0HlBO7eyXzSZkJri/giphy.gif',
+    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3aWQ9Zw/xT0xeJpnrWC4XWblEk/giphy.gif',
+    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3aWQ9Zw/3oKIPwoeGErMmaI43G/giphy.gif',
+    'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3Z3J3aWQ9Zw/l0HlNa5v3Fs7lyT9K/giphy.gif'
+  ];
+
+  openModal(`
+    <div class="modal-head">
+      <h2>Adicionar GIF</h2>
+      <button type="button" class="icon-btn" data-action="close-modal" aria-label="Fechar">${icon('close')}</button>
+    </div>
+    <div class="modal-form">
+      <div class="gif-search">
+        <input type="text" id="gif-search-input" placeholder="Buscar GIFs..." class="gif-search-input" autocomplete="off">
+        <div class="gif-search-results" id="gif-search-results">
+          ${trendingGifs.map(url => `
+            <button type="button" class="gif-result-item" data-gif-url="${esc(url)}" aria-label="Selecionar GIF">
+              <img src="${esc(url)}" alt="GIF" loading="lazy">
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-action="close-modal">Cancelar</button>
+    </div>
+  `, 'gif-modal');
+  hydrateIcons($('#modal-root'));
+
+  // Event listeners para busca de GIFs
+  const searchInput = $('#gif-search-input');
+  const resultsContainer = $('#gif-search-results');
+  let searchTimeout;
+
+  if (searchInput && resultsContainer) {
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(async () => {
+        const query = searchInput.value.trim();
+        if (query.length < 2) {
+          // Mostrar trending novamente
+          resultsContainer.innerHTML = trendingGifs.map(url => `
+            <button type="button" class="gif-result-item" data-gif-url="${esc(url)}" aria-label="Selecionar GIF">
+              <img src="${esc(url)}" alt="GIF" loading="lazy">
+            </button>
+          `).join('');
+          return;
+        }
+        
+        resultsContainer.innerHTML = '<div class="gif-loading">Buscando...</div>';
+        
+        // Simulação de busca - em produção usaria API real do Giphy/Tenor
+        try {
+          // Aqui faria fetch real para Giphy API
+          // const response = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=YOUR_KEY&q=${encodeURIComponent(query)}&limit=20`);
+          // const data = await response.json();
+          // resultsContainer.innerHTML = data.data.map(gif => `...`).join('');
+          
+          // Por enquanto, filtra os trending
+          resultsContainer.innerHTML = trendingGifs.map(url => `
+            <button type="button" class="gif-result-item" data-gif-url="${esc(url)}" aria-label="Selecionar GIF">
+              <img src="${esc(url)}" alt="GIF" loading="lazy">
+            </button>
+          `).join('');
+        } catch {
+          resultsContainer.innerHTML = '<div class="gif-error">Erro ao buscar GIFs</div>';
+        }
+      }, 300);
+    });
+
+    resultsContainer.addEventListener('click', (e) => {
+      const item = e.target.closest('.gif-result-item');
+      if (item) {
+        const gifUrl = item.dataset.gifUrl;
+        addGifToPost(gifUrl);
+        closeModal();
+      }
+    });
+
+    searchInput.focus();
+  }
+}
+
+/** Adiciona GIF selecionado ao post */
+function addGifToPost(gifUrl) {
+  const mediaPreview = $('#quick-post-media-preview');
+  const cancelBtn = $('#quick-post-form .quick-post-cancel');
+  const submitBtn = $('#quick-post-form .quick-post-submit-btn');
+  
+  if (!mediaPreview) return;
+  
+  mediaPreview.innerHTML = '';
+  mediaPreview.hidden = false;
+  if (cancelBtn) cancelBtn.hidden = false;
+  
+  mediaPreview.insertAdjacentHTML('beforeend', `
+    <figure class="quick-post-media-item">
+      <img src="${esc(gifUrl)}" alt="GIF" />
+      <button type="button" class="quick-post-media-remove" data-action="quick-post-remove-media" aria-label="Remover GIF">${icon('close', 16)}</button>
+    </figure>
+  `);
+  
+  if (submitBtn) submitBtn.disabled = false;
+  quickPostState.gifUrl = gifUrl;
+}
+
+/** Alterna exibição dos campos de enquete */
+function togglePollFields() {
+  const form = $('#quick-post-form');
+  if (!form) return;
+  
+  let pollContainer = form.querySelector('.quick-post-poll-container');
+  
+  if (pollContainer) {
+    // Remover campos de enquete
+    pollContainer.remove();
+    quickPostState.pollOptions = ['', ''];
+  } else {
+    // Adicionar campos de enquete
+    pollContainer = document.createElement('div');
+    pollContainer.className = 'quick-post-poll-container';
+    pollContainer.innerHTML = `
+      <div class="poll-header">
+        <span>${icon('chart', 16)} Enquete</span>
+        <button type="button" class="poll-close" data-action="quick-post-poll-close" aria-label="Remover enquete">${icon('close', 16)}</button>
+      </div>
+      <div class="poll-options" id="poll-options">
+        <div class="poll-option">
+          <input type="text" class="poll-option-input" placeholder="Opção 1" maxlength="50" value="${esc(quickPostState.pollOptions[0])}">
+        </div>
+        <div class="poll-option">
+          <input type="text" class="poll-option-input" placeholder="Opção 2" maxlength="50" value="${esc(quickPostState.pollOptions[1])}">
+        </div>
+      </div>
+      <div class="poll-controls">
+        <button type="button" class="btn ghost small" data-action="poll-add-option">${icon('plus', 14)} Adicionar opção</button>
+        <div class="poll-duration">
+          <label>Duração: </label>
+          <select class="poll-duration-select" id="poll-duration-select">
+            <option value="1" ${quickPostState.pollDuration === 1 ? 'selected' : ''}>1 dia</option>
+            <option value="3" ${quickPostState.pollDuration === 3 ? 'selected' : ''}>3 dias</option>
+            <option value="7" ${quickPostState.pollDuration === 7 ? 'selected' : ''}>7 dias</option>
+            <option value="30" ${quickPostState.pollDuration === 30 ? 'selected' : ''}>30 dias</option>
+          </select>
+        </div>
+      </div>
+    `;
+    
+    // Inserir antes da toolbar
+    const toolbar = form.querySelector('.quick-post-toolbar');
+    form.insertBefore(pollContainer, toolbar);
+    
+    // Event listeners para enquete
+    pollContainer.querySelector('[data-action="quick-post-poll-close"]')?.addEventListener('click', () => {
+      pollContainer.remove();
+      quickPostState.pollOptions = ['', ''];
+    });
+    
+    pollContainer.querySelector('[data-action="poll-add-option"]')?.addEventListener('click', () => {
+      if (quickPostState.pollOptions.length < 4) {
+        quickPostState.pollOptions.push('');
+        const optionsContainer = pollContainer.querySelector('#poll-options');
+        optionsContainer.insertAdjacentHTML('beforeend', `
+          <div class="poll-option">
+            <input type="text" class="poll-option-input" placeholder="Opção ${quickPostState.pollOptions.length}" maxlength="50">
+          </div>
+        `);
+      }
+    });
+    
+    pollContainer.querySelector('#poll-duration-select')?.addEventListener('change', (e) => {
+      quickPostState.pollDuration = parseInt(e.target.value);
+    });
+    
+    pollContainer.querySelectorAll('.poll-option-input').forEach((input, index) => {
+      input.addEventListener('input', () => {
+        quickPostState.pollOptions[index] = input.value;
+      });
+    });
+  }
+}
+
+/** Abre seletor de emojis */
+function openEmojiPicker(event, textarea) {
+  const button = event.currentTarget;
+  const rect = button.getBoundingClientRect();
+  
+  // Categorias de emojis comuns
+  const emojiCategories = {
+    'Smileys': ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈','👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾','🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿','😾'],
+    'Gestos': ['👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦵','🦿','🦶','🦷','🦴','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄','🫦'],
+    'Corações': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','♥️','🧡','💛','💚','💙','💜','🖤','🤍','🤎'],
+    'Natureza': ['🌞','🌝','🌛','🌜','🌚','🌕','🌖','🌗','🌘','🌑','🌒','🌓','🌔','🌙','🌎','🌍','🌏','🪐','⭐','🌟','🌠','☀️','🌤️','⛅','🌥️','🌦️','🌧️','⛈️','🌩️','🌨️','❄️','☃️','⛄','☄️','🌊','🌈','🗻','🏔️','⛰️','🌋','🏞️','🏜️','🏝️','🏖️','🏟️','🏛️','🏗️','🏘️','🏚️','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏯','🏰','💒','🗼','🗽','⛪','🕌','🛕','🕍','⛩️','🕋','⛲','⛱️','🌁','🌃','🌄','🌅','🌆','🌇','🌉','♨️','🎠','🎡','🎢','💈','🎪','🚂','🚁','🚀','✈️','🛸','🛶','⛵','🚤','🛳️'],
+    'Comida': ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🥔','🍠','🥐','🥯','🍞','🥖','🥨','🧀','🥚','🍳','🧈','🥞','🧇','🥓','🥩','🍗','🍖','🦴','🌭','🍔','🍟','🍕','🫓','🥪','🥙','🧆','🌮','🌯','🫔','🥗','🥘','🥫','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍚','🍘','🍥','🥠','🥮','🍢','🍡','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍩','🍪','🌰','🥜','🍯','🥛','🍼','☕','🫖','🍵','🧃','🥤','🧋','🍶','🍺','🍻','🥂','🍷','🥃','🍸','🍹','🧉','🍾','🧊']
+  };
+
+  // Remover picker anterior se existir
+  const existingPicker = document.querySelector('.emoji-picker-popover');
+  if (existingPicker) existingPicker.remove();
+
+  const picker = document.createElement('div');
+  picker.className = 'emoji-picker-popover';
+  picker.style.cssText = `
+    position: fixed;
+    top: ${rect.bottom + 8}px;
+    left: ${rect.left}px;
+    z-index: 1000;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    padding: 12px;
+    max-width: 320px;
+    max-height: 400px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  `;
+
+  let html = '<div class="emoji-tabs" style="display: flex; gap: 4px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 4px;">';
+  Object.keys(emojiCategories).forEach((cat, i) => {
+    html += `<button type="button" class="emoji-tab ${i === 0 ? 'active' : ''}" data-category="${cat}" style="padding: 6px 10px; border: none; background: ${i === 0 ? 'var(--primary-soft)' : 'transparent'}; color: ${i === 0 ? 'var(--primary)' : 'var(--muted)'}; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;">${cat}</button>`;
+  });
+  html += '</div>';
+  
+  html += '<div class="emoji-content" style="flex: 1; overflow-y: auto; max-height: 300px;">';
+  Object.entries(emojiCategories).forEach(([cat, emojis], i) => {
+    html += `<div class="emoji-category ${i === 0 ? 'active' : ''}" data-category="${cat}" style="${i === 0 ? '' : 'display: none;'}">`;
+    html += '<div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px;">';
+    emojis.forEach(emoji => {
+      html += `<button type="button" class="emoji-btn" data-emoji="${esc(emoji)}" style="width: 100%; aspect-ratio: 1; border: none; background: transparent; font-size: 22px; cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: background 0.1s;">${emoji}</button>`;
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  picker.innerHTML = html;
+  document.body.appendChild(picker);
+
+  // Event listeners
+  picker.querySelectorAll('.emoji-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      picker.querySelectorAll('.emoji-tab').forEach(t => {
+        t.style.background = 'transparent';
+        t.style.color = 'var(--muted)';
+      });
+      tab.style.background = 'var(--primary-soft)';
+      tab.style.color = 'var(--primary)';
+      
+      const category = tab.dataset.category;
+      picker.querySelectorAll('.emoji-category').forEach(cat => {
+        cat.style.display = cat.dataset.category === category ? 'block' : 'none';
+      });
+    });
+  });
+
+  picker.querySelectorAll('.emoji-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const emoji = btn.dataset.emoji;
+      insertEmojiAtCursor(textarea, emoji);
+      picker.remove();
+    });
+    btn.addEventListener('mouseenter', () => btn.style.background = 'var(--surface-2)');
+    btn.addEventListener('mouseleave', () => btn.style.background = 'transparent');
+  });
+
+  // Fechar ao clicar fora
+  const closeHandler = (e) => {
+    if (!picker.contains(e.target) && e.target !== button) {
+      picker.remove();
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeHandler), 0);
+}
+
+/** Insere emoji na posição do cursor */
+function insertEmojiAtCursor(textarea, emoji) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  textarea.value = text.substring(0, start) + emoji + text.substring(end);
+  textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+  textarea.focus();
+  textarea.dispatchEvent(new Event('input'));
+}
+
+/** Abre seletor de data/hora para agendamento */
+function openSchedulePicker() {
+  const form = $('#quick-post-form');
+  if (!form) return;
+
+  let scheduleContainer = form.querySelector('.quick-post-schedule-container');
+  
+  if (scheduleContainer) {
+    scheduleContainer.remove();
+    quickPostState.scheduledDate = null;
+    return;
+  }
+
+  const now = new Date();
+  const minDate = now.toISOString().slice(0, 16);
+  const maxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+
+  scheduleContainer = document.createElement('div');
+  scheduleContainer.className = 'quick-post-schedule-container';
+  scheduleContainer.innerHTML = `
+    <div class="schedule-header">
+      <span>${icon('calendar', 16)} Agendar publicação</span>
+      <button type="button" class="schedule-close" data-action="quick-post-schedule-close" aria-label="Remover agendamento">${icon('close', 16)}</button>
+    </div>
+    <div class="schedule-inputs">
+      <label>
+        Data e hora:
+        <input type="datetime-local" id="schedule-datetime" min="${minDate}" max="${maxDate}" value="${quickPostState.scheduledDate || ''}">
+      </label>
+    </div>
+  `;
+
+  const toolbar = form.querySelector('.quick-post-toolbar');
+  form.insertBefore(scheduleContainer, toolbar);
+
+  scheduleContainer.querySelector('[data-action="quick-post-schedule-close"]')?.addEventListener('click', () => {
+    scheduleContainer.remove();
+    quickPostState.scheduledDate = null;
+  });
+
+  scheduleContainer.querySelector('#schedule-datetime')?.addEventListener('change', (e) => {
+    quickPostState.scheduledDate = e.target.value ? new Date(e.target.value).toISOString() : null;
+  });
+}
+
+/** Adiciona localização (geolocalização do navegador) */
+function addLocation() {
+  if (!navigator.geolocation) {
+    toast('Geolocalização não suportada neste navegador.', 'error');
+    return;
+  }
+
+  toast('Obtendo localização...');
+  
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+      // Em produção, faria reverse geocoding para obter nome da cidade
+      const locationName = `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`;
+      quickPostState.location = { latitude, longitude, name: locationName };
+      showLocationInPost(locationName);
+      toast('Localização adicionada.');
+    },
+    (error) => {
+      if (error.code === error.PERMISSION_DENIED) {
+        toast('Permissão de localização negada. Ative nas configurações do navegador.', 'error');
+      } else {
+        toast('Não foi possível obter a localização.', 'error');
+      }
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+
+/** Mostra localização na caixa de postagem */
+function showLocationInPost(locationName) {
+  const form = $('#quick-post-form');
+  if (!form) return;
+
+  let locationContainer = form.querySelector('.quick-post-location-container');
+  
+  if (locationContainer) {
+    locationContainer.querySelector('.location-name').textContent = locationName;
+    return;
+  }
+
+  locationContainer = document.createElement('div');
+  locationContainer.className = 'quick-post-location-container';
+  locationContainer.innerHTML = `
+    <div class="location-header">
+      <span>${icon('mapPin', 16)} Localização</span>
+      <button type="button" class="location-close" data-action="quick-post-location-close" aria-label="Remover localização">${icon('close', 16)}</button>
+    </div>
+    <div class="location-name">${esc(locationName)}</div>
+  `;
+
+  const toolbar = form.querySelector('.quick-post-toolbar');
+  form.insertBefore(locationContainer, toolbar);
+
+  locationContainer.querySelector('[data-action="quick-post-location-close"]')?.addEventListener('click', () => {
+    locationContainer.remove();
+    quickPostState.location = null;
+  });
+}
+
+/** Reseta estado da quick post */
+function resetQuickPostState() {
+  quickPostState = {
+    pollOptions: ['', ''],
+    pollDuration: 7,
+    scheduledDate: null,
+    location: null,
+    gifUrl: null
+  };
+}
+
+/** Manipula o envio da postagem rápida (versão completa com poll, schedule, location, gif) */
+async function handleQuickPostSubmit(form) {
+  const textarea = form.querySelector('.quick-post-input');
+  const mediaPreview = $('#quick-post-media-preview');
+  const submitBtn = form.querySelector('.quick-post-submit-btn');
+
+  const caption = textarea?.value.trim() || '';
+  const mediaItems = [...mediaPreview?.querySelectorAll('.quick-post-media-item') || []];
+
+  // Verifica se tem enquete
+  const pollOptions = quickPostState.pollOptions.filter(opt => opt.trim());
+  const hasPoll = pollOptions.length >= 2;
+
+  if (!caption && mediaItems.length === 0 && !hasPoll && !quickPostState.gifUrl) return;
+
+  setBusy(submitBtn, true);
+
+  try {
+    const body = { caption };
+
+    if (mediaItems.length === 1) {
+      const item = mediaItems[0];
+      const isVideo = item.querySelector('video');
+      if (isVideo) {
+        toast('Para vídeos, use o botão "Publicar" completo.', 'error');
+        setBusy(submitBtn, false);
+        return;
+      } else {
+        const img = item.querySelector('img');
+        if (img) body.image = img.src;
+      }
+    } else if (mediaItems.length > 1) {
+      body.images = mediaItems.map(item => {
+        const img = item.querySelector('img');
+        return img?.src;
+      }).filter(Boolean);
+    }
+
+    // Adiciona GIF se houver
+    if (quickPostState.gifUrl) {
+      body.gif = quickPostState.gifUrl;
+    }
+
+    // Adiciona enquete
+    if (hasPoll) {
+      body.poll = {
+        options: pollOptions,
+        durationDays: quickPostState.pollDuration
+      };
+    }
+
+    // Adiciona agendamento
+    if (quickPostState.scheduledDate) {
+      body.scheduledAt = quickPostState.scheduledDate;
+    }
+
+    // Adiciona localização
+    if (quickPostState.location) {
+      body.location = quickPostState.location;
+    }
+
+    await api('/api/posts', { method: 'POST', body: JSON.stringify(body) });
+    resetQuickPostForm();
+    resetQuickPostState();
+    toast('Publicação criada.');
+    await navigate('home');
+  } catch (error) {
+    toast(error.message || 'Não foi possível publicar.', 'error');
+  } finally {
+    setBusy(submitBtn, false);
+  }
 }
 
 function renderFeedMore() {

@@ -27,7 +27,7 @@ import {
   closeProfileMenu,
   isProfileMenuOpen,
 } from './core.js';
-import { renderHome, renderExplore, renderProfile, closeStories } from './social.js';
+import { renderHome, renderExplore, renderProfile, closeStories, setupQuickPostListeners } from './social.js';
 import {
   handleAction as handleSocialAction,
   handleSubmit as handleSocialSubmit,

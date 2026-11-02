@@ -53,7 +53,7 @@
           <h2 class="auth-title" id="auth-title">Bem-vindo de volta</h2>
           <p class="auth-subtitle" id="auth-subtitle">Entre para acompanhar as pessoas e os interesses que você escolheu.</p>
 
-          <form id="login-form" class="auth-form" autocomplete="on">
+          <form id="login-form" class="auth-form" autocomplete="on" novalidate>
             <label class="field">
               <span>Usuário</span>
               <input name="username" type="text" autocomplete="username" placeholder="seu.usuário" minlength="3" maxlength="24" required />
@@ -66,7 +66,7 @@
             <button class="btn primary btn-block" type="submit">Entrar</button>
           </form>
 
-          <form id="register-form" class="auth-form hidden" autocomplete="on">
+          <form id="register-form" class="auth-form hidden" autocomplete="on" novalidate>
             <label class="field">
               <span>Nome</span>
               <input name="name" type="text" autocomplete="name" placeholder="Seu nome" maxlength="40" required />
@@ -121,13 +121,6 @@
             <button type="button" class="topnav-item" data-action="nav" data-view="dating" data-nav="dating">
               <span data-icon="spark"></span><span>Namoro</span>
             </button>
-            <button type="button" class="topnav-item" data-action="nav" data-view="messages" data-nav="messages">
-              <span data-icon="message"></span><span>Mensagens</span>
-              <span class="nav-badge" data-badge="messages" hidden></span>
-            </button>
-            <button type="button" class="topnav-item" data-action="nav-self" data-nav="profile">
-              <span data-icon="user"></span><span>Perfil</span>
-            </button>
           </nav>
 
           <div class="top-actions">
@@ -138,12 +131,16 @@
             <button type="button" class="icon-btn" data-action="theme" aria-label="Alternar tema">
               <span data-theme-icon></span>
             </button>
-            <button type="button" class="btn primary publish-btn" data-action="new-post">
-              <span data-icon="plus" class="publish-icon"></span>
-              <span class="publish-label">Publicar</span>
+            <button type="button" class="icon-btn messages-btn" data-action="nav" data-view="messages" data-nav="messages" aria-label="Mensagens">
+              <span data-icon="message"></span>
+              <span class="nav-badge" data-badge="messages" hidden></span>
             </button>
             <button type="button" class="top-avatar" data-action="account-menu" aria-label="Abrir menu do perfil" aria-haspopup="menu" aria-expanded="false">
-              <span id="top-avatar"></span>
+              <span id="top-avatar" class="top-avatar-badge"></span>
+              <div class="top-user-info" id="top-user-info" hidden>
+                <span class="top-user-name" id="top-user-name"></span>
+                <span class="top-user-plan" id="top-user-plan"></span>
+              </div>
             </button>
           </div>
         </div>
@@ -168,7 +165,7 @@
           <span class="nav-badge" data-badge="messages" hidden></span>
         </button>
         <button type="button" class="bottom-item" data-action="nav-self" data-nav="profile">
-          <span id="bottom-avatar"></span><span>Perfil</span>
+          <span id="bottom-avatar"></span>
         </button>
       </nav>
     </div>

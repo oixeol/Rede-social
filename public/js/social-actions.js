@@ -1126,11 +1126,64 @@ export async function handleAction(action, target) {
     case 'open-notification':
       await openNotification(target.dataset.link);
       return true;
+    case 'open-turbo':
+      openTurboModal();
+      return true;
     case 'noop':
       return true;
     default:
       return false;
   }
+}
+
+/**
+ * Abre o modal do Turbo Vibra.
+ */
+function openTurboModal() {
+  openModal(`
+    <div class="modal-head">
+      <h2>Turbo Vibra</h2>
+      <button type="button" class="icon-btn" data-action="close-modal" aria-label="Fechar">${icon('close')}</button>
+    </div>
+    <div class="modal-form">
+      <div class="turbo-features">
+        <div class="turbo-feature">
+          <div class="turbo-feature-icon">${icon('heart', 24)}</div>
+          <div>
+            <strong>Curtidas ilimitadas</strong>
+            <small>Curta quantas publicações quiser, sem limites diários.</small>
+          </div>
+        </div>
+        <div class="turbo-feature">
+          <div class="turbo-feature-icon">${icon('image', 24)}</div>
+          <div>
+            <strong>Perfil personalizado</strong>
+            <small>Fotos e banners em GIF, cores e fontes exclusivas.</small>
+          </div>
+        </div>
+        <div class="turbo-feature">
+          <div class="turbo-feature-icon">${icon('spark', 24)}</div>
+          <div>
+            <strong>Mais visibilidade</strong>
+            <small>Suas publicações aparecem para mais pessoas no Explorar.</small>
+          </div>
+        </div>
+        <div class="turbo-feature">
+          <div class="turbo-feature-icon">${icon('bolt', 24)}</div>
+          <div>
+            <strong>Sem anúncios</strong>
+            <small>Experiência limpa, sem caixas de publicidade na lateral.</small>
+          </div>
+        </div>
+      </div>
+      <p class="turbo-price">R$ 19,90 <span>/mês</span></p>
+      <p class="muted small">Cancele quando quiser. Cobrança mensal automática.</p>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-action="close-modal">Agora não</button>
+      <button type="button" class="btn primary" data-action="close-modal">Ativar Turbo</button>
+    </div>`, 'turbo-modal');
+  hydrateIcons($('#modal-root'));
 }
 
 async function followUser(username) {

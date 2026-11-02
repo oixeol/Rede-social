@@ -110,6 +110,11 @@ const ICONS = {
   at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.9 7.9"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   filter: '<path d="M3.5 5.5h17l-6.5 7.5v5.5l-4 1.5v-7z"/>',
+  chart: '<path d="M18 20V10M12 20V4M6 20v-6"/><path d="M3 3v18h18"/>',
+  smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
+  bolt: '<path d="M13 2L3 14h9l-1 8 10-16h-9l1-8z"/>',
+  hashtag: '<path d="M6 5v14M18 5v14M4 9h16M4 15h16"/>',
+  gif: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 12h3M7 16h3M14 12h3M14 16h3M9 8h6v8H9z"/><text x="12" y="12.5" font-size="6" text-anchor="middle" font-weight="bold" fill="currentColor">GIF</text>',
 };
 
 /**
@@ -628,10 +633,28 @@ export function showAuth(tab = 'login') {
 
 export function refreshNavAvatar() {
   const markup = state.me ? avatar(state.me, 30) : icon('user');
-  const top = $('#top-avatar');
-  if (top) top.innerHTML = markup;
+  const topBadge = $('#top-avatar');
+  if (topBadge) topBadge.innerHTML = markup;
   const bottom = $('#bottom-avatar');
   if (bottom) bottom.innerHTML = markup;
+
+  // Atualiza nome e plano do usuário no header
+  if (state.me) {
+    const nameEl = $('#top-user-name');
+    const planEl = $('#top-user-plan');
+    const infoEl = $('#top-user-info');
+    if (nameEl) nameEl.textContent = state.me.name || state.me.username;
+    if (planEl && infoEl) {
+      const isTurbo = state.me.isTurbo || state.me.plan === 'turbo';
+      infoEl.hidden = false;
+      planEl.innerHTML = isTurbo
+        ? `<span class="plan-badge turbo">${icon('bolt', 10)} Assinante Turbo</span>`
+        : `<span class="plan-badge free">${icon('user', 10)} Plano Gratuito</span>`;
+    }
+  } else {
+    const infoEl = $('#top-user-info');
+    if (infoEl) infoEl.hidden = true;
+  }
 }
 
 export function refreshBadges() {
@@ -726,7 +749,13 @@ export async function navigate(view, params = {}) {
   try {
     if (!renderer) throw new Error('Área indisponível.');
     await renderer(viewElement, state.params);
-    if (state.view === view) hydrateIcons(viewElement);
+    if (state.view === view) {
+      hydrateIcons(viewElement);
+      // Configura listeners específicos da home (quick post)
+      if (view === 'home' && typeof setupQuickPostListeners === 'function') {
+        setupQuickPostListeners();
+      }
+    }
   } catch (error) {
     if (state.view !== view) return;
     if (error.status === 401) {
