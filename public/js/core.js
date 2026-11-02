@@ -450,6 +450,84 @@ export function initTheme() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Menu lateral do perfil                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Controla a abertura do menu lateral ancorado no ícone de perfil da
+ * navbar. O menu é um painel flutuante com as ações da conta.
+ */
+let profileMenuOpen = false;
+
+/**
+ * Abre o menu lateral do perfil com as ações de conta.
+ *
+ * @param {object} me Usuário logado (precisa de `username`).
+ */
+export function openProfileMenu(me) {
+  if (profileMenuOpen || !me) return;
+  profileMenuOpen = true;
+  const root = document.createElement('div');
+  root.className = 'profile-menu-layer';
+  root.innerHTML = `
+    <div class="profile-menu-backdrop" data-profile-menu-close></div>
+    <div class="profile-menu" role="menu" aria-label="Opções da conta">
+      <div class="profile-menu-head">
+        <span class="profile-menu-avatar">${avatar(me, 44)}</span>
+        <span class="profile-menu-id">
+          <strong>${esc(me.name)}</strong>
+          <small>@${esc(me.username)}</small>
+        </span>
+      </div>
+      <div class="profile-menu-list">
+        <button type="button" class="menu-item" data-action="menu-my-profile" role="menuitem">
+          ${icon('user', 19)} <span><strong>Meu perfil</strong><small>Ver suas publicações e stories.</small></span>
+        </button>
+        <button type="button" class="menu-item" data-action="settings" role="menuitem">
+          ${icon('settings', 19)} <span><strong>Configurações</strong><small>Conta, privacidade, segurança e suporte.</small></span>
+        </button>
+        <button type="button" class="menu-item" data-action="report-problem" role="menuitem">
+          ${icon('alert', 19)} <span><strong>Relatar um problema</strong><small>Avise a equipe sobre um erro ou falha.</small></span>
+        </button>
+        <button type="button" class="menu-item danger" data-action="logout" role="menuitem">
+          ${icon('logout', 19)} <span><strong>Sair</strong><small>Encerrar a sessão neste dispositivo.</small></span>
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(root);
+  hydrateIcons(root);
+  document.body.classList.add('modal-open');
+  const trigger = $('.top-avatar');
+  if (trigger) trigger.setAttribute('aria-expanded', 'true');
+  const firstItem = root.querySelector('.menu-item');
+  if (firstItem) setTimeout(() => firstItem.focus(), 30);
+}
+
+/**
+ * Fecha o menu lateral do perfil (se estiver aberto).
+ */
+export function closeProfileMenu() {
+  if (!profileMenuOpen) return;
+  profileMenuOpen = false;
+  const root = document.querySelector('.profile-menu-layer');
+  if (root) root.remove();
+  const trigger = $('.top-avatar');
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  if (!$('#modal-root') || !$('#modal-root').innerHTML) {
+    document.body.classList.remove('modal-open');
+  }
+}
+
+/**
+ * Indica se o menu lateral do perfil está aberto.
+ *
+ * @returns {boolean} `true` quando o menu está visível.
+ */
+export function isProfileMenuOpen() {
+  return profileMenuOpen;
+}
+
+/* ------------------------------------------------------------------ */
 /* Modal                                                              */
 /* ------------------------------------------------------------------ */
 

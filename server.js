@@ -39,6 +39,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const APP = require('./app.config');
+const APP_VERSION = require('./package.json').version;
 const dating = require('./lib/dating');
 
 /* ------------------------------------------------------------------ */
@@ -278,6 +279,20 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at);
 
+  /* Relatos de problemas técnicos enviados pelo menu do perfil. */
+  CREATE TABLE IF NOT EXISTS problem_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category TEXT NOT NULL CHECK (category IN ('bug', 'layout', 'login', 'performance', 'moderation', 'other')),
+    title TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT '',
+    context TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reviewing', 'resolved', 'dismissed')),
+    created_at INTEGER NOT NULL,
+    reviewed_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_problem_reports_status ON problem_reports(status, created_at);
+
   CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -426,6 +441,8 @@ ensureColumn('users', 'interests', "TEXT NOT NULL DEFAULT '[]'");
 ensureColumn('users', 'message_policy', "TEXT NOT NULL DEFAULT 'connections'");
 ensureColumn('users', 'is_private', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('users', 'last_active_at', 'INTEGER');
+ensureColumn('users', 'banner', 'TEXT');
+ensureColumn('sessions', 'user_agent', 'TEXT');
 ensureColumn('posts', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
 ensureColumn('posts', 'topic', "TEXT NOT NULL DEFAULT 'cotidiano'");
 ensureColumn('stories', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
@@ -485,6 +502,8 @@ const INTERESTS = [
 
 /* Conjunto de IDs válidos: usado para validar entrada de interesses. */
 const INTEREST_IDS = new Set(INTERESTS.map((item) => item.id));
+/* Categorias aceitas no relato de problemas técnicos (menu do perfil). */
+const PROBLEM_CATEGORIES = new Set(['bug', 'layout', 'login', 'performance', 'moderation', 'other']);
 /* Tópicos aceitos na tag de uma publicação. */
 const POST_TOPICS = ['cotidiano', 'fotografia', 'natureza', 'arte', 'gastronomia', 'tecnologia', 'viagens', 'esportes'];
 /* Idade máxima aceita. Acima disso a data de nascimento é tratada como inválida. */
@@ -1090,10 +1109,60 @@ function checkPassword(password, stored) {
   return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected);
 }
 
-function createSession(userId) {
+function createSession(userId, userAgent = null) {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare('INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)').run(token, userId, now());
+  db.prepare('INSERT INTO sessions (token, user_id, created_at, user_agent) VALUES (?, ?, ?, ?)').run(
+    token,
+    userId,
+    now(),
+    userAgent ? String(userAgent).slice(0, 255) : null
+  );
   return token;
+}
+
+/**
+ * Identificador público de uma sessão. Não expõe o token: usa um resumo
+ * SHA-256 em hexadecimal, o que permite revogar a sessão sem vazar credencial.
+ *
+ * @param {string} token Token bruto da sessão.
+ * @returns {string} Identificador curto e estável.
+ */
+function sessionId(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex').slice(0, 16);
+}
+
+/**
+ * Descreve o agente do usuário de forma resumida para a lista de sessões.
+ *
+ * @param {string|null} userAgent Cabeçalho User-Agent.
+ * @returns {string} Texto legível.
+ */
+function describeUserAgent(userAgent) {
+  const agent = String(userAgent || '');
+  if (!agent) return 'Dispositivo desconhecido';
+  const browser = /Edg\//.test(agent)
+    ? 'Edge'
+    : /OPR\//.test(agent)
+      ? 'Opera'
+      : /Chrome\//.test(agent)
+        ? 'Chrome'
+        : /Safari\//.test(agent)
+          ? 'Safari'
+          : /Firefox\//.test(agent)
+            ? 'Firefox'
+            : 'Navegador';
+  const platform = /Windows/.test(agent)
+    ? 'Windows'
+    : /Android/.test(agent)
+      ? 'Android'
+      : /(iPhone|iPad|iPod)/.test(agent)
+        ? 'iOS'
+        : /Mac OS X/.test(agent)
+          ? 'macOS'
+          : /Linux/.test(agent)
+            ? 'Linux'
+            : '';
+  return platform ? `${browser} · ${platform}` : browser;
 }
 
 function cookieAttributes() {
@@ -1134,6 +1203,7 @@ function userDTO(row) {
     name: row.name,
     bio: row.bio,
     avatar: row.avatar || null,
+    banner: row.banner || null,
     interests: parseJsonArray(row.interests, INTEREST_IDS),
     isPrivate: !!row.is_private,
   };
@@ -1357,17 +1427,52 @@ function removeUploadIfUnused(url) {
     db.prepare('SELECT 1 AS ok FROM posts WHERE image = ? LIMIT 1').get(url) ||
     db.prepare('SELECT 1 AS ok FROM post_media WHERE url = ? LIMIT 1').get(url) ||
     db.prepare('SELECT 1 AS ok FROM users WHERE avatar = ? LIMIT 1').get(url) ||
+    db.prepare('SELECT 1 AS ok FROM users WHERE banner = ? LIMIT 1').get(url) ||
     db.prepare('SELECT 1 AS ok FROM stories WHERE image = ? LIMIT 1').get(url) ||
     db.prepare('SELECT 1 AS ok FROM dating_profiles WHERE instr(photos, ?) > 0 LIMIT 1').get(`"${url}"`);
   if (!used) fs.rm(path.join(UPLOAD_DIR, filename), { force: true }, () => {});
 }
 
-function cleanText(value, field, { min = 0, max = 1000, required = false } = {}) {
+/**
+ * Normaliza um texto curto vindo do cliente.
+ *
+ * Por padrão apenas remove espaços das pontas e valida o tamanho. Com
+ * `strict: true` (usado em Nome e Bio) recusa caracteres de controle e
+ * remove espaços extras entre palavras. Em textos de uma linha, como o
+ * Nome, quebras de linha também são recusadas.
+ *
+ * @param {*} value Valor recebido.
+ * @param {string} field Nome do campo (usado nas mensagens).
+ * @param {object} [options] Opções de validação.
+ * @param {number} [options.min=0] Tamanho mínimo.
+ * @param {number} [options.max=1000] Tamanho máximo.
+ * @param {boolean} [options.required=false] Campo obrigatório.
+ * @param {boolean} [options.strict=false] Recusa controles e compacta espaços.
+ * @param {boolean} [options.multiline=false] Mantém quebras de linha.
+ * @returns {string} Texto normalizado.
+ */
+function cleanText(value, field, { min = 0, max = 1000, required = false, strict = false, multiline = false } = {}) {
   const text = typeof value === 'string' ? value.trim() : '';
   if (required && !text) throw new HttpError(400, `${field} e obrigatorio.`);
-  if (text.length < min) throw new HttpError(400, `${field} muito curto.`);
-  if (text.length > max) throw new HttpError(400, `${field} muito longo (máximo ${max}).`);
-  return text;
+  let normalized = text;
+  if (strict && text) {
+    const forbidden = multiline
+      ? /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/
+      : /[\u0000-\u001F\u007F]/;
+    if (forbidden.test(text)) {
+      throw new HttpError(400, `${field} contem caracteres invalidos.`);
+    }
+    normalized = multiline
+      ? text
+          .split('\n')
+          .map((line) => line.replace(/[ \t]+/g, ' ').trimEnd())
+          .join('\n')
+          .trim()
+      : text.replace(/\s+/g, ' ');
+  }
+  if (normalized.length < min) throw new HttpError(400, `${field} muito curto.`);
+  if (normalized.length > max) throw new HttpError(400, `${field} muito longo (máximo ${max}).`);
+  return normalized;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1511,7 +1616,7 @@ async function handleApi(req, res, pathname, url) {
 
   if (method === 'GET' && pathname === '/api/config') {
     return json(res, 200, {
-      app: { name: APP.name, slug: APP.slug, tagline: APP.tagline },
+      app: { name: APP.name, slug: APP.slug, tagline: APP.tagline, version: APP_VERSION },
       interests: INTERESTS,
       identity: {
         mode: IDENTITY_MODE,
@@ -1549,7 +1654,7 @@ async function handleApi(req, res, pathname, url) {
       )
       .run(username, name, '', null, hashPassword(password), now(), birthDate);
     const id = Number(result.lastInsertRowid);
-    const token = createSession(id);
+    const token = createSession(id, req.headers['user-agent']);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     return json(res, 201, { user: selfDTO(user), stats: statsFor(id) }, { 'Set-Cookie': sessionCookie(token) });
   }
@@ -1564,7 +1669,7 @@ async function handleApi(req, res, pathname, url) {
       throw new HttpError(401, 'Usuário ou senha incorretos.');
     }
     db.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').run(now(), user.id);
-    const token = createSession(user.id);
+    const token = createSession(user.id, req.headers['user-agent']);
     return json(res, 200, { user: selfDTO(user), stats: statsFor(user.id) }, { 'Set-Cookie': sessionCookie(token) });
   }
 
@@ -1615,13 +1720,27 @@ async function handleApi(req, res, pathname, url) {
 
   if (method === 'PATCH' && pathname === '/api/me') {
     const body = await readBody(req);
-    const name = body.name === undefined ? me.name : cleanText(body.name, 'Nome', { min: 1, max: 40, required: true });
-    const bio = body.bio === undefined ? me.bio : cleanText(body.bio, 'Bio', { max: 150 });
+    /* Username e user_id nunca podem ser alterados por esta rota: o perfil
+       editado é sempre o do usuário autenticado. */
+    if (Object.prototype.hasOwnProperty.call(body, 'username')) {
+      throw new HttpError(400, 'O usuario nao pode ser alterado.');
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'user_id') || Object.prototype.hasOwnProperty.call(body, 'userId')) {
+      throw new HttpError(400, 'O usuario da conta nao pode ser alterado.');
+    }
+    const name = body.name === undefined ? me.name : cleanText(body.name, 'Nome', { min: 1, max: 40, required: true, strict: true });
+    const bio = body.bio === undefined ? me.bio : cleanText(body.bio, 'Bio', { min: 0, max: 150, strict: true, multiline: true });
     let avatar = me.avatar;
     if (body.avatar === null) {
       avatar = null;
     } else if (typeof body.avatar === 'string' && body.avatar) {
       avatar = saveImage(body.avatar, 'avatar');
+    }
+    let banner = me.banner || null;
+    if (body.banner === null) {
+      banner = null;
+    } else if (typeof body.banner === 'string' && body.banner) {
+      banner = saveImage(body.banner, 'banner');
     }
     let interests = parseJsonArray(me.interests, INTEREST_IDS);
     if (Array.isArray(body.interests)) {
@@ -1649,12 +1768,14 @@ async function handleApi(req, res, pathname, url) {
       if (age < 13) throw new HttpError(403, 'É necessário ter pelo menos 13 anos.');
     }
     const oldAvatar = me.avatar;
+    const oldBanner = me.banner || null;
     db.prepare(
-      'UPDATE users SET name = ?, bio = ?, avatar = ?, interests = ?, message_policy = ?, is_private = ?, birth_date = ? WHERE id = ?'
+      'UPDATE users SET name = ?, bio = ?, avatar = ?, banner = ?, interests = ?, message_policy = ?, is_private = ?, birth_date = ? WHERE id = ?'
     ).run(
       name,
       bio,
       avatar,
+      banner,
       JSON.stringify(interests),
       messagePolicy,
       isPrivate,
@@ -1662,6 +1783,7 @@ async function handleApi(req, res, pathname, url) {
       me.id
     );
     if (oldAvatar && oldAvatar !== avatar) removeUploadIfUnused(oldAvatar);
+    if (oldBanner && oldBanner !== banner) removeUploadIfUnused(oldBanner);
     if (Number(me.is_private) === 1 && isPrivate === 0) {
       const pending = db.prepare('SELECT * FROM follow_requests WHERE target_id = ?').all(me.id);
       for (const request of pending) acceptFollowRequestRow(request);
@@ -1674,6 +1796,51 @@ async function handleApi(req, res, pathname, url) {
       badges: badgesFor(fresh, freshStats),
       pendingFollowRequests: followRequestCount(me.id),
     });
+  }
+
+  // --- segurança: sessões e senha --------------------------------------
+  if (method === 'GET' && pathname === '/api/sessions') {
+    const currentToken = cookieValue(req, SESSION_COOKIE);
+    const rows = db
+      .prepare('SELECT token, created_at, user_agent FROM sessions WHERE user_id = ? AND created_at > ? ORDER BY created_at DESC')
+      .all(me.id, now() - SESSION_TTL);
+    return json(res, 200, {
+      sessions: rows.map((row) => ({
+        id: sessionId(row.token),
+        device: describeUserAgent(row.user_agent),
+        createdAt: row.created_at,
+        current: row.token === currentToken,
+      })),
+    });
+  }
+
+  const sessionMatch = matchRoute(pathname, '/api/sessions/:id');
+  if (method === 'DELETE' && sessionMatch) {
+    const currentToken = cookieValue(req, SESSION_COOKIE);
+    const rows = db.prepare('SELECT token FROM sessions WHERE user_id = ?').all(me.id);
+    const target = rows.find((row) => sessionId(row.token) === sessionMatch.id);
+    if (!target) throw new HttpError(404, 'Sessão não encontrada.');
+    if (target.token === currentToken) {
+      throw new HttpError(400, 'Use "Sair" para encerrar a sessão atual.');
+    }
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(target.token);
+    return json(res, 200, { ok: true });
+  }
+
+  if (method === 'POST' && pathname === '/api/me/password') {
+    rateLimit(req, 'password-change', 8, 60 * 60 * 1000);
+    const body = await readBody(req);
+    const currentPassword = String(body.currentPassword || '');
+    const newPassword = String(body.newPassword || '');
+    if (!checkPassword(currentPassword, me.password_hash)) {
+      throw new HttpError(401, 'Senha atual incorreta.');
+    }
+    const password = cleanText(newPassword, 'Nova senha', { min: 6, max: 100, required: true });
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), me.id);
+    /* Mantém apenas a sessão atual ativa após a troca. */
+    const currentToken = cookieValue(req, SESSION_COOKIE);
+    db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(me.id, currentToken);
+    return json(res, 200, { ok: true });
   }
 
   // --- feed / explore -------------------------------------------------
@@ -2847,6 +3014,24 @@ async function handleApi(req, res, pathname, url) {
   }
 
   // --- denúncias / moderação -----------------------------------------
+  if (method === 'POST' && pathname === '/api/problem-reports') {
+    rateLimit(req, 'problem-reports', 8, 60 * 60 * 1000);
+    const body = await readBody(req);
+    const category = String(body.category || '').trim();
+    if (!PROBLEM_CATEGORIES.has(category)) {
+      throw new HttpError(400, 'Categoria de problema inválida.');
+    }
+    const title = cleanText(body.title, 'Resumo', { min: 3, max: 120, required: true });
+    const details = cleanText(body.details || '', 'Detalhes', { max: 2000 });
+    const context = cleanText(body.context || '', 'Contexto', { max: 300 });
+    const result = db
+      .prepare(
+        'INSERT INTO problem_reports (reporter_id, category, title, details, context, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      .run(me.id, category, title, details, context, now());
+    return json(res, 201, { report: { id: Number(result.lastInsertRowid), status: 'open' } });
+  }
+
   if (method === 'POST' && pathname === '/api/reports') {
     rateLimit(req, 'reports', 10, 60 * 60 * 1000);
     const body = await readBody(req);
@@ -2893,6 +3078,37 @@ async function handleApi(req, res, pathname, url) {
     const report = db.prepare('SELECT id FROM reports WHERE id = ?').get(Number(reportMatch.id));
     if (!report) throw new HttpError(404, 'Denúncia não encontrada.');
     db.prepare('UPDATE reports SET status = ?, reviewed_at = ? WHERE id = ?').run(body.status, now(), report.id);
+    return json(res, 200, { ok: true });
+  }
+
+  // --- relatos de problemas técnicos ----------------------------------
+  if (method === 'GET' && pathname === '/api/moderation/problem-reports') {
+    requireAdmin(req);
+    const rows = db
+      .prepare(
+        `SELECT p.*, u.username AS reporter_username
+         FROM problem_reports p JOIN users u ON u.id = p.reporter_id
+         WHERE p.status IN ('open', 'reviewing')
+         ORDER BY p.created_at ASC LIMIT 100`
+      )
+      .all();
+    return json(res, 200, { reports: rows });
+  }
+
+  const problemReportMatch = matchRoute(pathname, '/api/moderation/problem-reports/:id');
+  if (method === 'PATCH' && problemReportMatch) {
+    requireAdmin(req);
+    const body = await readBody(req);
+    if (!['reviewing', 'resolved', 'dismissed'].includes(body.status)) {
+      throw new HttpError(400, 'Status de moderação inválido.');
+    }
+    const report = db.prepare('SELECT id FROM problem_reports WHERE id = ?').get(Number(problemReportMatch.id));
+    if (!report) throw new HttpError(404, 'Relato não encontrado.');
+    db.prepare('UPDATE problem_reports SET status = ?, reviewed_at = ? WHERE id = ?').run(
+      body.status,
+      now(),
+      report.id
+    );
     return json(res, 200, { ok: true });
   }
 

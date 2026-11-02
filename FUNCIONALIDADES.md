@@ -311,3 +311,28 @@ Modelo para novas entradas:
 - Adicionados `.gitignore`, `.env.example` e `qa/production-tests.mjs`.
 - Os testes que dependem dos perfis de exemplo agora habilitam o seed de forma
   explícita e recebem uma senha aleatória.
+
+### 2026-11-02 — Atualização 024 — Cartão “Conta” simplificado
+
+- O cartão “Conta” das Configurações agora tem apenas **Nome**, **Usuário**
+  (somente leitura, com a dica “O usuário não pode ser alterado.”), **Bio**
+  (com limite de 150 caracteres e contador), **Aparência** (tema) e o botão
+  **Salvar conta**.
+- Removidos da interface os cartões “Foto de perfil” e “Capa do perfil” e toda a
+  seção “Interesses”. A foto e a capa continuam editáveis pelo próprio perfil
+  (lápis sobre o avatar e botão “Editar capa” na capa).
+- O formulário “Conta” envia apenas `name` e `bio` (mais `birthDate` quando a
+  conta ainda não tem data de nascimento): foto, capa e interesses não são
+  enviados e portanto não são apagados nem sobrescritos no banco.
+- `PATCH /api/me` passou a recusar `username` e `user_id` com **400** e a
+  validar Nome e Bio (tamanho mínimo/máximo, remoção de espaços extras e
+  recusa de caracteres de controle).
+- A rota continua atualizando apenas o perfil autenticado; editar o perfil de
+  outra pessoa responde **404**.
+- O botão de editar a foto de perfil foi movido do cartão para um selo sobre o
+  canto inferior direito do avatar: invisível por padrão, aparece no hover do
+  avatar, no foco por teclado e fica sempre visível em dispositivos sem hover
+  (área de toque de 44×44 px).
+- Testes automatizados novos em `qa/smoke.mjs`: rejeição de `username` e
+  `user_id`, edição de perfil alheio, persistência de nome/bio e preservação de
+  foto e interesses ao salvar a conta.

@@ -23,6 +23,9 @@ import {
   navigate,
   registerView,
   closeModal,
+  openProfileMenu,
+  closeProfileMenu,
+  isProfileMenuOpen,
 } from './core.js';
 import { renderHome, renderExplore, renderProfile, closeStories } from './social.js';
 import {
@@ -41,6 +44,11 @@ import {
   handleAction as handleDatingAction,
   handleSubmit as handleDatingSubmit,
 } from './dating.js';
+import {
+  openProblemReportModal,
+  handleSubmit as handleAccountSubmit,
+} from './account-menu.js';
+import { renderSettings, handleAction as handleSettingsAction, handleSubmit as handleSettingsSubmit } from './settings.js';
 
 /* ------------------------------------------------------------------ */
 /* Sessão                                                             */
@@ -227,11 +235,36 @@ async function handleClick(event) {
       await navigate('profile', { username: state.me.username });
       return;
     }
+    if (action === 'account-menu') {
+      if (!state.me) return;
+      openProfileMenu(state.me);
+      return;
+    }
+    if (action === 'menu-my-profile') {
+      closeProfileMenu();
+      await navigate('profile', { username: state.me.username });
+      return;
+    }
+    if (action === 'settings') {
+      closeProfileMenu();
+      await navigate('settings');
+      return;
+    }
+    if (action === 'report-problem') {
+      closeProfileMenu();
+      openProblemReportModal();
+      return;
+    }
+    if (action === 'close-profile-menu') {
+      closeProfileMenu();
+      return;
+    }
     if (action === 'retry-view') {
       await navigate(state.view, state.params);
       return;
     }
     if (action === 'logout') {
+      closeProfileMenu();
       await logout();
       return;
     }
@@ -244,6 +277,7 @@ async function handleClick(event) {
       return;
     }
 
+    if (await handleSettingsAction(action, target)) return;
     if (await handleSocialAction(action, target)) return;
     if (await handleMessagesAction(action, target)) return;
     if (await handleDatingAction(action, target)) return;
@@ -265,6 +299,8 @@ async function handleSubmit(event) {
     if (await handleSocialSubmit(form, event)) return;
     if (await handleMessagesSubmit(form, event)) return;
     if (await handleDatingSubmit(form, event)) return;
+    if (await handleSettingsSubmit(form, event)) return;
+    if (await handleAccountSubmit(form, event)) return;
   } catch (error) {
     if (error.status === 401) {
       showAuth('login');
@@ -287,11 +323,16 @@ async function boot() {
     if (event.target.classList && event.target.classList.contains('modal-backdrop')) {
       closeModal();
     }
+    /* Clique fora do menu lateral do perfil fecha o painel. */
+    if (event.target.closest && event.target.closest('[data-profile-menu-close]')) {
+      closeProfileMenu();
+    }
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       const modalRoot = $('#modal-root');
       if (modalRoot && modalRoot.innerHTML) closeModal();
+      else if (isProfileMenuOpen()) closeProfileMenu();
       else closeStories();
     }
   });
@@ -319,5 +360,6 @@ registerView('explore', renderExplore);
 registerView('dating', renderDating);
 registerView('messages', renderMessages);
 registerView('profile', renderProfile);
+registerView('settings', renderSettings);
 
 boot();

@@ -806,7 +806,7 @@
               </div>
               <div class="profile-actions">
                 ${data.isMe
-                  ? `<button type="button" class="btn ghost" data-action="edit-profile">Editar perfil</button>
+                  ? `<button type="button" class="btn ghost" data-action="open-settings">Configurações</button>
                      <button type="button" class="btn ghost" data-action="logout">Sair</button>`
                   : `<button type="button" class="btn ${data.isFollowing ? 'ghost' : 'primary'}" data-action="follow" data-username="${esc(data.user.username)}" data-following="${data.isFollowing}">${data.isFollowing ? 'Seguindo' : 'Seguir'}</button>`}
               </div>
@@ -992,11 +992,11 @@
     });
   }
 
-  function openEditProfileModal() {
+  function openSettingsModal() {
     pendingAvatar = null;
     openModal(`
       <div class="modal-head">
-        <h2>Editar perfil</h2>
+        <h2>Configurações</h2>
         <button type="button" class="icon-btn" data-action="close-modal" aria-label="Fechar">${icon('close')}</button>
       </div>
       <form id="edit-form" class="modal-form">
@@ -1024,21 +1024,23 @@
       </form>`, 'create-modal');
 
     const input = $('#avatar-image');
-    input.addEventListener('change', () => {
-      const file = input.files && input.files[0];
-      if (!file) return;
-      if (file.size > 8 * 1024 * 1024) {
-        toast('A imagem precisa ter no máximo 8 MB.', 'error');
-        input.value = '';
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        pendingAvatar = String(reader.result);
-        $('#edit-avatar-preview').innerHTML = `<img class="avatar" src="${pendingAvatar}" alt="Nova foto de perfil" style="width:84px;height:84px" />`;
-      };
-      reader.readAsDataURL(file);
-    });
+    if (input) {
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (file.size > 8 * 1024 * 1024) {
+          toast('A imagem precisa ter no máximo 8 MB.', 'error');
+          input.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          pendingAvatar = String(reader.result);
+          $('#edit-avatar-preview').innerHTML = `<img class="avatar" src="${pendingAvatar}" alt="Nova foto de perfil" style="width:84px;height:84px" />`;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   }
 
   /* ---------------------------------------------------------------- */
@@ -1174,8 +1176,8 @@
         return;
       }
 
-      if (action === 'edit-profile') {
-        openEditProfileModal();
+      if (action === 'open-settings') {
+        openSettingsModal();
         return;
       }
 

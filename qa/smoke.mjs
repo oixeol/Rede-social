@@ -47,6 +47,107 @@ ok('cookie de sessão', cookie.startsWith('vibra_session='));
 const me = await api('/api/me');
 ok('sessão /api/me', me.status === 200 && me.data.user.id === 1);
 
+/* --- edição de conta: username imutável e persistência de nome/bio --- */
+const originalUsername = me.data.user.username;
+const originalAvatar = me.data.user.avatar;
+const originalInterests = me.data.user.interests;
+
+const usernameAttempt = await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ username: 'vibra-editado' }),
+});
+ok(
+  'PATCH /api/me rejeita alteração de username',
+  usernameAttempt.status === 400 || usernameAttempt.status === 422,
+  `status ${usernameAttempt.status}`
+);
+
+const userIdAttempt = await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ user_id: 99 }),
+});
+ok(
+  'PATCH /api/me rejeita user_id do cliente',
+  userIdAttempt.status === 400 || userIdAttempt.status === 422,
+  `status ${userIdAttempt.status}`
+);
+
+const usernameAfter = await api('/api/me');
+ok(
+  'username permanece inalterado no banco',
+  usernameAfter.status === 200 && usernameAfter.data.user.username === originalUsername
+);
+
+const otherProfileAttempt = await api('/api/users/ana.souza', {
+  method: 'PATCH',
+  body: JSON.stringify({ name: 'Invadido' }),
+});
+ok(
+  'não é possível editar perfil de outra pessoa',
+  otherProfileAttempt.status === 403 || otherProfileAttempt.status === 404,
+  `status ${otherProfileAttempt.status}`
+);
+
+const otherProfileIntact = await api('/api/users/ana.souza');
+ok(
+  'perfil de outra pessoa permanece intacto',
+  otherProfileIntact.status === 200 && otherProfileIntact.data.user.name !== 'Invadido'
+);
+
+const nameBioUpdate = await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ name: '  Vibra   Teste  ', bio: 'Bio de teste automatizado.' }),
+});
+ok(
+  'nome e bio são salvos e normalizados',
+  nameBioUpdate.status === 200 &&
+    nameBioUpdate.data.user.name === 'Vibra Teste' &&
+    nameBioUpdate.data.user.bio === 'Bio de teste automatizado.'
+);
+
+const meAfterEdit = await api('/api/me');
+ok(
+  'nome e bio persistem no banco',
+  meAfterEdit.status === 200 &&
+    meAfterEdit.data.user.name === 'Vibra Teste' &&
+    meAfterEdit.data.user.bio === 'Bio de teste automatizado.'
+);
+
+ok(
+  'salvar conta não apaga foto nem interesses',
+  meAfterEdit.data.user.avatar === originalAvatar &&
+    JSON.stringify(meAfterEdit.data.user.interests) === JSON.stringify(originalInterests)
+);
+
+const bioTooLong = await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ bio: 'x'.repeat(151) }),
+});
+ok('bio acima do limite é rejeitada', bioTooLong.status === 400, `status ${bioTooLong.status}`);
+
+const bioWithControl = await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ bio: 'texto\u0007invalido' }),
+});
+ok('bio com caractere de controle é rejeitada', bioWithControl.status === 400, `status ${bioWithControl.status}`);
+
+const nameWithControl = await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ name: 'Vibra\u0007z' }),
+});
+ok('nome com caractere de controle é rejeitado', nameWithControl.status === 400, `status ${nameWithControl.status}`);
+
+const emptyName = await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ name: '   ' }),
+});
+ok('nome vazio é rejeitado', emptyName.status === 400, `status ${emptyName.status}`);
+
+await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ name: originalUsername === 'vibra' ? 'Vibra' : originalUsername, bio: 'Seu cantinho visual. Compartilhe o que te inspira.' }),
+});
+
 const feed = await api('/api/feed');
 ok('feed carregado', feed.status === 200 && feed.data.posts.length >= 7, `${feed.data.posts.length} posts`);
 ok('feed com autor e contagem', feed.data.posts.every((post) => post.user && typeof post.likes === 'number'));

@@ -7,7 +7,6 @@
  *  - Player de vídeo no feed: reproduzir, pausar, silenciar e sincronizar vídeos.
  *  - Publicação aberta: exibir mídia, legenda, comentários, curtidas e compartilhamento.
  *  - Criar publicação / story: selecionar, validar, pré-visualizar e enviar mídias.
- *  - Editar perfil: atualizar avatar, dados, interesses, privacidade e política de mensagens.
  *  - Menu de perfil, denúncia e bloqueio: denunciar, bloquear, desbloquear e listar bloqueados.
  *  - Solicitações de seguimento: consultar, aceitar e recusar pedidos.
  *  - Melhores amigos: buscar, adicionar e remover pessoas da lista exclusiva.
@@ -46,7 +45,6 @@ import {
   closeModal,
   confirmDialog,
   navigate,
-  refreshNavAvatar,
   refreshBadges,
   fileToDataUrl,
   uploadVideo,
@@ -64,6 +62,7 @@ import {
   fetchExplore,
   carouselMarkup,
   carouselStep,
+  openAvatarViewer,
 } from './social.js';
 
 /* ------------------------------------------------------------------ */
@@ -465,99 +464,6 @@ export function openStoryModal() {
       </div>
     </form>`, 'create-modal');
   bindMediaInput($('#story-media'), $('#upload-preview'));
-}
-
-/* ------------------------------------------------------------------ */
-/* Editar perfil                                                      */
-/* ------------------------------------------------------------------ */
-
-let pendingAvatar = null;
-
-export function openEditProfileModal() {
-  pendingAvatar = null;
-  const interests = state.me.interests || [];
-  const policy = state.me.messagePolicy || 'connections';
-  openModal(`
-    <div class="modal-head">
-      <h2>Editar perfil</h2>
-      <button type="button" class="icon-btn" data-action="close-modal" aria-label="Fechar">${icon('close')}</button>
-    </div>
-    <form id="edit-form" class="modal-form">
-      <div class="edit-avatar">
-        <span id="edit-avatar-preview">${avatar(state.me, 84)}</span>
-        <label class="btn ghost small" for="avatar-image">Trocar foto</label>
-        <input id="avatar-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
-      </div>
-      <label class="field">
-        <span>Nome</span>
-        <input name="name" type="text" value="${esc(state.me.name)}" maxlength="40" required />
-      </label>
-      <label class="field">
-        <span>Usuário</span>
-        <input type="text" value="@${esc(state.me.username)}" disabled />
-      </label>
-      <label class="field">
-        <span>Bio</span>
-        <textarea name="bio" rows="3" maxlength="150" placeholder="Conte um pouco sobre você">${esc(state.me.bio)}</textarea>
-      </label>
-      <fieldset class="field interests-field">
-        <legend>Interesses <small>(até 12)</small></legend>
-        <div class="interest-options">
-          ${state.config.interests.map((interest) => `
-            <label class="check-chip">
-              <input type="checkbox" name="interests" value="${esc(interest.id)}" ${interests.includes(interest.id) ? 'checked' : ''} />
-              <span>${esc(interest.label)}</span>
-            </label>`).join('')}
-        </div>
-      </fieldset>
-      <label class="field">
-        <span>Quem pode enviar mensagens</span>
-        <select name="messagePolicy">
-          <option value="connections" ${policy === 'connections' ? 'selected' : ''}>Pessoas que eu sigo de volta</option>
-          <option value="everyone" ${policy === 'everyone' ? 'selected' : ''}>Qualquer pessoa</option>
-          <option value="nobody" ${policy === 'nobody' ? 'selected' : ''}>Ninguém</option>
-        </select>
-      </label>
-      <div class="switch-list profile-private-switch">
-        <label class="switch-row">
-          <span>
-            <strong>Perfil privado</strong>
-            <small>Quem quiser seguir você precisa enviar uma solicitação. Você aceita ou recusa, e só seguidores aprovados veem suas publicações e stories.</small>
-          </span>
-          <span class="switch">
-            <input type="checkbox" name="isPrivate" ${state.me.isPrivate ? 'checked' : ''} />
-            <i></i>
-          </span>
-        </label>
-      </div>
-      ${!state.me.birthDate ? `
-        <label class="field">
-          <span>Data de nascimento</span>
-          <input name="birthDate" type="date" required />
-          <small class="field-hint">Necessária para idade mínima da plataforma.</small>
-        </label>` : ''}
-      <div class="modal-actions">
-        <button type="button" class="btn ghost" data-action="close-modal">Cancelar</button>
-        <button type="submit" class="btn primary">Salvar</button>
-      </div>
-    </form>`, 'create-modal');
-
-  const input = $('#avatar-image');
-  input.addEventListener('change', async () => {
-    const file = input.files && input.files[0];
-    if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast('A imagem precisa ter no máximo 8 MB.', 'error');
-      input.value = '';
-      return;
-    }
-    try {
-      pendingAvatar = await fileToDataUrl(file);
-      $('#edit-avatar-preview').innerHTML = `<img class="avatar" src="${pendingAvatar}" alt="Nova foto de perfil" style="width:84px;height:84px" />`;
-    } catch (error) {
-      toast(error.message, 'error');
-    }
-  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -1051,9 +957,6 @@ export async function handleAction(action, target) {
       pauseInlineVideos();
       openStoryModal();
       return true;
-    case 'edit-profile':
-      openEditProfileModal();
-      return true;
     case 'like':
       await toggleLike(Number(target.dataset.likeBtn));
       return true;
@@ -1167,6 +1070,18 @@ export async function handleAction(action, target) {
     case 'profile-menu': {
       const data = await api(`/api/users/${encodeURIComponent(target.dataset.username)}`);
       openProfileMenu(data.user);
+      return true;
+    }
+    case 'preview-avatar': {
+      const profile = state.profile;
+      if (!profile || !profile.user) return true;
+      openAvatarViewer(profile);
+      return true;
+    }
+    case 'edit-profile-avatar': {
+      const profile = state.profile;
+      if (!profile || !profile.user || !profile.isMe) return true;
+      openAvatarViewer(profile, { autoEdit: true });
       return true;
     }
     case 'message-user':
@@ -1377,49 +1292,6 @@ export async function handleSubmit(form, event) {
       closeModal();
       toast('Story publicado. Ele desaparece em 24 horas.');
       await navigate('home');
-    } finally {
-      setBusy(button, false);
-    }
-    return true;
-  }
-
-  if (form.id === 'edit-form') {
-    event.preventDefault();
-    const button = form.querySelector('button[type="submit"]');
-    const data = new FormData(form);
-    const interests = data.getAll('interests').map(String);
-    if (interests.length > 12) {
-      toast('Selecione no máximo 12 interesses.', 'error');
-      return true;
-    }
-    const payload = {
-      name: String(data.get('name') || '').trim(),
-      bio: String(data.get('bio') || '').trim(),
-      interests,
-      messagePolicy: String(data.get('messagePolicy') || 'connections'),
-      isPrivate: data.get('isPrivate') === 'on',
-    };
-    if (!state.me.birthDate && data.get('birthDate')) payload.birthDate = String(data.get('birthDate'));
-    if (pendingAvatar) payload.avatar = pendingAvatar;
-    const wasPrivate = !!state.me.isPrivate;
-    const pendingBefore = Number(state.me.pendingFollowRequests) || 0;
-    setBusy(button, true);
-    try {
-      const result = await api('/api/me', { method: 'PATCH', body: JSON.stringify(payload) });
-      state.me = result.user;
-      state.me.pendingFollowRequests = Number.isFinite(result.pendingFollowRequests)
-        ? result.pendingFollowRequests
-        : 0;
-      state.me.badges = Array.isArray(result.badges) ? result.badges : [];
-      pendingAvatar = null;
-      refreshNavAvatar();
-      closeModal();
-      if (wasPrivate && !state.me.isPrivate && pendingBefore > 0) {
-        toast(`Perfil público. ${pendingBefore} ${plural(pendingBefore, 'solicitação foi aceita', 'solicitações foram aceitas')}.`);
-      } else {
-        toast('Perfil atualizado.');
-      }
-      await navigate('profile', { username: state.me.username });
     } finally {
       setBusy(button, false);
     }

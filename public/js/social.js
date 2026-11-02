@@ -26,6 +26,7 @@ import {
   relTime,
   longDate,
   avatar,
+  initialsFor,
   interestLabel,
   mediaMarkup,
   emptyState,
@@ -856,6 +857,169 @@ function paintExplorePeople(users) {
 /* Perfil                                                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Aplica no estado local o retorno de `PATCH /api/me`.
+ *
+ * O DTO do usuário não traz `pendingFollowRequests` nem `badges`; ambos são
+ * repostos manualmente para não perder os contadores exibidos na interface.
+ *
+ * @param {object} result Resposta da API.
+ */
+function applyMeUpdate(result) {
+  if (!result || !result.user) return;
+  state.me = result.user;
+  state.stats = result.stats;
+  state.me.pendingFollowRequests = Number.isFinite(result.pendingFollowRequests)
+    ? result.pendingFollowRequests
+    : 0;
+  state.me.badges = Array.isArray(result.badges) ? result.badges : [];
+  refreshNavAvatar();
+}
+
+/**
+ * Envia a foto ou a capa escolhida e recarrega o perfil.
+ *
+ * @param {HTMLElement} viewElement Elemento da view de perfil.
+ * @param {object} data Dados do perfil exibido.
+ * @param {'avatar'|'banner'} field Campo atualizado.
+ * @param {File} file Arquivo selecionado.
+ */
+async function uploadProfileMedia(viewElement, data, field, file) {
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    toast('A imagem precisa ter no máximo 8 MB.', 'error');
+    return;
+  }
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    await saveProfileMedia(viewElement, data, field, dataUrl);
+  } catch (error) {
+    toast(error.message || 'Não foi possível atualizar a imagem.', 'error');
+  }
+}
+
+/**
+ * Persiste a foto ou a capa e recarrega o perfil.
+ *
+ * @param {HTMLElement} viewElement Elemento da view de perfil.
+ * @param {object} data Dados do perfil exibido.
+ * @param {'avatar'|'banner'} field Campo atualizado.
+ * @param {string} dataUrl Imagem em data URL.
+ */
+async function saveProfileMedia(viewElement, data, field, dataUrl) {
+  try {
+    const result = await api('/api/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ [field]: dataUrl }),
+    });
+    applyMeUpdate(result);
+    toast(field === 'avatar' ? 'Foto de perfil atualizada.' : 'Capa atualizada.');
+    await renderProfile(viewElement, { username: data.user.username });
+  } catch (error) {
+    toast(error.message || 'Não foi possível atualizar a imagem.', 'error');
+  }
+}
+
+/**
+ * Abre a visualização ampliada da foto de perfil.
+ *
+ * A foto aparece ampliada no centro da tela, sobre um fundo escurecido. No
+ * próprio perfil, a foto traz um lápis no canto para escolher um novo arquivo
+ * e o botão "Salvar" fica no canto inferior direito da tela.
+ *
+ * @param {object} data Objeto com `user` e `isMe`.
+ * @param {object} [options] Opções da visualização.
+ * @param {boolean} [options.autoEdit=false] Abre o seletor de arquivo em seguida.
+ * @returns {void}
+ */
+export function openAvatarViewer(data, { autoEdit = false } = {}) {
+  const user = data.user;
+  const canEdit = !!data.isMe;
+  const frame = user.avatar
+    ? `<img src="${esc(user.avatar)}" alt="Foto de ${esc(user.name)}" />`
+    : `<span class="avatar-viewer-fallback">${esc(initialsFor(user))}</span>`;
+
+  const modal = openModal(`
+    <div class="avatar-viewer">
+      <h2 class="avatar-viewer-title">Foto de perfil</h2>
+      <button type="button" class="icon-btn avatar-viewer-close" data-action="close-modal" aria-label="Fechar">${icon('close')}</button>
+      <div class="avatar-viewer-media">
+        <span class="avatar-viewer-frame" id="avatar-viewer-frame">
+          ${frame}
+          ${canEdit ? `
+            <button type="button" class="avatar-viewer-pencil" id="avatar-viewer-edit" aria-label="Alterar foto de perfil">${icon('edit', 16)}</button>` : ''}
+        </span>
+      </div>
+      ${canEdit ? `
+        <input id="avatar-viewer-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+        <div class="avatar-viewer-footer">
+          <button type="button" class="btn primary" id="avatar-viewer-save" disabled>Salvar</button>
+        </div>` : ''}
+    </div>`, 'avatar-viewer-modal-wrap');
+
+  if (!canEdit) return;
+  const input = $('#avatar-viewer-input', modal);
+  const pencil = $('#avatar-viewer-edit', modal);
+  const save = $('#avatar-viewer-save', modal);
+  const holder = $('#avatar-viewer-frame', modal);
+  if (!input || !pencil || !save || !holder) return;
+
+  let pending = null;
+
+  pencil.addEventListener('click', () => input.click());
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast('A imagem precisa ter no máximo 8 MB.', 'error');
+      return;
+    }
+    try {
+      pending = await fileToDataUrl(file);
+      holder.innerHTML = `<img src="${pending}" alt="Nova foto de perfil" />
+        <button type="button" class="avatar-viewer-pencil" id="avatar-viewer-edit" aria-label="Alterar foto de perfil">${icon('edit', 16)}</button>`;
+      $('#avatar-viewer-edit', holder).addEventListener('click', () => input.click());
+      save.disabled = false;
+    } catch (error) {
+      toast(error.message || 'Não foi possível ler a imagem.', 'error');
+    }
+  });
+
+  save.addEventListener('click', async () => {
+    if (!pending) return;
+    setBusy(save, true);
+    try {
+      await saveProfileMedia($('#view'), data, 'avatar', pending);
+      closeModal();
+    } finally {
+      setBusy(save, false);
+    }
+  });
+
+  if (autoEdit) input.click();
+}
+
+/**
+ * Liga os botões de edição de foto e capa do próprio perfil.
+ *
+ * @param {HTMLElement} viewElement Elemento da view de perfil.
+ * @param {object} data Dados do perfil exibido.
+ */
+function bindProfileMediaEditors(viewElement, data) {
+  if (!data.isMe) return;
+  const bannerInput = $('#profile-banner-input', viewElement);
+  const bannerButton = $('[data-action="edit-profile-banner"]', viewElement);
+  if (bannerInput && bannerButton) {
+    bannerButton.addEventListener('click', () => bannerInput.click());
+    bannerInput.addEventListener('change', () => {
+      const file = bannerInput.files && bannerInput.files[0];
+      bannerInput.value = '';
+      uploadProfileMedia(viewElement, data, 'banner', file);
+    });
+  }
+}
+
 export async function renderProfile(viewElement, params = {}) {
   const username = params.username || state.me.username;
   viewElement.innerHTML = `
@@ -880,44 +1044,52 @@ export async function renderProfile(viewElement, params = {}) {
   const bio = data.user.bio
     ? `<p>${captionHtml(data.user.bio)}</p>`
     : '<p class="muted">Sem bio ainda.</p>';
-  const policyLabel = data.user.messagePolicy === 'everyone'
-    ? 'Qualquer pessoa pode enviar mensagem'
-    : data.user.messagePolicy === 'nobody'
-      ? 'Ninguém pode enviar mensagem'
-      : 'Pessoas que você segue de volta podem enviar mensagem';
-  const isPrivate = !!data.user.isPrivate;
-  const pendingRequests = data.pendingFollowRequests || 0;
-  const badges = Array.isArray(data.badges) ? data.badges : [];
-  const privateBadge = isPrivate
-    ? `<span class="private-badge">${icon('lock', 12)} Privado</span>`
-    : '';
+
+  /* A capa usa a imagem enviada pelo usuário; sem capa, cai na imagem da
+     primeira publicação apenas como preenchimento visual. */
+  const bannerMarkup = data.user.banner
+    ? `<img class="profile-banner-image" src="${esc(data.user.banner)}" alt="Capa de ${esc(data.user.name)}" />`
+    : cover
+      ? (cover.mediaType === 'video'
+        ? `<video src="${esc(cover.image)}" muted playsinline preload="metadata" aria-hidden="true"></video>`
+        : `<img src="${esc(cover.image)}" alt="" aria-hidden="true" />`)
+      : '';
 
   viewElement.innerHTML = `
     <div class="profile">
       <div class="profile-cover">
-        ${cover ? (cover.mediaType === 'video'
-          ? `<video src="${esc(cover.image)}" muted playsinline preload="metadata" aria-hidden="true"></video>`
-          : `<img src="${esc(cover.image)}" alt="" aria-hidden="true" />`) : ''}
+        ${bannerMarkup}
         <span class="profile-cover-shade"></span>
+        ${data.isMe ? `
+          <div class="profile-cover-actions">
+            <button type="button" class="profile-media-btn profile-cover-edit" data-action="edit-profile-banner" aria-label="Editar capa do perfil">
+              ${icon('camera', 15)} <span>Editar capa</span>
+            </button>
+          </div>
+          <input id="profile-banner-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />` : ''}
       </div>
       <header class="profile-card">
-        <div class="profile-avatar-wrap">${avatar(data.user, 112, 'profile-avatar')}</div>
+        <div class="profile-avatar-wrap">
+          <button type="button" class="profile-avatar-btn" data-action="preview-avatar" aria-label="Ampliar foto de perfil">
+            ${avatar(data.user, 112, 'profile-avatar')}
+          </button>
+          ${data.isMe ? `
+            <button type="button" class="profile-avatar-pencil" data-action="edit-profile-avatar" aria-label="Editar foto de perfil">
+              ${icon('edit', 15)}
+            </button>` : ''}
+        </div>
         <div class="profile-info">
           <div class="profile-top">
             <div class="profile-identity">
-              <p class="eyebrow">@${esc(data.user.username)} ${privateBadge}</p>
+              <p class="eyebrow">@${esc(data.user.username)}</p>
               <h1>${esc(data.user.name)}</h1>
             </div>
+            ${data.isMe ? '' : `
             <div class="profile-actions">
-              ${data.isMe
-                ? `<button type="button" class="btn ghost" data-action="edit-profile">${icon('edit', 16)} Editar perfil</button>
-                   <button type="button" class="btn primary" data-action="nav" data-view="dating">${icon('spark', 16)} Namoro</button>
-                   <button type="button" class="btn ghost" data-action="blocked-users">${icon('ban', 16)} Pessoas bloqueadas</button>
-                   <button type="button" class="btn ghost" data-action="logout">Sair</button>`
-                : `${followButton({ ...data.user, isFollowing: data.isFollowing, followRequested: data.followRequested })}
-                   ${data.canMessage ? `<button type="button" class="btn ghost" data-action="message-user" data-username="${esc(data.user.username)}">${icon('message', 16)} Mensagem</button>` : ''}
-                   <button type="button" class="icon-btn" data-action="profile-menu" data-username="${esc(data.user.username)}" aria-label="Mais opções">${icon('more')}</button>`}
-            </div>
+              ${followButton({ ...data.user, isFollowing: data.isFollowing, followRequested: data.followRequested })}
+              ${data.canMessage ? `<button type="button" class="btn ghost" data-action="message-user" data-username="${esc(data.user.username)}">${icon('message', 16)} Mensagem</button>` : ''}
+              <button type="button" class="icon-btn" data-action="profile-menu" data-username="${esc(data.user.username)}" aria-label="Mais opções">${icon('more')}</button>
+            </div>`}
           </div>
           <div class="profile-bio">${bio}</div>
           <div class="profile-stats">
@@ -929,38 +1101,6 @@ export async function renderProfile(viewElement, params = {}) {
               <strong>${formatCount(data.stats.following)}</strong> seguindo
             </button>
           </div>
-          ${badges.length ? `
-            <div class="profile-badges">
-              <p class="eyebrow">Conquistas</p>
-              <div class="badges">
-                ${badges.map((badge) => `<span class="badge" title="${esc(badge.description)}">${icon(badge.icon, 15)} ${esc(badge.label)}</span>`).join('')}
-              </div>
-            </div>` : ''}
-          ${data.isMe ? `
-            <div class="profile-privacy">
-              <div>
-                <strong>Quem pode enviar mensagens</strong>
-                <span>${esc(policyLabel)}</span>
-              </div>
-              <button type="button" class="btn ghost small" data-action="edit-profile">Ajustar</button>
-            </div>
-            <div class="profile-privacy">
-              <div>
-                <strong>Perfil ${isPrivate ? 'privado' : 'público'}</strong>
-                <span>${isPrivate ? 'Só quem você aprovar pode ver suas publicações e stories.' : 'Qualquer pessoa pode ver suas publicações e stories.'}</span>
-              </div>
-              <div class="profile-privacy-actions">
-                ${isPrivate ? `<button type="button" class="btn ghost small" data-action="follow-requests">${icon('users', 15)} Solicitações <span class="pending-count" data-pending-follow-requests ${pendingRequests > 0 ? '' : 'hidden'}>${pendingRequests}</span></button>` : ''}
-                <button type="button" class="btn ghost small" data-action="edit-profile">Ajustar</button>
-              </div>
-            </div>
-            <div class="profile-privacy">
-              <div>
-                <strong>Melhores amigos</strong>
-                <span>Escolha quem vê seus stories exclusivos.</span>
-              </div>
-              <button type="button" class="btn ghost small" data-action="close-friends">${icon('users', 15)} Gerenciar</button>
-            </div>` : ''}
         </div>
       </header>
 
@@ -992,6 +1132,7 @@ export async function renderProfile(viewElement, params = {}) {
         </div>`}
     </div>`;
   hydrateIcons(viewElement);
+  bindProfileMediaEditors(viewElement, data);
 }
 
 /* PART2 */

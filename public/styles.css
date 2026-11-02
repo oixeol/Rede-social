@@ -1707,6 +1707,7 @@ textarea {
 }
 
 .profile-avatar-wrap {
+  position: relative;
   flex: none;
   margin-top: -70px;
 }
@@ -2032,6 +2033,19 @@ textarea {
   justify-content: flex-end;
   gap: 9px;
   padding-top: 4px;
+}
+
+/* Ações distribuídas: botão auxiliar à esquerda, grupo principal à direita. */
+.modal-actions-split {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.modal-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
 
 .upload-area {
@@ -5259,8 +5273,7 @@ button.chip:hover {
 }
 
 .option-chip input,
-.scale-option input,
-.check-chip input {
+.scale-option input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -5281,8 +5294,7 @@ button.chip:hover {
 }
 
 .option-chip:focus-within,
-.scale-option:focus-within,
-.check-chip:focus-within {
+.scale-option:focus-within {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -5589,6 +5601,128 @@ button.chip:hover {
 .menu-item.danger,
 .menu-item.danger > svg {
   color: var(--primary);
+}
+
+/* ---------------------------------------------------------------- */
+/* Menu lateral do perfil (Configurações, Relatar, Sair)             */
+/* ---------------------------------------------------------------- */
+
+.profile-menu-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0;
+}
+
+.profile-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+
+.profile-menu {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 340px;
+  margin-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  animation: profile-menu-in 0.18s ease-out;
+}
+
+@keyframes profile-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-menu-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.profile-menu-avatar img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-menu-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.profile-menu-id strong {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-menu-id small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.profile-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+
+@media (min-width: 520px) {
+  .profile-menu-layer {
+    align-items: flex-start;
+    padding: 68px 18px 0 0;
+  }
+
+  .profile-menu {
+    border-radius: 16px;
+    margin: 0;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+    animation: profile-menu-drop-in 0.16s ease-out;
+  }
+
+  @keyframes profile-menu-drop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 }
 
 .notification-list {
@@ -6241,5 +6375,470 @@ button.chip:hover {
 
   .share-link .btn {
     width: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Configurações                                                     */
+/* ---------------------------------------------------------------- */
+
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 0 24px;
+}
+
+.settings-page .page-head {
+  margin: 0;
+}
+
+.settings-section {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.settings-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.settings-section-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.settings-section-head h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.settings-section-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-form .field-hint {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.settings-form select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: none;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.settings-form select:focus {
+  border-color: var(--primary);
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.settings-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-row strong {
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.settings-row small {
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.settings-row .btn {
+  flex: none;
+}
+
+.settings-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.settings-subtitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- */
+/* Edição de foto e capa no perfil                                   */
+/* ---------------------------------------------------------------- */
+
+.profile-media-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(20, 16, 12, 0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.profile-media-btn:hover {
+  border-color: var(--primary);
+  background: rgba(20, 16, 12, 0.9);
+}
+
+/* O botão de editar capa só aparece ao passar o mouse sobre ele.
+   `opacity` é usado (e não `display`/`visibility`) para que o elemento
+   continue recebendo o hover mesmo estando invisível. */
+.profile-cover-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.profile-cover-actions:hover,
+.profile-cover-actions:focus-within {
+  opacity: 1;
+}
+
+.profile-cover-edit {
+  backdrop-filter: blur(4px);
+}
+
+.profile-avatar-btn {
+  display: block;
+  width: 112px;
+  height: 112px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.profile-avatar-btn .profile-avatar {
+  display: block;
+}
+
+/* Lápis de editar a foto, sobreposto ao canto inferior direito do avatar.
+   Fica no DOM, mas invisível até o mouse passar sobre a foto ou o botão
+   receber foco do teclado. Como é irmão do botão da foto (e não filho),
+   o `overflow: hidden` da foto arredondada não o corta. */
+.profile-avatar-pencil {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--primary-fill);
+  color: var(--on-primary);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.profile-avatar-wrap:hover .profile-avatar-pencil,
+.profile-avatar-wrap:focus-within .profile-avatar-pencil,
+.profile-avatar-pencil:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.profile-avatar-pencil:hover {
+  background: var(--primary-hover);
+}
+
+/* Sem hover (celular/tablet) o botão fica sempre visível e ganha área de
+   toque de 44x44 px, mantendo o disco visual de 36 px. */
+@media (hover: none) {
+  .profile-avatar-pencil {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .profile-avatar-pencil::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-avatar-pencil {
+    transition: none;
+  }
+}
+
+.profile-banner-image {
+  filter: none;
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------- */
+/* Visualizador ampliado da foto de perfil                            */
+/* ---------------------------------------------------------------- */
+
+.modal.avatar-viewer-modal-wrap {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: fadeIn 0.16s ease;
+}
+
+/* Fundo totalmente escurecido ao redor da foto ampliada. */
+.modal-backdrop:has(.avatar-viewer-modal-wrap) {
+  padding: 0;
+  background: rgba(6, 4, 3, 0.92);
+  backdrop-filter: blur(3px);
+}
+
+.avatar-viewer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.avatar-viewer-title {
+  position: absolute;
+  top: 26px;
+  left: 28px;
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.avatar-viewer-close {
+  position: absolute;
+  top: 24px;
+  right: 26px;
+  z-index: 3;
+  color: var(--text);
+}
+
+.avatar-viewer-media {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+}
+
+.avatar-viewer-frame {
+  position: relative;
+  display: block;
+  width: min(360px, 74vw);
+  height: min(360px, 74vw);
+  border-radius: 50%;
+}
+
+.avatar-viewer-frame img,
+.avatar-viewer-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.avatar-viewer-fallback {
+  color: var(--muted);
+  font-size: 96px;
+  font-weight: 700;
+}
+
+/* Lápis sobre a foto ampliada. */
+.avatar-viewer-pencil {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--primary-fill);
+  color: var(--on-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.avatar-viewer-pencil:hover {
+  background: var(--primary-hover);
+  transform: scale(1.06);
+}
+
+.avatar-viewer-footer {
+  position: absolute;
+  right: 28px;
+  bottom: 26px;
+  display: flex;
+  gap: 9px;
+}
+
+.avatar-viewer-footer .btn {
+  min-width: 108px;
+  justify-content: center;
+}
+
+.avatar-viewer-footer .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .settings-section {
+    padding: 15px;
+    border-radius: 18px;
+  }
+
+  .settings-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .settings-row .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .avatar-viewer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .avatar-viewer-media img,
+  .avatar-viewer-fallback {
+    width: min(420px, 78vw);
+    height: min(420px, 52vh);
+  }
+
+  .avatar-viewer-side {
+    width: auto;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+
+  .avatar-viewer-actions {
+    flex-direction: row;
+  }
+
+  .avatar-viewer-actions .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 375px) {
+  .settings-page {
+    gap: 14px;
+  }
+
+  .settings-section {
+    padding: 13px;
+  }
+
+  .settings-section-head h2 {
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 320px) {
+  .settings-page {
+    padding-bottom: 18px;
+  }
+
+  .settings-section {
+    padding: 12px;
+  }
+
+  .settings-row {
+    padding: 10px;
   }
 }
