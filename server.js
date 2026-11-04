@@ -37,7 +37,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { DatabaseSync } = require('node:sqlite');
+const { createDatabase } = require('./lib/db');
 const APP = require('./app.config');
 const APP_VERSION = require('./package.json').version;
 const dating = require('./lib/dating');
@@ -139,18 +139,33 @@ if (IS_PRODUCTION && IDENTITY_MODE === 'disabled') {
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const db = new DatabaseSync(DB_PATH);
-/* WAL permite leituras concorrentes ao backend síncrono sem bloquear cada escrita. */
-db.exec('PRAGMA journal_mode = WAL');
-/* Foreign keys são desativadas por padrão no SQLite; este PRAGMA garante cascatas. */
-db.exec('PRAGMA foreign_keys = ON');
+/*
+ * Persistência: SQLite local por padrão; PostgreSQL (Supabase) quando
+ * `DATABASE_URL` estiver definido. A API do driver é a mesma nos dois casos
+ * (`prepare().get/all/run`), então o restante do servidor não muda.
+ */
+const db = createDatabase({ sqlitePath: DB_PATH });
+const USING_POSTGRES = db.mode === 'postgres';
+
+if (USING_POSTGRES) {
+  console.log('Banco de dados: PostgreSQL (Supabase).');
+} else {
+  /* WAL permite leituras concorrentes ao backend síncrono sem bloquear cada escrita. */
+  db.exec('PRAGMA journal_mode = WAL');
+  /* Foreign keys são desativadas por padrão no SQLite; este PRAGMA garante cascatas. */
+  db.exec('PRAGMA foreign_keys = ON');
+}
 
 /* ------------------------------------------------------------------ */
 /* Schema SQLite                                                       */
 /* ------------------------------------------------------------------ */
 
-/* Cria ou atualiza todas as tabelas e índices usados pela API e pelo seed. */
-db.exec(`
+/*
+ * Cria ou atualiza todas as tabelas e índices usados pela API e pelo seed.
+ * No PostgreSQL o schema é versionado em `supabase/migrations`, então o DDL
+ * abaixo só roda no modo SQLite.
+ */
+const SQLITE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -425,7 +440,9 @@ db.exec(`
     distance_m INTEGER NOT NULL,
     PRIMARY KEY (match_id, user_id)
   );
-`);
+`;
+
+if (!USING_POSTGRES) db.exec(SQLITE_SCHEMA);
 
 /* Colunas adicionadas em versões novas, sem recriar tabelas existentes. */
 // Verifica a metatable antes de aplicar uma migração aditiva idempotente.
@@ -436,19 +453,21 @@ function ensureColumn(table, column, definition) {
   }
 }
 
-ensureColumn('users', 'birth_date', 'TEXT');
-ensureColumn('users', 'interests', "TEXT NOT NULL DEFAULT '[]'");
-ensureColumn('users', 'message_policy', "TEXT NOT NULL DEFAULT 'connections'");
-ensureColumn('users', 'is_private', 'INTEGER NOT NULL DEFAULT 0');
-ensureColumn('users', 'last_active_at', 'INTEGER');
-ensureColumn('users', 'banner', 'TEXT');
-ensureColumn('sessions', 'user_agent', 'TEXT');
-ensureColumn('posts', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
-ensureColumn('posts', 'topic', "TEXT NOT NULL DEFAULT 'cotidiano'");
-ensureColumn('stories', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
-ensureColumn('stories', 'audience', "TEXT NOT NULL DEFAULT 'public'");
-ensureColumn('stories', 'caption', "TEXT NOT NULL DEFAULT ''");
-ensureColumn('stories', 'mentions', "TEXT NOT NULL DEFAULT '[]'");
+if (!USING_POSTGRES) {
+  ensureColumn('users', 'birth_date', 'TEXT');
+  ensureColumn('users', 'interests', "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn('users', 'message_policy', "TEXT NOT NULL DEFAULT 'connections'");
+  ensureColumn('users', 'is_private', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('users', 'last_active_at', 'INTEGER');
+  ensureColumn('users', 'banner', 'TEXT');
+  ensureColumn('sessions', 'user_agent', 'TEXT');
+  ensureColumn('posts', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
+  ensureColumn('posts', 'topic', "TEXT NOT NULL DEFAULT 'cotidiano'");
+  ensureColumn('stories', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
+  ensureColumn('stories', 'audience', "TEXT NOT NULL DEFAULT 'public'");
+  ensureColumn('stories', 'caption', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('stories', 'mentions', "TEXT NOT NULL DEFAULT '[]'");
+}
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
