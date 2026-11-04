@@ -463,6 +463,10 @@ if (!USING_POSTGRES) {
   ensureColumn('users', 'subscription_status', "TEXT NOT NULL DEFAULT 'free'");
   ensureColumn('users', 'subscription_ends_at', 'INTEGER');
   ensureColumn('users', 'theme_palette', "TEXT NOT NULL DEFAULT 'orange'");
+  ensureColumn('users', 'email', 'TEXT');
+  ensureColumn('users', 'gender', 'TEXT');
+  ensureColumn('users', 'country', 'TEXT');
+  ensureColumn('users', 'state', 'TEXT');
   ensureColumn('sessions', 'user_agent', 'TEXT');
   ensureColumn('posts', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
   ensureColumn('posts', 'topic', "TEXT NOT NULL DEFAULT 'cotidiano'");
@@ -1250,6 +1254,10 @@ function userDTO(row) {
     banner: row.banner || null,
     interests: parseJsonArray(row.interests, INTEREST_IDS),
     isPrivate: !!row.is_private,
+    email: row.email || null,
+    gender: row.gender || null,
+    country: row.country || null,
+    state: row.state || null,
   };
 }
 
@@ -1261,6 +1269,10 @@ function selfDTO(row) {
     messagePolicy: row.message_policy || 'connections',
     canCustomizeTheme: themeState.canCustomizeTheme,
     themePalette: themeState.themePalette,
+    email: row.email || null,
+    gender: row.gender || null,
+    country: row.country || null,
+    state: row.state || null,
   };
 }
 
@@ -1720,24 +1732,77 @@ async function handleApi(req, res, pathname, url) {
   if (method === 'POST' && pathname === '/api/register') {
     rateLimit(req, 'register', 10, 60 * 60 * 1000);
     const body = await readBody(req);
-    const username = cleanText(body.username, 'Usuário', { min: 3, max: 24, required: true }).toLowerCase();
-    if (!/^[a-z0-9._]+$/.test(username)) {
+
+    // Validação de username (gerado automaticamente ou fornecido)
+    const username = body.username
+      ? cleanText(body.username, 'Usuário', { min: 3, max: 24, required: true }).toLowerCase()
+      : null;
+    if (username && !/^[a-z0-9._]+$/.test(username)) {
       throw new HttpError(400, 'Usuário deve ter apenas letras, números, ponto e underline.');
     }
-    const name = cleanText(body.name, 'Nome', { min: 1, max: 40, required: true });
-    const password = cleanText(body.password, 'Senha', { min: 6, max: 100, required: true });
+
+    // Nome completo
+    const name = cleanText(body.name, 'Nome', { min: 1, max: 80, required: true });
+
+    // E-mail (opcional mas se fornecido deve ser válido)
+    let email = null;
+    if (body.email) {
+      email = cleanText(body.email, 'E-mail', { min: 5, max: 120, required: true }).toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new HttpError(400, 'E-mail inválido.');
+      }
+      // Verificar se e-mail já existe
+      if (db.prepare('SELECT 1 AS ok FROM users WHERE email = ?').get(email)) {
+        throw new HttpError(409, 'Este e-mail já está cadastrado.');
+      }
+    }
+
+    // Senha com validação de segurança
+    const password = cleanText(body.password, 'Senha', { min: 8, max: 100, required: true });
+    const passwordErrors = [];
+    if (!/[A-Z]/.test(password)) passwordErrors.push('pelo menos 1 letra maiúscula');
+    if (!/[0-9]/.test(password)) passwordErrors.push('pelo menos 1 número');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) passwordErrors.push('pelo menos 1 caractere especial');
+    if (passwordErrors.length > 0) {
+      throw new HttpError(400, `A senha deve conter: ${passwordErrors.join(', ')}.`);
+    }
+
+    // Data de nascimento e validação de idade (mínimo 12 anos)
     const birthDate = cleanText(body.birthDate, 'Data de nascimento', { min: 10, max: 10, required: true });
     const age = ageFromBirthDate(birthDate);
     if (age === null) throw new HttpError(400, 'Data de nascimento inválida.');
-    if (age < 13) throw new HttpError(403, 'É necessário ter pelo menos 13 anos para criar uma conta.');
-    if (db.prepare('SELECT 1 AS ok FROM users WHERE username = ?').get(username)) {
-      throw new HttpError(409, 'Esse usuário já está em uso.');
+    if (age < 12) throw new HttpError(403, 'É necessário ter pelo menos 12 anos para criar uma conta.');
+
+    // Gênero (opcional)
+    const validGenders = ['cis_man', 'cis_woman', 'trans_man', 'trans_woman', 'non_binary', 'genderfluid', 'agender', 'other'];
+    const gender = body.gender && validGenders.includes(body.gender) ? body.gender : null;
+
+    // País e Estado (opcionais)
+    const country = body.country ? cleanText(body.country, 'País', { min: 2, max: 3, required: false }).toUpperCase() : null;
+    const state = body.state ? cleanText(body.state, 'Estado', { min: 1, max: 10, required: false }).toUpperCase() : null;
+
+    // Gerar username se não fornecido
+    let finalUsername = username;
+    if (!finalUsername) {
+      const base = name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 20) || 'user';
+      const random = Math.random().toString(36).substring(2, 6);
+      finalUsername = base + random;
+      if (finalUsername.length < 3) {
+        finalUsername = 'user' + finalUsername;
+      }
     }
+
+    // Verificar se username já existe
+    if (db.prepare('SELECT 1 AS ok FROM users WHERE username = ?').get(finalUsername)) {
+      throw new HttpError(409, 'Esse usuário já está em uso. Tente outro.');
+    }
+
     const result = db
       .prepare(
-        'INSERT INTO users (username, name, bio, avatar, password_hash, created_at, birth_date) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO users (username, name, bio, avatar, password_hash, created_at, birth_date, email, gender, country, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       )
-      .run(username, name, '', null, hashPassword(password), now(), birthDate);
+      .run(finalUsername, name, '', null, hashPassword(password), now(), birthDate, email, gender, country, state);
+
     const id = Number(result.lastInsertRowid);
     const token = createSession(id, req.headers['user-agent']);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);

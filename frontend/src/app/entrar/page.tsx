@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import { Brand } from '@/components/ui/brand';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -25,6 +26,12 @@ export default function EntrarPage() {
             <p className="mt-2 text-sm text-muted">Acesse sua conta para continuar</p>
           </div>
           <LoginForm />
+          <p className="mt-6 text-center text-sm text-muted">
+            Ainda não tem conta?{' '}
+            <Link href="/cadastrar" className="font-medium text-brand-fill hover:text-brand-fill-hover hover:underline">
+              Criar conta
+            </Link>
+          </p>
         </div>
       </main>
     </div>
