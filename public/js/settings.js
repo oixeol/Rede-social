@@ -6,9 +6,10 @@
  *
  *  - Conta: nome, usuário (somente leitura), bio, data de nascimento e tema.
  *  - Privacidade: perfil público/privado, política de mensagens, pessoas
- *    bloqueadas, melhores amigos e solicitações de seguimento.
+ *    bloqueadas e melhores amigos.
  *  - Notificações: ajuste de leitura e acesso à central de notificações.
- *  - Segurança: sessões ativas e troca de senha.
+ *  - Segurança: dispositivos conectados, solicitações de seguimento e troca
+ *    de senha.
  *  - Suporte: relato de problema, versão do aplicativo e ajuda.
  *
  * Contrato de `handleSubmit(form, event)`: recebe o formulário identificado
@@ -32,34 +33,49 @@ import {
 } from './core.js';
 
 /**
- * Carrega a lista de sessões ativas e monta a linha de cada uma.
+ * Carrega a lista de dispositivos conectados e monta a linha de cada um.
  *
  * @returns {Promise<void>}
  */
 async function paintSessions() {
   const container = $('#settings-sessions');
+  const title = $('#settings-sessions-title');
   if (!container) return;
-  container.innerHTML = '<p class="muted-note">Carregando sessões…</p>';
+  container.innerHTML = '<p class="muted-note">Carregando dispositivos…</p>';
   try {
     const data = await api('/api/sessions');
     const sessions = data.sessions || [];
+    if (title) {
+      title.textContent = sessions.length
+        ? `Dispositivos conectados (${sessions.length})`
+        : 'Dispositivos conectados';
+    }
     if (!sessions.length) {
-      container.innerHTML = '<p class="muted-note">Nenhuma sessão ativa encontrada.</p>';
+      container.innerHTML = '<p class="muted-note">Nenhum dispositivo conectado encontrado.</p>';
       return;
     }
-    container.innerHTML = sessions.map((session) => `
+    container.innerHTML = sessions.map((session) => {
+      const startedAt = session.createdAt
+        ? new Date(session.createdAt).toLocaleString('pt-BR')
+        : '';
+      const detail = session.current
+        ? `Esta sessão${startedAt ? ` · iniciada em ${startedAt}` : ''}`
+        : `${startedAt ? `Iniciada em ${startedAt}` : 'Sessão ativa em outro dispositivo'}`;
+      return `
       <article class="settings-row settings-row--session">
+        <span class="settings-session-icon" aria-hidden="true">${icon('device', 18)}</span>
         <div>
           <strong>${esc(session.device)}</strong>
-          <small>${session.current ? 'Esta sessão' : `Criada em ${new Date(session.createdAt).toLocaleString('pt-BR')}`}</small>
+          <small>${esc(detail)}</small>
         </div>
         ${session.current
           ? '<span class="settings-tag">Atual</span>'
           : `<button type="button" class="btn ghost small" data-action="revoke-session" data-id="${esc(session.id)}">Encerrar</button>`}
-      </article>`).join('');
+      </article>`;
+    }).join('');
     hydrateIcons(container);
   } catch (error) {
-    container.innerHTML = `<p class="muted-note">${esc(error.message || 'Não foi possível carregar as sessões.')}</p>`;
+    container.innerHTML = `<p class="muted-note">${esc(error.message || 'Não foi possível carregar os dispositivos.')}</p>`;
   }
 }
 
@@ -163,13 +179,6 @@ export async function renderSettings(viewElement) {
         <div class="settings-list">
           <article class="settings-row">
             <div>
-              <strong>Solicitações de seguimento</strong>
-              <small>${pendingRequests > 0 ? `${pendingRequests} ${pendingRequests === 1 ? 'pedido aguardando' : 'pedidos aguardando'}.` : 'Nenhum pedido aguardando resposta.'}</small>
-            </div>
-            <button type="button" class="btn ghost small" data-action="follow-requests">${icon('users', 15)} Abrir</button>
-          </article>
-          <article class="settings-row">
-            <div>
               <strong>Melhores amigos</strong>
               <small>Escolha quem vê seus stories exclusivos.</small>
             </div>
@@ -209,13 +218,23 @@ export async function renderSettings(viewElement) {
           <span class="settings-section-icon">${icon('lock', 20)}</span>
           <div>
             <h2 id="settings-security-title">Segurança</h2>
-            <p>Sessões abertas no seu账号 e a sua senha de acesso.</p>
+            <p>Sessões abertas e a sua senha de acesso.</p>
           </div>
         </div>
-        <div class="settings-list" id="settings-sessions">
-          <p class="muted-note">Carregando sessões…</p>
+        <h3 class="settings-subtitle" id="settings-sessions-title">Dispositivos conectados</h3>
+        <div class="settings-list" id="settings-sessions" aria-live="polite">
+          <p class="muted-note">Carregando dispositivos…</p>
         </div>
-        <form id="settings-password-form" class="settings-form">
+        <div class="settings-list">
+          <article class="settings-row">
+            <div>
+              <strong>Solicitações</strong>
+              <small>${pendingRequests > 0 ? `${pendingRequests} ${pendingRequests === 1 ? 'pedido aguardando' : 'pedidos aguardando'}.` : 'Nenhum pedido aguardando resposta.'}</small>
+            </div>
+            <button type="button" class="btn ghost small" data-action="follow-requests">${icon('users', 15)} Abrir</button>
+          </article>
+        </div>
+        <form id="settings-password-form" class="settings-form settings-form--block">
           <h3 class="settings-subtitle">Trocar senha</h3>
           <label class="field">
             <span>Senha atual</span>

@@ -123,6 +123,15 @@
             </button>
           </nav>
 
+          <form class="topbar-search" id="topbar-search" role="search" autocomplete="off">
+            <span class="topbar-search-icon" data-icon="search" aria-hidden="true"></span>
+            <input type="search" id="topbar-search-input" name="q" placeholder="Buscar no Vibra..." aria-label="Buscar no Vibra" autocomplete="off" />
+            <button type="button" class="topbar-search-clear" data-action="clear-search" aria-label="Limpar busca" hidden>
+              <span data-icon="close" aria-hidden="true"></span>
+            </button>
+            <div class="search-panel" id="search-panel" role="listbox" aria-label="Resultados da busca" hidden></div>
+          </form>
+
           <div class="top-actions">
             <button type="button" class="icon-btn notification-btn" data-action="open-notifications" aria-label="Notificações">
               <span data-icon="bell"></span>

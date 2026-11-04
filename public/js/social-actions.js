@@ -63,7 +63,22 @@ import {
   carouselMarkup,
   carouselStep,
   openAvatarViewer,
+  selectProfileTab,
+  renderProfile,
 } from './social.js';
+import { openAvatarEditor, openCoverEditor } from './media-editor.js';
+
+/**
+ * Recarrega o perfil visível após uma alteração de mídia.
+ *
+ * @returns {Promise<void>} Resolve após a renderização do perfil.
+ */
+async function reloadProfile() {
+  const viewElement = $('#view');
+  const username = state.profile && state.profile.user ? state.profile.user.username : null;
+  if (!viewElement || !username) return;
+  await renderProfile(viewElement, { username });
+}
 
 /* ------------------------------------------------------------------ */
 /* Player de vídeo no feed                                            */
@@ -943,12 +958,67 @@ async function copyShareLink(link) {
   }
 }
 
+/**
+ * Abre o modal de compartilhamento de um perfil.
+ *
+ * O link do perfil é exibido em destaque e pode ser copiado. Quando o
+ * dispositivo oferece a Web Share API, um botão extra abre o menu nativo de
+ * compartilhamento do sistema.
+ *
+ * @param {string} username Usuário do perfil compartilhado.
+ * @returns {void}
+ */
+export function openProfileShareModal(username) {
+  const link = `${window.location.origin}/?profile=${encodeURIComponent(username)}`;
+  const canNativeShare = typeof navigator.share === 'function';
+  openModal(`
+    <div class="modal-head">
+      <h2>Compartilhar perfil</h2>
+      <button type="button" class="icon-btn" data-action="close-modal" aria-label="Fechar">${icon('close')}</button>
+    </div>
+    <div class="share-modal">
+      <div class="share-link">
+        <div>
+          <strong>Link do perfil</strong>
+          <span>${esc(link)}</span>
+        </div>
+        <button type="button" class="btn ghost small" data-action="copy-share-link" data-link="${esc(link)}">${icon('link', 15)} Copiar</button>
+      </div>
+      <p class="eyebrow">${esc(`@${username}`)}</p>
+      <div class="modal-actions">
+        ${canNativeShare ? `<button type="button" class="btn primary" data-action="native-share-profile" data-link="${esc(link)}">${icon('share', 16)} Compartilhar</button>` : ''}
+        <button type="button" class="btn ghost" data-action="close-modal">Fechar</button>
+      </div>
+    </div>`, 'profile-share-modal');
+}
+
+/**
+ * Compartilha o link de um perfil pelo menu nativo do sistema.
+ *
+ * @param {string} link Link a compartilhar.
+ * @returns {Promise<void>} Resolve após a tentativa de compartilhamento.
+ */
+async function nativeShareProfile(link) {
+  try {
+    await navigator.share({ title: 'Vibra', text: 'Confira este perfil no Vibra.', url: link });
+  } catch (error) {
+    if (error && error.name === 'AbortError') return;
+    toast(error.message || 'Não foi possível compartilhar.', 'error');
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Ações                                                              */
 /* ------------------------------------------------------------------ */
 
 export async function handleAction(action, target) {
   switch (action) {
+    case 'profile': {
+      const username = target.dataset.username;
+      if (!username) return true;
+      await navigate('profile', { username });
+      return true;
+    }
     case 'new-post':
       pauseInlineVideos();
       openCreateModal();
@@ -1075,15 +1145,33 @@ export async function handleAction(action, target) {
     case 'preview-avatar': {
       const profile = state.profile;
       if (!profile || !profile.user) return true;
-      openAvatarViewer(profile);
+      openAvatarViewer(profile, { onSaved: () => reloadProfile() });
       return true;
     }
     case 'edit-profile-avatar': {
       const profile = state.profile;
       if (!profile || !profile.user || !profile.isMe) return true;
-      openAvatarViewer(profile, { autoEdit: true });
+      openAvatarEditor(profile, { autoEdit: true, onSaved: () => reloadProfile() });
       return true;
     }
+    case 'edit-profile-banner': {
+      const profile = state.profile;
+      if (!profile || !profile.user || !profile.isMe) return true;
+      openCoverEditor(profile, { onSaved: () => reloadProfile() });
+      return true;
+    }
+    case 'profile-tab':
+      await selectProfileTab(target.dataset.tab);
+      return true;
+    case 'profile-stat-posts':
+      await selectProfileTab('posts');
+      return true;
+    case 'share-profile':
+      openProfileShareModal(target.dataset.username);
+      return true;
+    case 'native-share-profile':
+      await nativeShareProfile(target.dataset.link);
+      return true;
     case 'message-user':
       await openMessageWith(target.dataset.username);
       return true;
@@ -1120,6 +1208,30 @@ export async function handleAction(action, target) {
     case 'send-share-to':
       await sendShareTo(Number(target.dataset.conversation), Number(target.dataset.post));
       return true;
+    case 'post-menu': {
+      const postId = Number(target.dataset.id);
+      const isOwner = target.dataset.owner === '1';
+      /* O menu apenas reúne ações reais já existentes no app; nenhuma
+         requisição é feita aqui para não contabilizar compartilhamentos. */
+      openModal(`
+        <div class="modal-head"><h2>Mais opções</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Fechar">${icon('close')}</button></div>
+        <div class="menu-list">
+          <button type="button" class="menu-item" data-action="open-post" data-id="${postId}">
+            ${icon('eye', 19)} <span><strong>Abrir publicação</strong><small>Ver imagem ou vídeo completo.</small></span>
+          </button>
+          <button type="button" class="menu-item" data-action="share-post" data-id="${postId}">
+            ${icon('share', 19)} <span><strong>Compartilhar</strong><small>Copiar link ou enviar para conversa.</small></span>
+          </button>
+          <button type="button" class="menu-item" data-action="report-post" data-id="${postId}">
+            ${icon('flag', 19)} <span><strong>Denunciar</strong><small>Enviar para revisão de moderação.</small></span>
+          </button>
+          ${isOwner ? `<button type="button" class="menu-item danger" data-action="delete-post" data-id="${postId}">
+            ${icon('trash', 19)} <span><strong>Apagar publicação</strong><small>Excluir esta publicação da sua timeline.</small></span>
+          </button>` : ''}
+        </div>
+      `, 'menu-modal');
+      return true;
+    }
     case 'open-notifications':
       await openNotifications();
       return true;

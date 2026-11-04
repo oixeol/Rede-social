@@ -1,0 +1,267 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-lora);
+
+  --color-background: var(--vibra-background);
+  --color-surface: var(--vibra-surface);
+  --color-surface-raised: var(--vibra-surface-raised);
+  --color-surface-subtle: var(--vibra-surface-subtle);
+  --color-foreground: var(--vibra-foreground);
+  --color-muted: var(--vibra-muted);
+  --color-subtle: var(--vibra-subtle);
+  --color-border: var(--vibra-border);
+  --color-border-strong: var(--vibra-border-strong);
+  --color-brand: var(--vibra-brand);
+  --color-brand-hover: var(--vibra-brand-hover);
+  --color-brand-fill: var(--vibra-brand-fill);
+  --color-brand-fill-hover: var(--vibra-brand-fill-hover);
+  --color-brand-soft: var(--vibra-brand-soft);
+  --color-on-brand: var(--vibra-on-brand);
+  --color-accent: var(--vibra-accent);
+  --color-accent-soft: var(--vibra-accent-soft);
+  --color-navy: var(--vibra-navy);
+  --color-gold: var(--vibra-gold);
+  --color-lilac: var(--vibra-lilac);
+  --color-success: var(--vibra-success);
+  --color-danger: var(--vibra-danger);
+  --color-danger-soft: var(--vibra-danger-soft);
+
+  --radius-pill: 999px;
+  --radius-card: 1.25rem;
+  --radius-panel: 1.5rem;
+
+  --shadow-card: 0 14px 34px rgb(0 0 0 / 0.08);
+  --shadow-float: 0 18px 50px rgb(0 0 0 / 0.16);
+}
+
+:root {
+  color-scheme: light;
+
+  --vibra-background: #fffaf2;
+  --vibra-surface: #fffdf8;
+  --vibra-surface-raised: #ffffff;
+  --vibra-surface-subtle: #f5ede3;
+  --vibra-foreground: #111111;
+  --vibra-muted: #625b54;
+  --vibra-subtle: #6b645d;
+  --vibra-border: #eadfd2;
+  --vibra-border-strong: #d7c8b7;
+  --vibra-brand: #a83f00;
+  --vibra-brand-hover: #8f3500;
+  --vibra-brand-fill: #f97316;
+  --vibra-brand-fill-hover: #ea580c;
+  --vibra-brand-soft: #ffead4;
+  --vibra-on-brand: #111111;
+  --vibra-accent: #8a3d00;
+  --vibra-accent-soft: #ffefdc;
+  --vibra-navy: #000000;
+  --vibra-gold: #b45309;
+  --vibra-lilac: #9a3412;
+  --vibra-success: #176b4c;
+  --vibra-danger: #b42318;
+  --vibra-danger-soft: #fee4e2;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --vibra-background: #080808;
+  --vibra-surface: #111111;
+  --vibra-surface-raised: #171717;
+  --vibra-surface-subtle: #202020;
+  --vibra-foreground: #f7f5f2;
+  --vibra-muted: #bdb8b0;
+  --vibra-subtle: #a59f97;
+  --vibra-border: #2c2c2c;
+  --vibra-border-strong: #3d3d3d;
+  --vibra-brand: #ff8a1f;
+  --vibra-brand-hover: #ffa04a;
+  --vibra-brand-fill: #f97316;
+  --vibra-brand-fill-hover: #fb923c;
+  --vibra-brand-soft: #3a1e08;
+  --vibra-on-brand: #111111;
+  --vibra-accent: #ffb15c;
+  --vibra-accent-soft: #35230f;
+  --vibra-navy: #000000;
+  --vibra-gold: #f59e0b;
+  --vibra-lilac: #c2410c;
+  --vibra-success: #55c79a;
+  --vibra-danger: #f97066;
+  --vibra-danger-soft: #411916;
+}
+
+/*
+ * Paletas de assinatura.
+ *
+ * O backend limita `theme_palette` à lista allow-list e restaura `orange`
+ * quando a assinatura expira. Esses seletores são a única fonte de verdade
+ * para a personalização; alterações/manipulação no DOM não ampliam o
+ * entitlement, que continua sendo validado no servidor.
+ */
+[data-palette="blue"] {
+  --vibra-brand: #1d4ed8;
+  --vibra-brand-hover: #1e40af;
+  --vibra-brand-fill: #2563eb;
+  --vibra-brand-fill-hover: #1d4ed8;
+  --vibra-brand-soft: #dbeafe;
+  --vibra-on-brand: #ffffff;
+  --vibra-accent: #1e3a8a;
+  --vibra-accent-soft: #e0e7ff;
+  --vibra-gold: #a16207;
+  --vibra-lilac: #6d28d9;
+}
+
+[data-palette="green"] {
+  --vibra-brand: #166534;
+  --vibra-brand-hover: #14532d;
+  --vibra-brand-fill: #16a34a;
+  --vibra-brand-fill-hover: #15803d;
+  --vibra-brand-soft: #dcfce7;
+  --vibra-on-brand: #ffffff;
+  --vibra-accent: #14532d;
+  --vibra-accent-soft: #dcfce7;
+  --vibra-gold: #a16207;
+  --vibra-lilac: #7e22ce;
+}
+
+[data-palette="purple"] {
+  --vibra-brand: #6b21a8;
+  --vibra-brand-hover: #581c87;
+  --vibra-brand-fill: #9333ea;
+  --vibra-brand-fill-hover: #7e22ce;
+  --vibra-brand-soft: #f3e8ff;
+  --vibra-on-brand: #ffffff;
+  --vibra-accent: #581c87;
+  --vibra-accent-soft: #f3e8ff;
+  --vibra-gold: #a16207;
+  --vibra-lilac: #7e22ce;
+}
+
+[data-theme="dark"] [data-palette="blue"] {
+  --vibra-brand: #93c5fd;
+  --vibra-brand-hover: #bfdbfe;
+  --vibra-brand-fill: #3b82f6;
+  --vibra-brand-fill-hover: #60a5fa;
+  --vibra-brand-soft: #172554;
+  --vibra-on-brand: #ffffff;
+  --vibra-accent: #bfdbfe;
+  --vibra-accent-soft: #172554;
+  --vibra-gold: #fbbf24;
+  --vibra-lilac: #c084fc;
+}
+
+[data-theme="dark"] [data-palette="green"] {
+  --vibra-brand: #86efac;
+  --vibra-brand-hover: #bbf7d0;
+  --vibra-brand-fill: #22c55e;
+  --vibra-brand-fill-hover: #4ade80;
+  --vibra-brand-soft: #052e16;
+  --vibra-on-brand: #052e16;
+  --vibra-accent: #bbf7d0;
+  --vibra-accent-soft: #052e16;
+  --vibra-gold: #fbbf24;
+  --vibra-lilac: #c084fc;
+}
+
+[data-theme="dark"] [data-palette="purple"] {
+  --vibra-brand: #d8b4fe;
+  --vibra-brand-hover: #e9d5ff;
+  --vibra-brand-fill: #a855f7;
+  --vibra-brand-fill-hover: #9333ea;
+  --vibra-brand-soft: #2e1065;
+  --vibra-on-brand: #ffffff;
+  --vibra-accent: #e9d5ff;
+  --vibra-accent-soft: #2e1065;
+  --vibra-gold: #fbbf24;
+  --vibra-lilac: #c084fc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--vibra-background);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--vibra-background);
+  color: var(--vibra-foreground);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--vibra-brand);
+  color: var(--vibra-on-brand);
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--vibra-brand-fill) 68%, transparent);
+  outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  transform: translateY(-150%);
+  border-radius: 999px;
+  background: var(--vibra-foreground);
+  color: var(--vibra-background);
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+  transition: transform 160ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

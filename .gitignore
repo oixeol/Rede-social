@@ -1,6 +1,11 @@
 node_modules/
 .next/
 out/
+*.tsbuildinfo
+
+# Ferramentas de agente do OpenCode.
+.agents/
+skills-lock.json
 
 # Ambiente virtual Python do backend Django.
 .venv/

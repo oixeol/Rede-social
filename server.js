@@ -460,6 +460,9 @@ if (!USING_POSTGRES) {
   ensureColumn('users', 'is_private', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('users', 'last_active_at', 'INTEGER');
   ensureColumn('users', 'banner', 'TEXT');
+  ensureColumn('users', 'subscription_status', "TEXT NOT NULL DEFAULT 'free'");
+  ensureColumn('users', 'subscription_ends_at', 'INTEGER');
+  ensureColumn('users', 'theme_palette', "TEXT NOT NULL DEFAULT 'orange'");
   ensureColumn('sessions', 'user_agent', 'TEXT');
   ensureColumn('posts', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
   ensureColumn('posts', 'topic', "TEXT NOT NULL DEFAULT 'cotidiano'");
@@ -525,6 +528,25 @@ const INTEREST_IDS = new Set(INTERESTS.map((item) => item.id));
 const PROBLEM_CATEGORIES = new Set(['bug', 'layout', 'login', 'performance', 'moderation', 'other']);
 /* Tópicos aceitos na tag de uma publicação. */
 const POST_TOPICS = ['cotidiano', 'fotografia', 'natureza', 'arte', 'gastronomia', 'tecnologia', 'viagens', 'esportes'];
+const POST_TOPIC_LABELS = {
+  cotidiano: 'Cotidiano',
+  fotografia: 'Fotografia',
+  natureza: 'Natureza',
+  arte: 'Arte',
+  gastronomia: 'Gastronomia',
+  tecnologia: 'Tecnologia',
+  viagens: 'Viagens',
+  esportes: 'Esportes',
+};
+/*
+ * Paletas de tema são IDs fixos, nunca valores CSS/hex. O cliente traduz o
+ * token recebido para seus próprios estilos; assim a API não aceita estilo
+ * arbitrário nem precisa armazenar cores.
+ */
+const DEFAULT_THEME_PALETTE = 'orange';
+const THEME_PALETTE_PRESETS = new Set(['orange', 'blue', 'green', 'purple']);
+/* Statuses internos que representam uma assinatura utilizável. */
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'subscribed']);
 /* Idade máxima aceita. Acima disso a data de nascimento é tratada como inválida. */
 const MAX_AGE_PLATFORM = 120;
 
@@ -938,6 +960,8 @@ function rateLimit(req, bucket, max, windowMs) {
 /**
  * Proteção CSRF baseada em Same-Origin.
  * Compara o host do header `Origin` com o header `Host` da requisição.
+ * Quando atrás de um proxy reverso (ex.: Next.js rewrites), o proxy deve
+ * encaminhar o host público via `X-Forwarded-Host`.
  *
  * ATENÇÃO: requisições SEM header `Origin` são liberadas (`if (!origin) return`).
  * Navegadores modernos enviam `Origin` em POST, mas clientes não-browser
@@ -952,7 +976,8 @@ function assertSameOrigin(req) {
   } catch {
     throw new HttpError(403, 'Origem inválida.', 'bad_origin');
   }
-  if (parsed.host !== req.headers.host) {
+  const publicHost = req.headers['x-forwarded-host'] || req.headers.host;
+  if (parsed.host !== publicHost) {
     throw new HttpError(403, 'Origem não autorizada.', 'bad_origin');
   }
 }
@@ -1229,11 +1254,52 @@ function userDTO(row) {
 }
 
 function selfDTO(row) {
+  const themeState = themeStateFor(row);
   return {
     ...userDTO(row),
     birthDate: row.birth_date || null,
     messagePolicy: row.message_policy || 'connections',
+    canCustomizeTheme: themeState.canCustomizeTheme,
+    themePalette: themeState.themePalette,
   };
+}
+
+/**
+ * Calcula a entitlement de personalização sem expor o status interno.
+ * Statuses ativos valem até `subscription_ends_at`; sem término, a assinatura
+ * não expira. Uma assinatura expirada perde a entitlement imediatamente.
+ */
+function canCustomizeThemeFor(user) {
+  if (!user) return false;
+  const status = String(user.subscription_status || '').trim().toLowerCase();
+  if (!ACTIVE_SUBSCRIPTION_STATUSES.has(status)) return false;
+  if (user.subscription_ends_at === null || user.subscription_ends_at === undefined) return true;
+  const endsAt = Number(user.subscription_ends_at);
+  return Number.isFinite(endsAt) && endsAt > now();
+}
+
+/**
+ * Estado público da paleta. Usuários sem entitlement usam sempre o preset
+ * padrão, mesmo que uma assinatura tenha expirado depois da personalização.
+ */
+function themeStateFor(user) {
+  const canCustomizeTheme = canCustomizeThemeFor(user);
+  const storedPalette = String(user?.theme_palette || '');
+  const themePalette = canCustomizeTheme && THEME_PALETTE_PRESETS.has(storedPalette)
+    ? storedPalette
+    : DEFAULT_THEME_PALETTE;
+  return { canCustomizeTheme, themePalette };
+}
+
+/** Remove uma paleta persistida quando a entitlement não está mais válida. */
+function resetInvalidThemePalette(user) {
+  const state = themeStateFor(user);
+  if (!state.canCustomizeTheme || !THEME_PALETTE_PRESETS.has(user.theme_palette)) {
+    if (user.theme_palette !== DEFAULT_THEME_PALETTE) {
+      db.prepare('UPDATE users SET theme_palette = ? WHERE id = ?').run(DEFAULT_THEME_PALETTE, user.id);
+      user.theme_palette = DEFAULT_THEME_PALETTE;
+    }
+  }
 }
 
 function isVerifiedUser(userId) {
@@ -1348,7 +1414,7 @@ function acceptFollowRequestRow(request) {
       requester.id,
       'follow_accept',
       `${target.name} aceitou sua solicitação de seguir.`,
-      `/?profile=${encodeURIComponent(target.username)}`
+      `/perfil/${encodeURIComponent(target.username)}`
     );
   }
 }
@@ -1726,6 +1792,8 @@ async function handleApi(req, res, pathname, url) {
            ${datingAccessFor(me) ? '' : "AND c.kind != 'dating'"}`
       )
       .get(me.id, me.id).n;
+    resetInvalidThemePalette(me);
+    const themeState = themeStateFor(me);
     const meStats = statsFor(me.id);
     return json(res, 200, {
       user: selfDTO(me),
@@ -1734,6 +1802,35 @@ async function handleApi(req, res, pathname, url) {
       pendingFollowRequests: followRequestCount(me.id),
       unreadNotifications: unreadNotifications(me.id),
       unreadMessages,
+      canCustomizeTheme: themeState.canCustomizeTheme,
+      themePalette: themeState.themePalette,
+    });
+  }
+
+  if (method === 'PATCH' && pathname === '/api/me/theme-palette') {
+    const body = await readBody(req);
+    const bodyKeys = body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body) : [];
+    if (bodyKeys.length !== 1 || bodyKeys[0] !== 'palette') {
+      throw new HttpError(400, 'Informe apenas a paleta de tema.');
+    }
+    const palette = body.palette;
+    if (typeof palette !== 'string' || !THEME_PALETTE_PRESETS.has(palette)) {
+      throw new HttpError(400, 'Paleta de tema inválida.');
+    }
+
+    resetInvalidThemePalette(me);
+    const themeState = themeStateFor(me);
+    if (!themeState.canCustomizeTheme) {
+      throw new HttpError(403, 'A personalização de tema exige uma assinatura ativa.');
+    }
+
+    db.prepare('UPDATE users SET theme_palette = ? WHERE id = ?').run(palette, me.id);
+    const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(me.id);
+    const freshThemeState = themeStateFor(fresh);
+    return json(res, 200, {
+      user: selfDTO(fresh),
+      canCustomizeTheme: freshThemeState.canCustomizeTheme,
+      themePalette: freshThemeState.themePalette,
     });
   }
 
@@ -1746,6 +1843,16 @@ async function handleApi(req, res, pathname, url) {
     }
     if (Object.prototype.hasOwnProperty.call(body, 'user_id') || Object.prototype.hasOwnProperty.call(body, 'userId')) {
       throw new HttpError(400, 'O usuario da conta nao pode ser alterado.');
+    }
+    /* Assinatura é estado interno, gerenciado fora do perfil do cliente. */
+    const subscriptionFields = [
+      'subscription_status',
+      'subscriptionStatus',
+      'subscription_ends_at',
+      'subscriptionEndsAt',
+    ];
+    if (subscriptionFields.some((field) => Object.prototype.hasOwnProperty.call(body, field))) {
+      throw new HttpError(400, 'A assinatura não pode ser alterada pelo cliente.');
     }
     const name = body.name === undefined ? me.name : cleanText(body.name, 'Nome', { min: 1, max: 40, required: true, strict: true });
     const bio = body.bio === undefined ? me.bio : cleanText(body.bio, 'Bio', { min: 0, max: 150, strict: true, multiline: true });
@@ -1953,9 +2060,39 @@ async function handleApi(req, res, pathname, url) {
       .sort((a, b) => b.sharedInterests.length - a.sharedInterests.length || b.followers - a.followers)
       .slice(0, 6);
 
+    /* Tópicos em alta são agregados apenas sobre o mesmo conteúdo público
+       que o Explore permite visualizar. Não há números sintéticos: cada
+       contagem corresponde a publicações reais e visíveis para a sessão. */
+    const topicRows = db
+      .prepare(
+        `SELECT p.topic, COUNT(*) AS count
+         FROM posts p
+         JOIN users u ON u.id = p.user_id
+         WHERE p.topic IN (${POST_TOPICS.map(() => '?').join(',')})
+           AND NOT EXISTS (
+             SELECT 1 FROM blocks b
+             WHERE (b.blocker_id = ? AND b.blocked_id = p.user_id)
+                OR (b.blocker_id = p.user_id AND b.blocked_id = ?)
+           )
+           AND (u.is_private = 0 OR p.user_id = ? OR EXISTS (
+             SELECT 1 FROM follows f
+             WHERE f.follower_id = ? AND f.following_id = p.user_id
+           ))
+         GROUP BY p.topic
+         ORDER BY count DESC, p.topic ASC
+         LIMIT 8`
+      )
+      .all(...POST_TOPICS, me.id, me.id, me.id, me.id);
+    const topics = topicRows.map((row) => ({
+      id: row.topic,
+      label: POST_TOPIC_LABELS[row.topic] || row.topic,
+      count: row.count,
+    }));
+
     return json(res, 200, {
       posts,
       people,
+      topics,
       nextCursor: posts.length === limit ? posts[posts.length - 1].createdAt : null,
     });
   }
@@ -2058,6 +2195,7 @@ async function handleApi(req, res, pathname, url) {
       user: {
         ...userDTO(user),
         messagePolicy: user.message_policy || 'connections',
+        createdAt: user.created_at,
       },
       stats: statsFor(user.id),
       badges: badgesFor(user, statsFor(user.id)),
@@ -2122,7 +2260,7 @@ async function handleApi(req, res, pathname, url) {
       });
     }
     db.prepare('INSERT INTO follows (follower_id, following_id, created_at) VALUES (?, ?, ?)').run(me.id, target.id, now());
-    notify(target.id, 'follow', `${me.name} começou a seguir você.`, `/?profile=${encodeURIComponent(me.username)}`);
+    notify(target.id, 'follow', `${me.name} começou a seguir você.`, `/perfil/${encodeURIComponent(me.username)}`);
     return json(res, 200, {
       isFollowing: true,
       requested: false,
@@ -2288,6 +2426,41 @@ async function handleApi(req, res, pathname, url) {
     });
   }
 
+  const likesMatch = matchRoute(pathname, '/api/users/:username/likes');
+  if (method === 'GET' && likesMatch) {
+    const target = db.prepare('SELECT * FROM users WHERE username = ?').get(likesMatch.username);
+    if (!target) throw new HttpError(404, 'Perfil não encontrado.');
+    /* A lista de curtidas é um dado privado: assim como a aba "Curtidas" só
+       aparece no próprio perfil, a rota só responde ao dono da conta. */
+    if (target.id !== me.id) {
+      throw new HttpError(403, 'As curtidas são privadas.');
+    }
+    /* Cada publicação curtida também passa pelo filtro de bloqueios e pela
+       privacidade do autor, exatamente como no feed. */
+    const rows = db
+      .prepare(
+        `${POST_SELECT}
+         WHERE p.id IN (SELECT post_id FROM likes WHERE user_id = ?)
+           AND NOT EXISTS (
+             SELECT 1 FROM blocks b
+             WHERE (b.blocker_id = ? AND b.blocked_id = p.user_id)
+                OR (b.blocker_id = p.user_id AND b.blocked_id = ?)
+           )
+           AND (
+             u.is_private = 0
+             OR p.user_id = ?
+             OR EXISTS (
+               SELECT 1 FROM follows f
+               WHERE f.follower_id = ? AND f.following_id = p.user_id
+             )
+           )
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT 100`
+      )
+      .all(me.id, target.id, me.id, me.id, me.id, me.id);
+    return json(res, 200, { posts: withPreviews(rows.map(mapPost)) });
+  }
+
   if (method === 'GET' && pathname === '/api/blocks') {
     const rows = db
       .prepare(
@@ -2444,7 +2617,7 @@ async function handleApi(req, res, pathname, url) {
     const count = db.prepare('SELECT COUNT(*) AS n FROM shares WHERE post_id = ?').get(postId).n;
     return json(res, 200, {
       shares: count,
-      link: `/?post=${postId}`,
+      link: `/publicacoes/${postId}`,
       post: mapPost(db.prepare(`${POST_SELECT} WHERE p.id = ?`).get(me.id, postId)),
     });
   }
@@ -2464,7 +2637,7 @@ async function handleApi(req, res, pathname, url) {
       db.prepare('DELETE FROM likes WHERE user_id = ? AND post_id = ?').run(me.id, postId);
     } else {
       db.prepare('INSERT INTO likes (user_id, post_id, created_at) VALUES (?, ?, ?)').run(me.id, postId, now());
-      notify(post.user_id, 'like', `${me.name} curtiu sua publicação.`, `/?post=${postId}`);
+      notify(post.user_id, 'like', `${me.name} curtiu sua publicação.`, `/publicacoes/${postId}`);
     }
     const count = db.prepare('SELECT COUNT(*) AS n FROM likes WHERE post_id = ?').get(postId).n;
     return json(res, 200, { liked: !liked, likes: count });
@@ -2498,7 +2671,7 @@ async function handleApi(req, res, pathname, url) {
         )
         .get(Number(result.lastInsertRowid));
       const count = db.prepare('SELECT COUNT(*) AS n FROM comments WHERE post_id = ?').get(postId).n;
-      notify(post.user_id, 'comment', `${me.name} comentou na sua publicação.`, `/?post=${postId}`);
+      notify(post.user_id, 'comment', `${me.name} comentou na sua publicação.`, `/publicacoes/${postId}`);
       return json(res, 201, { comment: commentDTO(comment), comments: count });
     }
   }
@@ -2636,7 +2809,7 @@ async function handleApi(req, res, pathname, url) {
       throw error;
     }
     for (const user of mentionUsers) {
-      notify(user.id, 'mention', `${me.name} mencionou você em um story.`, `/?profile=${encodeURIComponent(me.username)}`);
+      notify(user.id, 'mention', `${me.name} mencionou você em um story.`, `/perfil/${encodeURIComponent(me.username)}`);
     }
     return json(res, 201, {
       story: {
@@ -2707,7 +2880,7 @@ async function handleApi(req, res, pathname, url) {
       'INSERT INTO story_reactions (story_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(story_id, user_id) DO UPDATE SET emoji = excluded.emoji, created_at = excluded.created_at'
     ).run(storyId, me.id, emoji, now());
     if (story.user_id !== me.id) {
-      notify(story.user_id, 'story_reaction', `${me.name} reagiu ${emoji} ao seu story.`, `/?profile=${encodeURIComponent(me.username)}`);
+      notify(story.user_id, 'story_reaction', `${me.name} reagiu ${emoji} ao seu story.`, `/perfil/${encodeURIComponent(me.username)}`);
     }
     return json(res, 200, { ok: true, emoji });
   }

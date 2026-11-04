@@ -40,7 +40,11 @@ export const state = {
   view: 'home',
   params: {},
   profile: null,
+  profileTab: 'posts',
+  profileTabUser: null,
   feed: [],
+  feedCursor: null,
+  explorePosts: [],
   storyGroups: [],
   conversations: [],
   activeConversation: null,
@@ -115,6 +119,23 @@ const ICONS = {
   bolt: '<path d="M13 2L3 14h9l-1 8 10-16h-9l1-8z"/>',
   hashtag: '<path d="M6 5v14M18 5v14M4 9h16M4 15h16"/>',
   gif: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 12h3M7 16h3M14 12h3M14 16h3M9 8h6v8H9z"/><text x="12" y="12.5" font-size="6" text-anchor="middle" font-weight="bold" fill="currentColor">GIF</text>',
+  minus: '<rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 12h8"/>',
+  device:
+    '<rect x="2.8" y="4" width="18.4" height="12.4" rx="2.2"/><path d="M8.5 20.2h7M12 16.4v3.8"/>',
+  zoomIn:
+    '<circle cx="10.6" cy="10.6" r="6.6"/><path d="m15.4 15.4 4.6 4.6M10.6 7.8v5.6M7.8 10.6h5.6"/>',
+  zoomOut:
+    '<circle cx="10.6" cy="10.6" r="6.6"/><path d="m15.4 15.4 4.6 4.6M7.8 10.6h5.6"/>',
+  grid:
+    '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
+  reel: '<rect x="6.6" y="2.8" width="10.8" height="18.4" rx="3"/><path d="m10.4 9.4 4.4 2.6-4.4 2.6z"/>',
+  rotate:
+    '<path d="M20.2 12a8.2 8.2 0 1 1-2.6-6"/><path d="M20.4 4.4v5.2h-5.2"/>',
+  crop:
+    '<path d="M6.2 2.8v13a2.2 2.2 0 0 0 2.2 2.2h12.8"/><path d="M2.8 6.2h13a2.2 2.2 0 0 1 2.2 2.2v12.8"/>',
+  flip:
+    '<path d="M12 3.2v17.6"/><path d="M8.8 7 4.4 12l4.4 5zM15.2 7l4.4 5-4.4 5z"/>',
+  crown: '<path d="M4 18h16l1-9-4.5 3L12 5 7.5 12 3 9z"/><path d="M4 20.5h16"/>',
 };
 
 /**
