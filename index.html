@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibra — Conecte-se do seu jeito</title>
+<style>
+:root {
+  --site-primary: #ff6a1a;
+  --site-secondary: #21140f;
+  --site-background: #090909;
+  --site-on-primary: #160b06;
+  --site-on-secondary: #fff3ec;
+  --site-on-background: #fffaf6;
+  --site-font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --site-font-heading: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --site-heading-scale: 1;
+  --site-spacing-scale: 1;
+  --site-radius-scale: 1;
+  --site-decoration-opacity: 1;
+  --surface: #11100f;
+  --muted: #b8aaa2;
+  --line: rgba(255,255,255,.11);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: light-dark(#f7f4f1, var(--site-background)); color: light-dark(#17110d, var(--site-on-background)); font-family: var(--site-font-body); }
+.app { min-height: 100vh; width: 100%; overflow: hidden; position: relative; border-radius: 0; background: radial-gradient(ellipse at 83% 38%, rgba(255,103,24,.2), transparent 35%), radial-gradient(ellipse at 53% 100%, rgba(110,42,13,.2), transparent 45%), var(--site-background); color: var(--site-on-background); }
+.decor { position:absolute; inset:0; pointer-events:none; opacity:var(--site-decoration-opacity); overflow:hidden; }
+.decor:before { content:""; position:absolute; width:680px;height:680px;border-radius:50%;right:-190px;top:90px;background:radial-gradient(circle,rgba(255,105,26,.22),rgba(255,105,26,.04) 48%,transparent 70%);filter:blur(10px); }
+.decor:after { content:"";position:absolute;inset:0;background-image:radial-gradient(#ff9a60 1px,transparent 1px),radial-gradient(#ffffff 1px,transparent 1px);background-size:83px 83px,137px 137px;background-position:0 0,37px 21px;opacity:.22; }
+header { height:86px; display:flex; align-items:center; justify-content:space-between; padding:0 clamp(22px,5vw,82px); position:relative; z-index:2; border-bottom:1px solid rgba(255,255,255,.06); }
+.brand { display:flex;align-items:center;gap:11px;font-size:25px;font-weight:850;letter-spacing:-1.2px; }
+.brand-mark { width:35px;height:35px;border-radius:12px;background:linear-gradient(145deg,#ff9a50,#f04a0a);display:grid;place-items:center;color:#1a0d07;font-weight:950;font-size:21px;box-shadow:0 5px 22px #ff681a55; }
+nav { display:flex;gap:clamp(15px,2.2vw,35px);align-items:center; }
+nav a { color:#e8ded8;text-decoration:none;font-size:13px;font-weight:650;transition:.2s; }
+nav a:hover { color:#ff8b4c; }
+.header-cta { text-decoration:none;color:#1a0d07;background:#fff8f3;border-radius:999px;padding:12px 20px;font-size:13px;font-weight:800;transition:.2s; }
+.header-cta:hover { transform:translateY(-2px);background:#ff8a4b; }
+.hero { position:relative;z-index:1;max-width:1320px;margin:auto;min-height:650px;padding:65px 5vw 100px;display:grid;grid-template-columns:.85fr 1.15fr;align-items:center;gap:25px; }
+.copy { max-width:510px; padding-bottom:15px; }
+.eyebrow { display:inline-flex;align-items:center;gap:9px;color:#ff9864;font-size:11px;font-weight:850;letter-spacing:2px;text-transform:uppercase;margin-bottom:24px; }
+.eyebrow:before { content:"";width:24px;height:2px;background:#ff6a1a; }
+h1 { font-family:var(--site-font-heading);font-size:clamp(48px,5.7vw,78px);line-height:.91;letter-spacing:-4px;text-transform:uppercase;font-weight:950;margin:0 0 25px;max-width:570px; }
+h1 span { color:#ff742b; }
+.lead { color:#d2c5bd;font-size:16px;line-height:1.75;max-width:440px;margin:0 0 32px; }
+.actions { display:flex;gap:13px;flex-wrap:wrap; }
+.btn { display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:16px 22px;border-radius:12px;text-decoration:none;font-size:14px;font-weight:800;transition:.2s;border:1px solid transparent; }
+.btn-primary { color:#1a0b04;background:linear-gradient(135deg,#ff9b59,#ff6418);box-shadow:0 12px 35px #ff641833; }
+.btn-secondary { color:#fff4ed;border-color:#ffffff35;background:#ffffff0b; }
+.btn:hover { transform:translateY(-3px);filter:brightness(1.08); }
+.note { color:#887b73;font-size:11px;margin-top:18px; }
+.visual { min-height:490px;position:relative;display:flex;align-items:center;justify-content:center; }
+.glow { position:absolute;width:440px;height:440px;border-radius:50%;background:#f45c1740;filter:blur(75px); }
+.device { position:relative;width:min(100%,650px);height:420px;border:1px solid #ffffff2c;border-radius:24px;background:linear-gradient(145deg,#27211e,#100e0d 65%);box-shadow:0 35px 90px #000a,0 0 0 8px #ffffff08;transform:perspective(1100px) rotateY(-8deg) rotateX(3deg);padding:15px; }
+.window-top { height:30px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #ffffff14;padding:0 8px 12px;color:#9e9189;font-size:10px; }
+.dot { width:7px;height:7px;border-radius:50%;background:#ff7040; }.dot:nth-child(2){background:#e9a24e}.dot:nth-child(3){background:#6e9a63}
+.mock { display:grid;grid-template-columns:145px 1fr 130px;height:calc(100% - 30px);padding-top:12px;gap:12px; }
+.side { border-right:1px solid #ffffff12;padding:5px 8px; }
+.mini-brand { font-size:16px;font-weight:900;margin:3px 0 20px; }.mini-brand b{color:#ff762d}
+.nav-item { color:#b6aaa2;font-size:10px;padding:9px 8px;border-radius:7px;margin:4px 0; }.nav-item.active { color:#fff;background:#ff6a1a25;border:1px solid #ff6a1a35; }
+.feed { padding:4px 5px; }.feed-title {font-weight:850;font-size:15px;margin:2px 0 14px;}.composer { border:1px solid #ffffff18;border-radius:10px;padding:12px;color:#9c8e86;font-size:10px;margin-bottom:12px;background:#ffffff05; }.post { display:flex;gap:9px;border-bottom:1px solid #ffffff13;padding:12px 3px; }.avatar { flex:0 0 27px;width:27px;height:27px;border-radius:50%;background:linear-gradient(140deg,#ff9b59,#79351e); }.post:nth-of-type(3) .avatar{background:linear-gradient(140deg,#f7b8a0,#7346a1)}.post strong{font-size:10px}.post small{color:#84776f;font-size:8px}.post p{font-size:9px;line-height:1.5;color:#d2c5bd;margin:6px 0}.post-media {height:90px;border-radius:8px;background:linear-gradient(130deg,#442014,#ff742b 48%,#1d1110);margin-top:8px;display:grid;place-items:center;color:#fff;font-size:25px;}
+.right { border-left:1px solid #ffffff12;padding:6px 4px 0 10px; }.trend { font-size:9px;color:#8d8179;margin-bottom:14px; }.trend b{display:block;color:#eee2db;font-size:10px;margin-top:4px}.float-card { position:absolute;z-index:2;border:1px solid #ffffff24;background:#211a17ed;backdrop-filter:blur(12px);border-radius:14px;padding:13px 16px;box-shadow:0 15px 35px #0008; }.float-card.one {right:-5px;top:50px}.float-card.two {left:-5px;bottom:35px}.float-card strong {display:block;font-size:12px}.float-card span {font-size:10px;color:#b5a69d}.spark {color:#ff8b4b;font-size:19px;margin-right:6px}
+.bottom-band { position:relative;z-index:1;margin:-20px auto 0;max-width:1050px;padding:0 25px 40px;display:flex;justify-content:center;gap:45px;flex-wrap:wrap;color:#a99a91;font-size:12px; }.bottom-band b{color:#fff0e8;font-size:17px;display:block;margin-bottom:3px}
+@media(max-width:900px){nav{display:none}.hero{grid-template-columns:1fr;padding-top:55px;gap:20px}.copy{max-width:650px}.visual{min-height:420px}.device{height:370px}.bottom-band{margin-top:0}}
+@media(max-width:560px){header{height:70px}.brand{font-size:22px}.header-cta{padding:10px 13px;font-size:11px}.hero{padding:48px 22px 55px}h1{font-size:51px;letter-spacing:-2.7px}.lead{font-size:14px}.visual{min-height:310px;overflow:visible}.device{height:280px;padding:9px;border-radius:15px;transform:none}.mock{grid-template-columns:85px 1fr 0;height:calc(100% - 26px);gap:6px}.right{display:none}.side{padding:4px}.mini-brand{font-size:12px;margin-bottom:10px}.nav-item{font-size:7px;padding:7px 4px}.feed-title{font-size:12px}.composer{font-size:8px;padding:8px}.post{padding:7px 2px}.post p{font-size:7px}.post-media{height:52px}.float-card.one{right:-3px;top:12px}.float-card.two{left:-2px;bottom:8px}.float-card{padding:9px 10px}.bottom-band{gap:25px;justify-content:flex-start;padding-left:25px}}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="decor" aria-hidden="true"></div>
+  <header>
+    <div class="brand"><div class="brand-mark">v.</div>vibra</div>
+    <nav aria-label="Navegação principal">
+      <a href="#inicio">Início</a><a href="#comunidade">Comunidades</a><a href="#explorar">Explorar</a><a href="#recursos">Recursos⌄</a><a href="#sobre">Sobre</a>
+    </nav>
+    <a class="header-cta" href="#entrar">Entrar</a>
+  </header>
+  <section class="hero" id="inicio">
+    <div class="copy">
+      <div class="eyebrow">Sua conexão começa aqui</div>
+      <h1>GENTE QUE<br>COMBINA.<br><span>IDEIAS QUE</span><br>VIBRAM.</h1>
+      <p class="lead">Um espaço para compartilhar o que você pensa, descobrir novos interesses e encontrar pessoas que têm tudo a ver com você. Do seu jeito, no seu ritmo.</p>
+      <div class="actions" id="entrar">
+        <a class="btn btn-primary" href="#comunidade">↓ &nbsp; Baixar</a>
+        <a class="btn btn-secondary" href="#explorar">Entrar pelo Navegador ↗</a>
+      </div>
+      <div class="note">Conexões reais. Conversas sem roteiro. Um novo jeito de socializar.</div>
+    </div>
+    <div class="visual" id="comunidade" aria-label="Prévia ilustrativa da interface do Vibra">
+      <div class="glow"></div>
+      <div class="device">
+        <div class="window-top"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span style="margin-left:8px">vibra.social / comunidade</span></div>
+        <div class="mock">
+          <aside class="side"><div class="mini-brand">vibra<b>.</b></div><div class="nav-item active">⌂ &nbsp; Início</div><div class="nav-item">⌕ &nbsp; Explorar</div><div class="nav-item">✉ &nbsp; Mensagens</div><div class="nav-item">♡ &nbsp; Conexões</div><div class="nav-item">▦ &nbsp; Comunidades</div><div class="nav-item">⚙ &nbsp; Ajustes</div></aside>
+          <section class="feed"><div class="feed-title">Seu universo</div><div class="composer">O que está passando pela sua cabeça?</div>
+            <article class="post"><div class="avatar"></div><div><strong>marina.lima</strong> <small> · há 12 min</small><p>Finalmente encontrei uma galera que curte os mesmos jogos que eu. ✨</p><div style="font-size:9px;color:#ff9a62">♡ 128 &nbsp;&nbsp; ◌ 24 comentários &nbsp;&nbsp; ↗</div></div></article>
+            <article class="post"><div class="avatar"></div><div><strong>caio.dev</strong> <small> · há 35 min</small><p>Qual foi a última música que ficou presa na sua cabeça?</p><div class="post-media">♫</div><div style="font-size:9px;color:#ff9a62;margin-top:7px">♡ 86 &nbsp;&nbsp; ◌ 19 comentários &nbsp;&nbsp; ↗</div></div></article>
+          </section>
+          <aside class="right"><div class="trend">EM ALTA<b>#NovasConexões</b></div><div class="trend">COMUNIDADE<b>Gamers BR</b></div><div class="trend">PARA VOCÊ<b>Design & Criatividade</b></div></aside>
+        </div>
+      </div>
+      <div class="float-card one"><strong><span class="spark">✦</span>Novas conexões</strong><span>Pessoas com seus interesses</span></div>
+      <div class="float-card two"><strong>+ 2,4 mil</strong><span>conversas acontecendo agora</span></div>
+    </div>
+  </section>
+  <section class="bottom-band" id="recursos">
+    <div><b>Seu espaço</b>Perfil com a sua identidade</div><div><b>Seus interesses</b>Descubra novas comunidades</div><div><b>Suas conexões</b>Converse com quem combina</div>
+  </section>
+</main>
+</body>
+</html>

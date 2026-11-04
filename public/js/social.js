@@ -28,6 +28,7 @@ import {
   avatar,
   initialsFor,
   interestLabel,
+  interestChips,
   mediaMarkup,
   emptyState,
   api,
@@ -43,6 +44,7 @@ import {
   onBeforeNavigate,
   addTimer,
 } from './core.js';
+import { openAvatarEditor, openCoverEditor } from './media-editor.js';
 
 /**
  * Converte uma legenda em HTML seguro, preservando as quebras de linha.
@@ -53,6 +55,19 @@ import {
  */
 function captionHtml(text) {
   return esc(text).replace(/\n/g, '<br />');
+}
+
+/**
+ * Formata a data de criação da conta no formato "mês de ano" (pt-BR).
+ * É usado no painel "Sobre mim" para indicar quando a pessoa entrou no Vibra.
+ *
+ * @param {number|string} timestamp Marca de tempo da criação da conta.
+ * @returns {string} Texto como "março de 2024" ou string vazia.
+ */
+function joinedMonthYear(timestamp) {
+  const date = new Date(Number(timestamp));
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 }
 
 /**
@@ -291,17 +306,53 @@ function postCard(post) {
     </article>`;
 }
 
+/**
+ * Monta o card usado na grade do perfil.
+ *
+ * O card reproduz o formato de "post" da referência: a mídia ocupa a parte
+ * superior, com o menu "..." flutuando no canto superior direito, e o rodapé
+ * concentra as ações reais (curtir, comentar e compartilhar) com os
+ * contadores correspondentes. As ações usam `data-action`, reaproveitando o
+ * mesmo fluxo do feed; os contadores usam `data-like-count`/`data-comment-count`
+ * para serem atualizados sem recarregar a grade.
+ *
+ * @param {Object} post Publicação retornada pela API.
+ * @returns {string} Markup HTML do card.
+ */
 function gridItem(post) {
+  const media = postMedia(post);
+  const mine = state.me && post.user.id === state.me.id;
   return `
-    <button type="button" class="gallery-item ${post.mediaType === 'video' ? 'gallery-video' : ''}" data-action="open-post" data-id="${post.id}" aria-label="Abrir publicação de ${esc(post.user.username)}">
-      ${thumbMarkup(post)}
-      ${postMedia(post).length > 1 ? `<span class="carousel-badge" aria-label="${postMedia(post).length} fotos">${icon('image', 13)} ${postMedia(post).length}</span>` : ''}
-      ${post.mediaType === 'video' ? `<span class="gallery-video-mark">${icon('video', 18)}</span>` : ''}
-      <span class="gallery-overlay">
-        <span>${icon('heart', 16)} ${formatCount(post.likes)}</span>
-        <span>${icon('comment', 16)} ${formatCount(post.comments)}</span>
-      </span>
-    </button>`;
+    <article class="gallery-item">
+      <div class="gallery-media-wrap">
+        <button type="button" class="gallery-media" data-action="open-post" data-id="${post.id}" aria-label="Abrir publicação de ${esc(post.user.username)}">
+          ${thumbMarkup(post)}
+          ${media.length > 1 ? `<span class="carousel-badge" aria-label="${media.length} fotos">${icon('image', 13)} ${media.length}</span>` : ''}
+          ${post.mediaType === 'video' ? `<span class="gallery-video-mark">${icon('video', 18)}</span>` : ''}
+        </button>
+        <button type="button" class="gallery-menu" data-action="post-menu" data-id="${post.id}" data-owner="${mine ? '1' : '0'}" aria-label="Mais opções da publicação">
+          ${icon('more', 18)}
+        </button>
+      </div>
+
+      <div class="gallery-foot">
+        <div class="gallery-actions">
+          <button type="button" class="gallery-action${post.liked ? ' active liked' : ''}" data-action="like" data-like-btn="${post.id}" aria-label="Curtir publicação">
+            ${icon('heart', 18)}
+          </button>
+          <button type="button" class="gallery-action" data-action="open-post" data-id="${post.id}" aria-label="Comentar publicação">
+            ${icon('comment', 18)}
+          </button>
+          <button type="button" class="gallery-action" data-action="share-post" data-id="${post.id}" aria-label="Compartilhar publicação">
+            ${icon('share', 18)}
+          </button>
+        </div>
+        <div class="gallery-metrics">
+          <span>${icon('heart', 14)} <strong data-like-count="${post.id}">${formatCount(post.likes)}</strong></span>
+          <span>${icon('comment', 14)} <strong data-comment-count="${post.id}">${formatCount(post.comments)}</strong></span>
+        </div>
+      </div>
+    </article>`;
 }
 
 function exploreCard(post) {
@@ -877,162 +928,438 @@ function applyMeUpdate(result) {
 }
 
 /**
- * Envia a foto ou a capa escolhida e recarrega o perfil.
+ * Abas disponíveis no perfil, na ordem exibida.
  *
- * @param {HTMLElement} viewElement Elemento da view de perfil.
- * @param {object} data Dados do perfil exibido.
- * @param {'avatar'|'banner'} field Campo atualizado.
- * @param {File} file Arquivo selecionado.
+ * @type {Array<{id: string, label: string, icon: string}>}
  */
-async function uploadProfileMedia(viewElement, data, field, file) {
-  if (!file) return;
-  if (file.size > 8 * 1024 * 1024) {
-    toast('A imagem precisa ter no máximo 8 MB.', 'error');
-    return;
+const PROFILE_TABS = [
+  { id: 'posts', label: 'Publicações', icon: 'grid' },
+  { id: 'reels', label: 'Reels', icon: 'reel' },
+  { id: 'photos', label: 'Fotos', icon: 'image' },
+  { id: 'likes', label: 'Curtidas', icon: 'heart' },
+];
+
+/**
+ * Monta a barra de abas do perfil.
+ *
+ * @param {object} data Dados do perfil exibido.
+ * @param {string} active Aba atualmente selecionada.
+ * @returns {string} Markup HTML das abas.
+ */
+function profileTabsMarkup(data, active) {
+  return `
+    <nav class="profile-tabs" role="tablist" aria-label="Conteúdo do perfil">
+      ${PROFILE_TABS.map((tab) => `
+        <button type="button" class="profile-tab${tab.id === active ? ' is-active' : ''}" role="tab"
+          aria-selected="${tab.id === active}" data-action="profile-tab" data-tab="${tab.id}">
+          ${icon(tab.icon, 16)} <span>${esc(tab.label)}</span>
+        </button>`).join('')}
+    </nav>`;
+}
+
+/**
+ * Carrega as publicações correspondentes a uma aba do perfil.
+ *
+ * As abas Publicações, Reels e Fotos são filtradas a partir dos posts já
+ * baixados; a aba Curtidas usa a lista de curtidas da pessoa autenticada.
+ *
+ * @param {object} data Dados do perfil exibido.
+ * @param {string} tab Identificador da aba.
+ * @returns {Promise<Array>} Lista de publicações da aba.
+ */
+async function loadProfileTabPosts(data, tab) {
+  const posts = Array.isArray(data.posts) ? data.posts : [];
+  if (tab === 'reels') return posts.filter((post) => post.mediaType === 'video');
+  if (tab === 'photos') return posts.filter((post) => post.mediaType !== 'video');
+  if (tab === 'likes') {
+    const username = state.me && state.me.username ? state.me.username : data.user.username;
+    const result = await api(`/api/users/${encodeURIComponent(username)}/likes`);
+    return Array.isArray(result.posts) ? result.posts : [];
   }
+  return posts;
+}
+
+/**
+ * Monta o card vertical usado na aba Reels.
+ *
+ * @param {Object} post Publicação de vídeo.
+ * @returns {string} Markup HTML do card.
+ */
+function profileReelItem(post) {
+  const [cover] = postMedia(post);
+  return `
+    <button type="button" class="reel-item" data-action="open-post" data-id="${post.id}"
+      aria-label="Abrir reel de ${esc(post.user.username)}">
+      <video src="${esc(cover.url)}" muted playsinline preload="metadata" aria-hidden="true"></video>
+      <span class="reel-item-mark">${icon('reel', 16)}</span>
+      <span class="reel-item-meta">
+        <span>${icon('heart', 14)} ${formatCount(post.likes)}</span>
+        <span>${icon('comment', 14)} ${formatCount(post.comments)}</span>
+      </span>
+    </button>`;
+}
+
+/**
+ * Monta o conteúdo (grade) de uma aba do perfil.
+ *
+ * @param {Array} posts Publicações da aba.
+ * @param {string} tab Identificador da aba.
+ * @param {object} data Dados do perfil exibido.
+ * @returns {string} Markup HTML da grade.
+ */
+function profileTabContent(posts, tab, data) {
+  if (!posts.length) {
+    const empty = {
+      posts: {
+        title: 'Nenhuma publicação',
+        own: 'Suas fotos e vídeos aparecerão aqui.',
+        other: 'Quando publicar, as fotos e vídeos aparecem aqui.',
+      },
+      reels: {
+        title: 'Nenhum reel',
+        own: 'Suas fotos e vídeos aparecerão aqui.',
+        other: 'Quando publicar, os vídeos aparecem aqui.',
+      },
+      photos: {
+        title: 'Nenhuma foto',
+        own: 'Suas fotos e vídeos aparecerão aqui.',
+        other: 'Quando publicar, as fotos aparecem aqui.',
+      },
+      likes: {
+        title: 'Nenhuma curtida',
+        own: 'As publicações que você curtir aparecem aqui.',
+        other: 'As publicações que você curtiu aparecem aqui.',
+      },
+    }[tab] || { title: 'Nada por aqui', own: 'Este perfil ainda não tem conteúdo.', other: 'Este perfil ainda não tem conteúdo.' };
+    const canCreate = data.isMe && (tab === 'posts' || tab === 'reels' || tab === 'photos');
+    return `<div class="empty-state grid-empty">
+      <div class="empty-icon">${icon(tab === 'likes' ? 'heart' : 'camera', 30)}</div>
+      <h3>${esc(empty.title)}</h3>
+      <p>${esc(data.isMe ? empty.own : empty.other)}</p>
+      ${canCreate ? '<button type="button" class="btn primary" data-action="new-post">Criar publicação</button>' : ''}
+    </div>`;
+  }
+  if (tab === 'reels') {
+    return `<div class="reel-grid">${posts.map(profileReelItem).join('')}</div>`;
+  }
+  return `<div class="gallery">${posts.map(gridItem).join('')}</div>`;
+}
+
+/**
+ * Troca a aba exibida no perfil e recarrega o conteúdo correspondente.
+ *
+ * @param {string} tab Identificador da aba.
+ * @returns {Promise<void>} Resolve após a renderização da aba.
+ */
+export async function selectProfileTab(tab) {
+  const data = state.profile;
+  if (!data || !data.user) return;
+  const known = PROFILE_TABS.some((item) => item.id === tab);
+  if (!known) return;
+  state.profileTab = tab;
+
+  const viewElement = $('#view');
+  if (!viewElement) return;
+
+  $$('.profile-tab', viewElement).forEach((button) => {
+    const isActive = button.dataset.tab === tab;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-selected', String(isActive));
+  });
+
+  const container = $('#profile-tab-content', viewElement);
+  if (!container) return;
+  container.innerHTML = '<div class="page-loading"><span class="spinner" aria-hidden="true"></span><span>Carregando...</span></div>';
+
   try {
-    const dataUrl = await fileToDataUrl(file);
-    await saveProfileMedia(viewElement, data, field, dataUrl);
+    const posts = await loadProfileTabPosts(data, tab);
+    if (state.profileTab !== tab || state.view !== 'profile') return;
+    container.innerHTML = profileTabContent(posts, tab, data);
+    hydrateIcons(container);
   } catch (error) {
-    toast(error.message || 'Não foi possível atualizar a imagem.', 'error');
+    if (state.profileTab !== tab) return;
+    container.innerHTML = `<div class="empty-state grid-empty">
+      <div class="empty-icon">${icon('alert', 30)}</div>
+      <h3>Não foi possível carregar</h3>
+      <p>${esc(error.message || 'Tente novamente em instantes.')}</p>
+    </div>`;
+    hydrateIcons(container);
   }
 }
 
 /**
- * Persiste a foto ou a capa e recarrega o perfil.
+ * Monta o painel "Sobre mim" com os dados públicos do perfil.
  *
- * @param {HTMLElement} viewElement Elemento da view de perfil.
+ * Usa apenas informações liberadas pela rota de perfil do backend (bio,
+ * data de criação, interesses, selos e estatísticas), sem inventar dados nem
+ * expor campos privados de contas bloqueadas ou em modo privado.
+ *
  * @param {object} data Dados do perfil exibido.
- * @param {'avatar'|'banner'} field Campo atualizado.
- * @param {string} dataUrl Imagem em data URL.
+ * @returns {string} Markup HTML do painel.
  */
-async function saveProfileMedia(viewElement, data, field, dataUrl) {
-  try {
-    const result = await api('/api/me', {
-      method: 'PATCH',
-      body: JSON.stringify({ [field]: dataUrl }),
-    });
-    applyMeUpdate(result);
-    toast(field === 'avatar' ? 'Foto de perfil atualizada.' : 'Capa atualizada.');
-    await renderProfile(viewElement, { username: data.user.username });
-  } catch (error) {
-    toast(error.message || 'Não foi possível atualizar a imagem.', 'error');
+function profileAboutPanel(data) {
+  const user = data.user || {};
+  const badges = Array.isArray(data.badges) ? data.badges : [];
+  const interests = Array.isArray(user.interests) ? user.interests : [];
+  const bio = user.bio
+    ? `<p class="profile-about-text">${captionHtml(user.bio)}</p>`
+    : '<p class="profile-about-text muted">Esta pessoa ainda não escreveu uma bio.</p>';
+
+  /* A data de entrada vem da criação da conta; só aparece quando existe. */
+  const joined = user.createdAt
+    ? `<li class="profile-about-meta-item">${icon('calendar', 15)}<span>Entrou em ${esc(joinedMonthYear(user.createdAt))}</span></li>`
+    : '';
+
+  /* O local é exibido apenas quando a conta registrou uma cidade pública. */
+  const place = user.location
+    ? `<li class="profile-about-meta-item">${icon('mapPin', 15)}<span>${esc(user.location)}</span></li>`
+    : '';
+
+  /* O link aparece apenas se o perfil tiver uma URL pública cadastrada. */
+  const link = user.link
+    ? `<li class="profile-about-meta-item">${icon('link', 15)}<a class="profile-about-link" href="${esc(user.link)}" target="_blank" rel="noopener noreferrer">${esc(user.link.replace(/^https?:\/\//, ''))}</a></li>`
+    : '';
+
+  const meta = place || joined || link
+    ? `<ul class="profile-about-meta">${place}${joined}${link}</ul>`
+    : '';
+
+  return `
+    <section class="side-panel profile-about" aria-labelledby="profile-about-title">
+      <header class="side-panel-head">
+        <h2 id="profile-about-title">Sobre mim</h2>
+        <span class="side-panel-icon">${icon('user', 17)}</span>
+      </header>
+      <div class="side-panel-body">
+        ${bio}
+        ${meta}
+        ${interests.length ? `
+          <div class="profile-about-block">
+            <span class="profile-about-label">Interesses</span>
+            ${interestChips(interests, 'compact')}
+          </div>` : ''}
+        ${badges.length ? `
+          <div class="profile-about-block">
+            <span class="profile-about-label">Selos</span>
+            <div class="profile-about-badges">
+              ${badges.map((badge) => `
+                <span class="profile-about-badge" title="${esc(badge.description || badge.label)}">
+                  ${icon(badge.icon || 'spark', 14)} ${esc(badge.label)}
+                </span>`).join('')}
+            </div>
+          </div>` : ''}
+      </div>
+    </section>`;
+}
+
+/**
+ * Monta o painel "Destaques" usando os stories reais da pessoa.
+ *
+ * Os destaques são preenchidos de forma assíncrona por `loadProfileAside`,
+ * que consulta `GET /api/stories`. O bloco inicial exibe apenas o estado de
+ * carregamento; nenhum story é inventado.
+ *
+ * @param {object} data Dados do perfil exibido.
+ * @returns {string} Markup HTML do painel.
+ */
+function profileHighlightsPanel(data) {
+  const isMe = !!data.isMe;
+  return `
+    <section class="side-panel profile-highlights" aria-labelledby="profile-highlights-title">
+      <header class="side-panel-head">
+        <h2 id="profile-highlights-title">Destaques</h2>
+        <span class="side-panel-icon">${icon('spark', 17)}</span>
+      </header>
+      <div class="side-panel-body" id="profile-highlights-body" aria-live="polite">
+        <div class="side-panel-loading"><span class="spinner" aria-hidden="true"></span><span>Carregando destaques...</span></div>
+      </div>
+      ${isMe ? `
+        <button type="button" class="side-panel-action" data-action="new-story">
+          ${icon('camera', 16)} <span>Publicar story</span>
+        </button>` : ''}
+    </section>`;
+}
+
+/**
+ * Monta o painel "Sugestões para você" com o estado de carregamento.
+ *
+ * A lista real é preenchida por `loadProfileAside` a partir de
+ * `GET /api/suggestions`, respeitando contas privadas e bloqueios.
+ *
+ * @returns {string} Markup HTML do painel.
+ */
+function profileSuggestionsPanel() {
+  return `
+    <section class="side-panel profile-suggestions" aria-labelledby="profile-suggestions-title">
+      <header class="side-panel-head">
+        <h2 id="profile-suggestions-title">Sugestões para você</h2>
+        <span class="side-panel-icon">${icon('users', 17)}</span>
+      </header>
+      <div class="side-panel-body" id="profile-suggestions-body" aria-live="polite">
+        <div class="side-panel-loading"><span class="spinner" aria-hidden="true"></span><span>Carregando sugestões...</span></div>
+      </div>
+    </section>`;
+}
+
+/**
+ * Renderiza a lista de sugestões reais de pessoas para seguir.
+ *
+ * O botão de seguir reutiliza `followButton`, que já trata os três estados
+ * possíveis: perfil público, perfil privado (solicitação) e já seguindo.
+ *
+ * @param {Array} users Usuários sugeridos pela API.
+ * @returns {string} Markup HTML da lista.
+ */
+function profileSuggestionsList(users) {
+  if (!Array.isArray(users) || !users.length) {
+    return '<p class="side-panel-empty">Você já está conectado às pessoas certas por aqui.</p>';
   }
+  return `<div class="profile-suggestion-list">
+    ${users.map((user) => `
+      <article class="profile-suggestion">
+        <button type="button" class="profile-suggestion-user" data-action="profile" data-username="${esc(user.username)}">
+          ${avatar(user, 38)}
+          <span class="profile-suggestion-meta">
+            <strong>${esc(user.name)}</strong>
+            <small>@${esc(user.username)}</small>
+          </span>
+        </button>
+        ${followButton(user, 'small')}
+      </article>`).join('')}
+  </div>`;
+}
+
+/**
+ * Renderiza os destaques (stories) da pessoa exibida no perfil.
+ *
+ * Usa o grupo de stories retornado por `GET /api/stories` para o usuário do
+ * perfil. Quando a pessoa não tem stories visíveis, mostra um estado vazio
+ * honesto, sem inventar conteúdo.
+ *
+ * @param {Array} groups Grupos de stories retornados pela API.
+ * @param {object} data Dados do perfil exibido.
+ * @returns {string} Markup HTML dos destaques.
+ */
+function profileHighlightsList(groups, data) {
+  const userId = Number(data.user.id);
+  const group = (Array.isArray(groups) ? groups : []).find((item) => Number(item.user.id) === userId);
+  if (!group || !group.stories.length) {
+    return `<p class="side-panel-empty">${data.isMe
+      ? 'Você ainda não tem stories. Publique o primeiro para guardar seus momentos aqui.'
+      : 'Esta pessoa não tem destaques visíveis no momento.'}</p>`;
+  }
+  return `<div class="profile-highlights-list">
+    ${group.stories.map((story, index) => `
+      <button type="button" class="profile-highlight${story.viewed ? ' seen' : ''}" data-action="open-stories" data-user="${userId}"
+        aria-label="Ver story de ${esc(group.user.username)}">
+        <span class="profile-highlight-media">
+          <img src="${esc(story.image)}" alt="" loading="lazy" />
+          ${story.mediaType === 'video' ? `<span class="profile-highlight-mark">${icon('video', 14)}</span>` : ''}
+        </span>
+        <span class="profile-highlight-label">${esc(story.caption || `Destaque ${index + 1}`)}</span>
+      </button>`).join('')}
+  </div>`;
+}
+
+/**
+ * Carrega os painéis laterais do perfil (destaques e sugestões).
+ *
+ * As duas rotas são consultadas em paralelo. Cada painel trata o seu próprio
+ * estado de erro, para que a falha de uma não esconda a outra. Se o usuário
+ * navegar para outra tela durante o carregamento, o resultado é descartado.
+ *
+ * @param {HTMLElement} viewElement Elemento da view do perfil.
+ * @param {object} data Dados do perfil exibido.
+ * @returns {Promise<void>} Resolve após a atualização dos painéis.
+ */
+async function loadProfileAside(viewElement, data) {
+  const highlightsBody = $('#profile-highlights-body', viewElement);
+  const suggestionsBody = $('#profile-suggestions-body', viewElement);
+  if (!highlightsBody && !suggestionsBody) return;
+
+  const [storiesResult, suggestionsResult] = await Promise.allSettled([
+    api('/api/stories'),
+    api('/api/suggestions'),
+  ]);
+
+  /* O usuário pode ter navegado para outra view durante o carregamento. */
+  if (state.view !== 'profile' || !viewElement.isConnected) return;
+
+  if (highlightsBody) {
+    if (storiesResult.status === 'fulfilled') {
+      const groups = storiesResult.value.groups || [];
+      /* `openStories` usa o estado compartilhado para abrir o visualizador. */
+      state.storyGroups = groups;
+      highlightsBody.innerHTML = profileHighlightsList(groups, data);
+    } else {
+      highlightsBody.innerHTML = '<p class="side-panel-error">Não foi possível carregar os destaques.</p>';
+    }
+  }
+
+  if (suggestionsBody) {
+    if (suggestionsResult.status === 'fulfilled') {
+      const users = (suggestionsResult.value.users || []).filter((user) => Number(user.id) !== Number(data.user.id));
+      suggestionsBody.innerHTML = profileSuggestionsList(users);
+    } else {
+      suggestionsBody.innerHTML = '<p class="side-panel-error">Não foi possível carregar as sugestões.</p>';
+    }
+  }
+
+  hydrateIcons(viewElement);
 }
 
 /**
  * Abre a visualização ampliada da foto de perfil.
  *
- * A foto aparece ampliada no centro da tela, sobre um fundo escurecido. No
- * próprio perfil, a foto traz um lápis no canto para escolher um novo arquivo
- * e o botão "Salvar" fica no canto inferior direito da tela.
+ * No próprio perfil a visualização abre diretamente o editor de imagem; nos
+ * demais perfis apenas exibe a foto em tamanho maior.
  *
  * @param {object} data Objeto com `user` e `isMe`.
  * @param {object} [options] Opções da visualização.
  * @param {boolean} [options.autoEdit=false] Abre o seletor de arquivo em seguida.
+ * @param {Function} [options.onSaved] Callback executado após salvar a foto.
  * @returns {void}
  */
-export function openAvatarViewer(data, { autoEdit = false } = {}) {
+export function openAvatarViewer(data, { autoEdit = false, onSaved = null } = {}) {
+  if (!data || !data.user) return;
+  if (data.isMe) {
+    openAvatarEditor(data, { autoEdit, onSaved });
+    return;
+  }
   const user = data.user;
-  const canEdit = !!data.isMe;
   const frame = user.avatar
     ? `<img src="${esc(user.avatar)}" alt="Foto de ${esc(user.name)}" />`
     : `<span class="avatar-viewer-fallback">${esc(initialsFor(user))}</span>`;
-
-  const modal = openModal(`
+  openModal(`
     <div class="avatar-viewer">
       <h2 class="avatar-viewer-title">Foto de perfil</h2>
       <button type="button" class="icon-btn avatar-viewer-close" data-action="close-modal" aria-label="Fechar">${icon('close')}</button>
       <div class="avatar-viewer-media">
-        <span class="avatar-viewer-frame" id="avatar-viewer-frame">
-          ${frame}
-          ${canEdit ? `
-            <button type="button" class="avatar-viewer-pencil" id="avatar-viewer-edit" aria-label="Alterar foto de perfil">${icon('edit', 16)}</button>` : ''}
-        </span>
+        <span class="avatar-viewer-frame" id="avatar-viewer-frame">${frame}</span>
       </div>
-      ${canEdit ? `
-        <input id="avatar-viewer-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
-        <div class="avatar-viewer-footer">
-          <button type="button" class="btn primary" id="avatar-viewer-save" disabled>Salvar</button>
-        </div>` : ''}
     </div>`, 'avatar-viewer-modal-wrap');
-
-  if (!canEdit) return;
-  const input = $('#avatar-viewer-input', modal);
-  const pencil = $('#avatar-viewer-edit', modal);
-  const save = $('#avatar-viewer-save', modal);
-  const holder = $('#avatar-viewer-frame', modal);
-  if (!input || !pencil || !save || !holder) return;
-
-  let pending = null;
-
-  pencil.addEventListener('click', () => input.click());
-  input.addEventListener('change', async () => {
-    const file = input.files && input.files[0];
-    input.value = '';
-    if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast('A imagem precisa ter no máximo 8 MB.', 'error');
-      return;
-    }
-    try {
-      pending = await fileToDataUrl(file);
-      holder.innerHTML = `<img src="${pending}" alt="Nova foto de perfil" />
-        <button type="button" class="avatar-viewer-pencil" id="avatar-viewer-edit" aria-label="Alterar foto de perfil">${icon('edit', 16)}</button>`;
-      $('#avatar-viewer-edit', holder).addEventListener('click', () => input.click());
-      save.disabled = false;
-    } catch (error) {
-      toast(error.message || 'Não foi possível ler a imagem.', 'error');
-    }
-  });
-
-  save.addEventListener('click', async () => {
-    if (!pending) return;
-    setBusy(save, true);
-    try {
-      await saveProfileMedia($('#view'), data, 'avatar', pending);
-      closeModal();
-    } finally {
-      setBusy(save, false);
-    }
-  });
-
-  if (autoEdit) input.click();
-}
-
-/**
- * Liga os botões de edição de foto e capa do próprio perfil.
- *
- * @param {HTMLElement} viewElement Elemento da view de perfil.
- * @param {object} data Dados do perfil exibido.
- */
-function bindProfileMediaEditors(viewElement, data) {
-  if (!data.isMe) return;
-  const bannerInput = $('#profile-banner-input', viewElement);
-  const bannerButton = $('[data-action="edit-profile-banner"]', viewElement);
-  if (bannerInput && bannerButton) {
-    bannerButton.addEventListener('click', () => bannerInput.click());
-    bannerInput.addEventListener('change', () => {
-      const file = bannerInput.files && bannerInput.files[0];
-      bannerInput.value = '';
-      uploadProfileMedia(viewElement, data, 'banner', file);
-    });
-  }
 }
 
 export async function renderProfile(viewElement, params = {}) {
   const username = params.username || state.me.username;
   viewElement.innerHTML = `
     <div class="profile">
-      <div class="profile-cover skeleton-cover"></div>
-      <header class="profile-card">
-        <div class="profile-avatar-wrap"><div class="skeleton-avatar"></div></div>
-        <div class="profile-info">
-          <div class="skeleton-line wide"></div>
-          <div class="skeleton-line"></div>
-          <div class="skeleton-line short"></div>
+      <div class="profile-layout">
+        <div class="profile-main">
+          <div class="profile-cover skeleton-cover"></div>
+          <header class="profile-card">
+            <div class="profile-avatar-wrap"><div class="skeleton-avatar"></div></div>
+            <div class="profile-info">
+              <div class="skeleton-line wide"></div>
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line short"></div>
+            </div>
+          </header>
         </div>
-      </header>
+        <aside class="profile-aside" aria-label="Informações do perfil">
+          <div class="side-panel skeleton-panel"><div class="skeleton-line wide"></div><div class="skeleton-line"></div></div>
+        </aside>
+      </div>
     </div>`;
 
   const data = await api(`/api/users/${encodeURIComponent(username)}`);
@@ -1040,7 +1367,16 @@ export async function renderProfile(viewElement, params = {}) {
   state.profile = data;
   state.params.username = data.user.username;
 
-  const cover = data.posts.find((post) => post.mediaType !== 'video') || data.posts[0];
+  /* Ao trocar de perfil a aba volta para "Publicações", evitando herdar a aba
+     de curtidas de um perfil anterior. */
+  if (state.profileTabUser !== data.user.username) {
+    state.profileTab = 'posts';
+    state.profileTabUser = data.user.username;
+  }
+
+  const posts = Array.isArray(data.posts) ? data.posts : [];
+  const stats = data.stats || { posts: posts.length, followers: 0, following: 0, verified: 0 };
+  const cover = posts.find((post) => post.mediaType !== 'video') || posts[0];
   const bio = data.user.bio
     ? `<p>${captionHtml(data.user.bio)}</p>`
     : '<p class="muted">Sem bio ainda.</p>';
@@ -1055,84 +1391,112 @@ export async function renderProfile(viewElement, params = {}) {
         : `<img src="${esc(cover.image)}" alt="" aria-hidden="true" />`)
       : '';
 
+  const verified = Number(stats.verified)
+    ? `<span class="profile-verified" title="Conta verificada" aria-label="Conta verificada">${icon('shield', 16)}</span>`
+    : '';
+
+  const activeTab = PROFILE_TABS.some((tab) => tab.id === state.profileTab) ? state.profileTab : 'posts';
+  const tabPosts = await loadProfileTabPosts(data, activeTab);
+
   viewElement.innerHTML = `
     <div class="profile">
-      <div class="profile-cover">
-        ${bannerMarkup}
-        <span class="profile-cover-shade"></span>
-        ${data.isMe ? `
-          <div class="profile-cover-actions">
-            <button type="button" class="profile-media-btn profile-cover-edit" data-action="edit-profile-banner" aria-label="Editar capa do perfil">
-              ${icon('camera', 15)} <span>Editar capa</span>
-            </button>
+      <div class="profile-layout">
+        <div class="profile-main">
+          <div class="profile-cover">
+            ${bannerMarkup}
+            <span class="profile-cover-shade"></span>
+            ${data.isMe ? `
+              <div class="profile-cover-actions">
+                <button type="button" class="profile-media-btn profile-cover-edit" data-action="edit-profile-banner" aria-label="Editar capa do perfil">
+                  ${icon('camera', 15)} <span>Editar capa</span>
+                </button>
+              </div>` : ''}
           </div>
-          <input id="profile-banner-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />` : ''}
-      </div>
-      <header class="profile-card">
-        <div class="profile-avatar-wrap">
-          <button type="button" class="profile-avatar-btn" data-action="preview-avatar" aria-label="Ampliar foto de perfil">
-            ${avatar(data.user, 112, 'profile-avatar')}
-          </button>
-          ${data.isMe ? `
-            <button type="button" class="profile-avatar-pencil" data-action="edit-profile-avatar" aria-label="Editar foto de perfil">
-              ${icon('edit', 15)}
-            </button>` : ''}
-        </div>
-        <div class="profile-info">
-          <div class="profile-top">
-            <div class="profile-identity">
-              <p class="eyebrow">@${esc(data.user.username)}</p>
-              <h1>${esc(data.user.name)}</h1>
-            </div>
-            ${data.isMe ? '' : `
-            <div class="profile-actions">
-              ${followButton({ ...data.user, isFollowing: data.isFollowing, followRequested: data.followRequested })}
-              ${data.canMessage ? `<button type="button" class="btn ghost" data-action="message-user" data-username="${esc(data.user.username)}">${icon('message', 16)} Mensagem</button>` : ''}
-              <button type="button" class="icon-btn" data-action="profile-menu" data-username="${esc(data.user.username)}" aria-label="Mais opções">${icon('more')}</button>
-            </div>`}
-          </div>
-          <div class="profile-bio">${bio}</div>
-          <div class="profile-stats">
-            <span><strong>${formatCount(data.stats.posts)}</strong> ${plural(data.stats.posts, 'publicação', 'publicações')}</span>
-            <button type="button" class="profile-stat" data-action="followers-list" data-username="${esc(data.user.username)}">
-              <strong data-profile-followers>${formatCount(data.stats.followers)}</strong> ${plural(data.stats.followers, 'seguidor', 'seguidores')}
-            </button>
-            <button type="button" class="profile-stat" data-action="following-list" data-username="${esc(data.user.username)}">
-              <strong>${formatCount(data.stats.following)}</strong> seguindo
-            </button>
-          </div>
-        </div>
-      </header>
 
-      ${data.canViewContent ? `
-        <div class="gallery-head">
-          <h2>Publicações</h2>
-          <span>${formatCount(data.posts.length)}</span>
+          <header class="profile-card">
+            <div class="profile-avatar-wrap">
+              <button type="button" class="profile-avatar-btn" data-action="preview-avatar" aria-label="Ampliar foto de perfil">
+                ${avatar(data.user, 128, 'profile-avatar')}
+              </button>
+              ${data.isMe ? `
+                <button type="button" class="profile-avatar-pencil" data-action="edit-profile-avatar" aria-label="Editar foto de perfil">
+                  ${icon('edit', 15)}
+                </button>` : ''}
+            </div>
+
+            <div class="profile-info">
+              <div class="profile-topline">
+                <div class="profile-identity">
+                  <h1>${esc(data.user.name)}${verified}</h1>
+                  <p class="profile-handle">@${esc(data.user.username)}</p>
+                </div>
+
+                <div class="profile-actions">
+                  ${data.isMe ? `
+                    <button type="button" class="btn primary profile-edit-btn" data-action="settings">Editar perfil</button>
+                    <button type="button" class="icon-btn profile-share-btn" data-action="share-profile" data-username="${esc(data.user.username)}" aria-label="Compartilhar perfil">
+                      ${icon('share', 18)}
+                    </button>
+                    <button type="button" class="icon-btn profile-share-btn" data-action="profile-menu" data-username="${esc(data.user.username)}" aria-label="Mais opções">
+                      ${icon('more', 18)}
+                    </button>` : `
+                    ${followButton({ ...data.user, isFollowing: data.isFollowing, followRequested: data.followRequested })}
+                    ${data.canMessage ? `<button type="button" class="btn ghost" data-action="message-user" data-username="${esc(data.user.username)}">${icon('message', 16)} Mensagem</button>` : ''}
+                    <button type="button" class="icon-btn profile-share-btn" data-action="share-profile" data-username="${esc(data.user.username)}" aria-label="Compartilhar perfil">
+                      ${icon('share', 18)}
+                    </button>
+                    <button type="button" class="icon-btn profile-share-btn" data-action="profile-menu" data-username="${esc(data.user.username)}" aria-label="Mais opções">
+                      ${icon('more', 18)}
+                    </button>`}
+                </div>
+              </div>
+
+              <div class="profile-bio">${bio}</div>
+
+              <div class="profile-stats">
+                <button type="button" class="profile-stat" data-action="profile-stat-posts" data-username="${esc(data.user.username)}">
+                  <strong>${formatCount(stats.posts)}</strong>
+                  <span>${plural(stats.posts, 'publicação', 'publicações')}</span>
+                </button>
+                <button type="button" class="profile-stat" data-action="followers-list" data-username="${esc(data.user.username)}">
+                  <strong data-profile-followers>${formatCount(stats.followers)}</strong>
+                  <span>${plural(stats.followers, 'seguidor', 'seguidores')}</span>
+                </button>
+                <button type="button" class="profile-stat" data-action="following-list" data-username="${esc(data.user.username)}">
+                  <strong>${formatCount(stats.following)}</strong>
+                  <span>seguindo</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          ${data.canViewContent ? `
+            ${profileTabsMarkup(data, activeTab)}
+            <div id="profile-tab-content" class="profile-tab-content">
+              ${profileTabContent(tabPosts, activeTab, data)}
+            </div>`
+          : `
+            <div class="private-gate">
+              <div class="private-gate-icon">${icon('lock', 30)}</div>
+              <h2>Este perfil é privado</h2>
+              <p>${data.followRequested
+                ? 'Sua solicitação está aguardando aprovação. Enquanto isso, as publicações e stories ficam ocultos.'
+                : 'Envie uma solicitação para seguir. Quando aprovada, você poderá ver as publicações e stories deste perfil.'}</p>
+              ${data.followRequested
+                ? `<button type="button" class="btn ghost" data-action="follow" data-username="${esc(data.user.username)}" data-following="false" data-requested="true" data-private="true">Cancelar solicitação</button>`
+                : `<button type="button" class="btn primary" data-action="follow" data-username="${esc(data.user.username)}" data-following="false" data-requested="false" data-private="true">${icon('lock', 16)} Solicitar para seguir</button>`}
+            </div>`}
         </div>
-        <div class="gallery" id="profile-grid">
-          ${data.posts.length
-            ? data.posts.map(gridItem).join('')
-            : `<div class="empty-state grid-empty">
-                <div class="empty-icon">${icon('camera', 30)}</div>
-                <h3>Nenhuma publicação</h3>
-                <p>${data.isMe ? 'Sua primeira foto ou vídeo pode estar aqui.' : 'Quando publicar, as fotos aparecem aqui.'}</p>
-                ${data.isMe ? '<button type="button" class="btn primary" data-action="new-post">Criar publicação</button>' : ''}
-              </div>`}
-        </div>`
-      : `
-        <div class="private-gate">
-          <div class="private-gate-icon">${icon('lock', 30)}</div>
-          <h2>Este perfil é privado</h2>
-          <p>${data.followRequested
-            ? 'Sua solicitação está aguardando aprovação. Enquanto isso, as publicações e stories ficam ocultos.'
-            : 'Envie uma solicitação para seguir. Quando aprovada, você poderá ver as publicações e stories deste perfil.'}</p>
-          ${data.followRequested
-            ? `<button type="button" class="btn ghost" data-action="follow" data-username="${esc(data.user.username)}" data-following="false" data-requested="true" data-private="true">Cancelar solicitação</button>`
-            : `<button type="button" class="btn primary" data-action="follow" data-username="${esc(data.user.username)}" data-following="false" data-requested="false" data-private="true">${icon('lock', 16)} Solicitar para seguir</button>`}
-        </div>`}
+
+        <aside class="profile-aside" aria-label="Informações do perfil">
+          ${profileAboutPanel(data)}
+          ${profileHighlightsPanel(data)}
+          ${profileSuggestionsPanel()}
+        </aside>
+      </div>
     </div>`;
   hydrateIcons(viewElement);
-  bindProfileMediaEditors(viewElement, data);
+  loadProfileAside(viewElement, data);
 }
 
 /* PART2 */

@@ -1,3 +1,8 @@
+import { existsSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:4173';
 const DEMO_PASSWORD = process.env.VIBRA_DEMO_PASSWORD || '';
 if (!DEMO_PASSWORD) {
@@ -46,6 +51,108 @@ ok('cookie de sessão', cookie.startsWith('vibra_session='));
 
 const me = await api('/api/me');
 ok('sessão /api/me', me.status === 200 && me.data.user.id === 1);
+
+/* --- entitlement de paleta de tema ---------------------------------- */
+ok(
+  'usuário free recebe capability explícita e paleta padrão',
+  me.data.user.canCustomizeTheme === false &&
+    me.data.user.themePalette === 'orange' &&
+    me.data.canCustomizeTheme === false &&
+    me.data.themePalette === 'orange'
+);
+
+const invalidPalette = await api('/api/me/theme-palette', {
+  method: 'PATCH',
+  body: JSON.stringify({ palette: '#ff8800' }),
+});
+ok('paleta arbitrária é rejeitada', invalidPalette.status === 400, `status ${invalidPalette.status}`);
+
+const freePaletteAttempt = await api('/api/me/theme-palette', {
+  method: 'PATCH',
+  body: JSON.stringify({ palette: 'blue' }),
+});
+ok('usuário free não altera a paleta', freePaletteAttempt.status === 403, `status ${freePaletteAttempt.status}`);
+
+const subscriptionAttempt = await api('/api/me', {
+  method: 'PATCH',
+  body: JSON.stringify({ subscriptionStatus: 'active', subscriptionEndsAt: Date.now() + 60_000 }),
+});
+ok(
+  'PATCH /api/me rejeita campos de assinatura do cliente',
+  subscriptionAttempt.status === 400,
+  `status ${subscriptionAttempt.status}`
+);
+
+/*
+ * O runner usa um banco temporário isolado. Só alteramos a assinatura nesse
+ * ambiente; smoke.mjs pode ser executado contra dev/produção sem mutá-los.
+ */
+const isolatedDataDir = process.env.VIBRA_DATA_DIR ? path.resolve(process.env.VIBRA_DATA_DIR) : '';
+const isolatedDbPath = isolatedDataDir ? path.join(isolatedDataDir, 'vibra.db') : '';
+const canMutateIsolatedUser =
+  process.env.NODE_ENV === 'test' &&
+  Boolean(isolatedDbPath) &&
+  existsSync(isolatedDbPath) &&
+  path.dirname(isolatedDataDir) === path.resolve(os.tmpdir());
+
+if (canMutateIsolatedUser) {
+  const testDb = new DatabaseSync(isolatedDbPath);
+  testDb.exec('PRAGMA busy_timeout = 5000');
+  const userId = me.data.user.id;
+  try {
+    testDb
+      .prepare("UPDATE users SET subscription_status = 'active', subscription_ends_at = ?, theme_palette = 'orange' WHERE id = ?")
+      .run(Date.now() + 60 * 60 * 1000, userId);
+
+    const subscriberMe = await api('/api/me');
+    ok(
+      'assinatura ativa recebe capability de personalização',
+      subscriberMe.status === 200 &&
+        subscriberMe.data.user.canCustomizeTheme === true &&
+        subscriberMe.data.user.themePalette === 'orange'
+    );
+
+    const subscriberPalette = await api('/api/me/theme-palette', {
+      method: 'PATCH',
+      body: JSON.stringify({ palette: 'blue' }),
+    });
+    ok(
+      'assinatura ativa persiste paleta allow-listed',
+      subscriberPalette.status === 200 &&
+        subscriberPalette.data.user.themePalette === 'blue' &&
+        subscriberPalette.data.themePalette === 'blue'
+    );
+
+    testDb
+      .prepare("UPDATE users SET subscription_status = 'active', subscription_ends_at = ?, theme_palette = 'blue' WHERE id = ?")
+      .run(Date.now() - 1000, userId);
+
+    const expiredMe = await api('/api/me');
+    ok(
+      'assinatura expirada perde capability e volta ao orange',
+      expiredMe.status === 200 &&
+        expiredMe.data.user.canCustomizeTheme === false &&
+        expiredMe.data.user.themePalette === 'orange' &&
+        expiredMe.data.themePalette === 'orange'
+    );
+
+    const expiredPalette = await api('/api/me/theme-palette', {
+      method: 'PATCH',
+      body: JSON.stringify({ palette: 'green' }),
+    });
+    ok('assinatura expirada não altera a paleta', expiredPalette.status === 403, `status ${expiredPalette.status}`);
+
+    const storedExpiredPalette = testDb.prepare('SELECT theme_palette FROM users WHERE id = ?').get(userId);
+    ok('paleta expirada é removida no banco', storedExpiredPalette.theme_palette === 'orange');
+  } finally {
+    testDb
+      .prepare("UPDATE users SET subscription_status = 'free', subscription_ends_at = NULL, theme_palette = 'orange' WHERE id = ?")
+      .run(me.data.user.id);
+    testDb.close();
+  }
+} else {
+  console.log('SKIP  cobertura de assinante exige banco temporário isolado');
+}
 
 /* --- edição de conta: username imutável e persistência de nome/bio --- */
 const originalUsername = me.data.user.username;
@@ -175,7 +282,31 @@ const postId = feed.data.posts.find((post) => post.user.id !== 1)?.id || feed.da
 const postBefore = await api(`/api/posts/${postId}`);
 const like = await api(`/api/posts/${postId}/like`, { method: 'POST' });
 ok('curtir publicação', like.status === 200 && like.data.liked !== postBefore.data.post.liked);
-await api(`/api/posts/${postId}/like`, { method: 'POST' });
+
+/* --- aba de curtidas do perfil ------------------------------------- */
+/* A curtida é alternada, então o estado final é normalizado para "curtida"
+   antes de consultar a lista, e restaurado ao final do teste. */
+if (!like.data.liked) {
+  await api(`/api/posts/${postId}/like`, { method: 'POST' });
+}
+const myLikes = await api(`/api/users/${me.data.user.username}/likes`);
+ok(
+  'lista de curtidas do próprio perfil',
+  myLikes.status === 200 && Array.isArray(myLikes.data.posts) && myLikes.data.posts.some((p) => p.id === postId),
+  `${myLikes.data?.posts?.length ?? 0} curtidas`
+);
+ok(
+  'curtidas trazem dados da publicação',
+  myLikes.data.posts.every((p) => p.id && p.user && typeof p.likes === 'number')
+);
+const otherLikes = await api('/api/users/ana.souza/likes');
+ok('curtidas de terceiro são privadas', otherLikes.status === 403);
+const missingLikes = await api('/api/users/usuario-inexistente/likes');
+ok('curtidas de perfil inexistente', missingLikes.status === 404);
+
+if (!like.data.liked) {
+  await api(`/api/posts/${postId}/like`, { method: 'POST' });
+}
 
 const comment = await api(`/api/posts/${postId}/comments`, {
   method: 'POST',
@@ -439,6 +570,25 @@ ok('apagar post privado de teste', deletedPrivatePost.status === 200);
 
 const deletedPrivateStory = await anaClient(`/api/stories/${anaPrivateStoryId}`, { method: 'DELETE' });
 ok('apagar story privado de teste', deletedPrivateStory.status === 200);
+
+/* --- segurança: dispositivos conectados e sessões abertas --- */
+const sessions = await api('/api/sessions');
+const sessionList = Array.isArray(sessions.data?.sessions) ? sessions.data.sessions : [];
+const currentSession = sessionList.find((session) => session.current);
+ok('lista de sessões abertas', sessions.status === 200 && sessionList.length > 0);
+ok('sessão atual destacada', Boolean(currentSession));
+ok(
+  'sessão informa o dispositivo',
+  Boolean(currentSession && typeof currentSession.device === 'string' && currentSession.device.trim().length > 0),
+  currentSession?.device || '',
+);
+ok(
+  'sessão informa a data de início',
+  Boolean(currentSession && Number.isFinite(currentSession.createdAt)),
+);
+
+const revokeCurrent = await api(`/api/sessions/${encodeURIComponent(currentSession?.id || '')}`, { method: 'DELETE' });
+ok('sessão atual não é encerrada pelo atalho', revokeCurrent.status === 400);
 
 const logout = await api('/api/logout', { method: 'POST' });
 ok('logout', logout.status === 200);

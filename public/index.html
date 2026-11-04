@@ -104,31 +104,78 @@
     <div id="app-shell" class="shell hidden">
       <a class="skip-link" href="#view">Pular para o conteúdo</a>
 
+      <aside class="sidebar" aria-label="Menu principal">
+        <button class="sidebar-brand brand" type="button" data-action="nav" data-view="home" aria-label="Ir para o início">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-word"><span data-brand-name>vibra</span><span class="brand-dot">.</span></span>
+        </button>
+
+        <nav class="sidebar-nav" aria-label="Navegação principal">
+          <button type="button" class="sidebar-item" data-action="nav" data-view="home" data-nav="home">
+            <span class="sidebar-item-icon" data-icon="home"></span>
+            <span class="sidebar-item-label">Início</span>
+          </button>
+          <button type="button" class="sidebar-item" data-action="nav" data-view="explore" data-nav="explore">
+            <span class="sidebar-item-icon" data-icon="compass"></span>
+            <span class="sidebar-item-label">Explorar</span>
+          </button>
+          <button type="button" class="sidebar-item" data-action="nav" data-view="dating" data-nav="dating">
+            <span class="sidebar-item-icon" data-icon="spark"></span>
+            <span class="sidebar-item-label">Namoro</span>
+          </button>
+          <button type="button" class="sidebar-item" data-action="nav" data-view="messages" data-nav="messages">
+            <span class="sidebar-item-icon" data-icon="message"></span>
+            <span class="sidebar-item-label">Mensagens</span>
+            <span class="nav-badge" data-badge="messages" hidden></span>
+          </button>
+          <button type="button" class="sidebar-item" data-action="open-notifications">
+            <span class="sidebar-item-icon" data-icon="bell"></span>
+            <span class="sidebar-item-label">Notificações</span>
+            <span class="nav-badge" data-badge="notifications" hidden></span>
+          </button>
+          <button type="button" class="sidebar-item sidebar-item-primary" data-action="new-post">
+            <span class="sidebar-item-icon" data-icon="plus"></span>
+            <span class="sidebar-item-label">Criar publicação</span>
+          </button>
+          <button type="button" class="sidebar-item" data-action="nav-self" data-nav="profile">
+            <span class="sidebar-item-icon" data-icon="user"></span>
+            <span class="sidebar-item-label">Perfil</span>
+          </button>
+          <button type="button" class="sidebar-item" data-action="settings" data-nav="settings">
+            <span class="sidebar-item-icon" data-icon="settings"></span>
+            <span class="sidebar-item-label">Configurações</span>
+          </button>
+          <button type="button" class="sidebar-item" data-action="account-menu">
+            <span class="sidebar-item-icon" data-icon="more"></span>
+            <span class="sidebar-item-label">Mais</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-foot">
+          <div class="premium-card">
+            <span class="premium-card-icon" data-icon="crown" aria-hidden="true"></span>
+            <strong>Vibra Premium</strong>
+            <p>Novos recursos chegam em breve. Nenhuma cobrança por enquanto.</p>
+            <span class="premium-card-tag">Em breve</span>
+          </div>
+        </div>
+      </aside>
+
       <header class="topbar">
         <div class="topbar-inner">
-          <button class="brand" type="button" data-action="nav" data-view="home" aria-label="Ir para o início">
+          <button class="brand topbar-brand" type="button" data-action="nav" data-view="home" aria-label="Ir para o início">
             <span class="brand-mark" aria-hidden="true"></span>
             <span class="brand-word"><span data-brand-name>vibra</span><span class="brand-dot">.</span></span>
           </button>
 
-          <nav class="topnav" aria-label="Navegação principal">
-            <button type="button" class="topnav-item" data-action="nav" data-view="home" data-nav="home">
-              <span data-icon="home"></span><span>Início</span>
+          <form class="topbar-search" id="topbar-search" role="search" autocomplete="off">
+            <span class="topbar-search-icon" data-icon="search" aria-hidden="true"></span>
+            <input type="search" id="topbar-search-input" name="q" placeholder="Buscar no Vibra..." aria-label="Buscar no Vibra" autocomplete="off" />
+            <button type="button" class="topbar-search-clear" data-action="clear-search" aria-label="Limpar busca" hidden>
+              <span data-icon="close" aria-hidden="true"></span>
             </button>
-            <button type="button" class="topnav-item" data-action="nav" data-view="explore" data-nav="explore">
-              <span data-icon="compass"></span><span>Explorar</span>
-            </button>
-            <button type="button" class="topnav-item" data-action="nav" data-view="dating" data-nav="dating">
-              <span data-icon="spark"></span><span>Namoro</span>
-            </button>
-            <button type="button" class="topnav-item" data-action="nav" data-view="messages" data-nav="messages">
-              <span data-icon="message"></span><span>Mensagens</span>
-              <span class="nav-badge" data-badge="messages" hidden></span>
-            </button>
-            <button type="button" class="topnav-item" data-action="nav-self" data-nav="profile">
-              <span data-icon="user"></span><span>Perfil</span>
-            </button>
-          </nav>
+            <div class="search-panel" id="search-panel" role="listbox" aria-label="Resultados da busca" hidden></div>
+          </form>
 
           <div class="top-actions">
             <button type="button" class="icon-btn notification-btn" data-action="open-notifications" aria-label="Notificações">

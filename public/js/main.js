@@ -49,6 +49,7 @@ import {
   handleSubmit as handleAccountSubmit,
 } from './account-menu.js';
 import { renderSettings, handleAction as handleSettingsAction, handleSubmit as handleSettingsSubmit } from './settings.js';
+import { initSearch, clearSearch } from './search.js';
 
 /* ------------------------------------------------------------------ */
 /* Sessão                                                             */
@@ -276,6 +277,10 @@ async function handleClick(event) {
       await openNotifications();
       return;
     }
+    if (action === 'clear-search') {
+      clearSearch();
+      return;
+    }
 
     if (await handleSettingsAction(action, target)) return;
     if (await handleSocialAction(action, target)) return;
@@ -317,6 +322,7 @@ async function handleSubmit(event) {
 async function boot() {
   initTheme();
   hydrateIcons();
+  initSearch();
   setAuthTab('login');
 
   document.addEventListener('click', (event) => {

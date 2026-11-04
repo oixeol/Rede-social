@@ -41,6 +41,9 @@ Legenda de estado:
 | 11 | Curtir, comentar, apagar os próprios comentários e compartilhar | Concluído | `server.js`, `social.js` |
 | 12 | Stories de 24 h, visualizações, menções, reações e respostas | Concluído | `server.js`, `social.js` |
 | 13 | Perfis com bio, foto, interesses, seguidores, badges e privacidade | Concluído | `server.js`, `social.js` |
+| 13.1 | Perfil redesenhado: capa arredondada, avatar circular sobreposto, identidade/stats/botões centralizados e abas Publicações/Reels/Fotos/Curtidas | Concluído | `social.js`, `styles.css` |
+| 13.2 | Editor de imagem (recorte, zoom, rotação e arraste) para foto de perfil e capa, sem dependências | Concluído | `media-editor.js`, `styles.css` |
+| 13.3 | Compartilhamento de perfil com link copiável e Web Share API | Concluído | `social-actions.js` |
 | 14 | Seguir, deixar de seguir, perfil privado e solicitações de seguimento | Concluído | `server.js`, `social-actions.js` |
 | 15 | Melhores amigos e stories restritos | Concluído | `server.js`, `social-actions.js` |
 | 16 | Explorar e buscar pessoas por nome, usuário, bio ou legenda | Concluído | `server.js`, `social.js` |
@@ -336,3 +339,84 @@ Modelo para novas entradas:
 - Testes automatizados novos em `qa/smoke.mjs`: rejeição de `username` e
   `user_id`, edição de perfil alheio, persistência de nome/bio e preservação de
   foto e interesses ao salvar a conta.
+
+### 2026-11-02 — Atualização 025 — Sessões e dispositivos em Segurança
+
+- A seção **Segurança** das Configurações agora tem o texto
+  “Sessões abertas e a sua senha de acesso.” (o texto anterior trazia um
+  caractere indevido no lugar da palavra “conta”).
+- O item **Solicitações de seguimento** saiu da seção **Privacidade** e passou
+  a existir apenas em **Segurança**, com o rótulo curto **Solicitações** e o
+  mesmo contador de pedidos aguardando.
+- A lista de sessões foi requalificada como **Dispositivos conectados**: cada
+  linha mostra um ícone de monitor, o navegador e o sistema operacional
+  (ex.: “Chrome · Windows”), a data de início da sessão, a marcação **Atual**
+  para o dispositivo atual e o botão **Encerrar** para os demais.
+- O subtítulo da lista mostra quantos dispositivos estão conectados, e a lista
+  é anunciada de forma acessível via `aria-live="polite"`.
+- Testes automatizados novos em `qa/smoke.mjs`: `GET /api/sessions` devolve as
+  sessões com o dispositivo identificado, a sessão atual é destacada e não pode
+  ser encerrada pelo atalho (o próprio endpoint responde **400**).
+
+### 2026-11-02 — Atualização 026 — Novo perfil e editor de imagem
+
+- O perfil foi redesenhado: capa com cantos arredondados, avatar circular
+  sobreposto e centralizado sobre a capa, identidade (nome, selo de verificação
+  e `@usuário`), bio, indicadores e botões centralizados.
+- Os botões do próprio perfil agora são **Editar perfil** (que leva às
+  Configurações) e **Compartilhar** (modal com o link do perfil, botão de
+  copiar e Web Share API quando disponível). Em perfis de terceiros, o botão de
+  compartilhamento também aparece ao lado de seguir, mensagem e mais opções.
+- O perfil ganhou as abas **Publicações**, **Reels**, **Fotos** e **Curtidas**,
+  com sublinhado laranja na aba ativa. A aba **Curtidas** aparece apenas no
+  próprio perfil.
+- Novo módulo `public/js/media-editor.js` com o componente `Cropper`: recorte
+  em `<canvas>`, zoom (botões e slider), rotação de 90° e deslocamento por
+  arraste, sem dependências externas.
+- Editor de foto de perfil: preview circular, controles de zoom à esquerda,
+  botão de rotação à direita, slider de zoom, abas **Trocar foto** /
+  **Tirar foto** / **Remover foto**, faixa de thumbnails e rodapé com
+  **Cancelar** e **Salvar alterações**.
+- Editor de capa: moldura de recorte, slider de zoom, rotação e rodapé com
+  **Redefinir**, **Cancelar** e **Aplicar**. O recorte é gravado no backend via
+  `PATCH /api/me`, no mesmo formato de data URL já aceito.
+- Novo endpoint `GET /api/users/:username/likes`, que lista as publicações
+  curtidas aplicando os filtros de bloqueio e de privacidade dos autores. Como
+  a aba **Curtidas** só existe no próprio perfil, a rota responde **403** para
+  consulta a outro usuário.
+- Testes automatizados novos em `qa/smoke.mjs`: listagem das curtidas do
+  próprio perfil, consistência dos dados das publicações, privacidade das
+  curtidas de terceiros e resposta **404** para perfil inexistente.
+
+### 2026-11-03 — Atualização 027 — Perfil no formato de referência
+
+- O cabeçalho do perfil foi refeito no formato da imagem de referência:
+  avatar circular **sobreposto à esquerda da capa**, com borda roxa, e a
+  identidade alinhada à direita dele.
+- A linha do nome agora é única: **nome + selo de verificação** e
+  `@usuário` à esquerda, com **Editar perfil**, **Compartilhar** e **mais
+  opções** à direita, na mesma linha. No perfil de terceiros, o mesmo espaço
+  recebe **Seguir**, **Mensagem**, **Compartilhar** e **mais opções**.
+- As estatísticas saíram das três colunas com divisores e passaram a uma
+  **linha horizontal** de número destacado + rótulo
+  (publicações / seguidores / seguindo), mantendo os contadores reais e
+  clicáveis.
+- As abas **Publicações**, **Reels**, **Fotos** e **Curtidas** passaram a ser
+  uma linha horizontal de pills com ícone, com destaque na aba ativa.
+- Os cards da grade viraram cards de *post*: mídia grande (proporção 4:5),
+  botão **"..."** flutuando no canto superior direito e rodapé com
+  **curtir**, **comentar** e **compartilhar**, mantendo os contadores reais de
+  curtidas e comentários.
+- Painel **Sobre mim** ganhou linhas de metadados no formato da referência:
+  local, **Entrou em <mês de ano>** e link. O mês/ano vem do campo
+  `createdAt`, agora liberado pela rota `GET /api/users/:username`; local e
+  link só aparecem quando existirem, sem inventar dados.
+- Painel **Destaques** passou a mostrar círculos com rótulo abaixo, usando os
+  stories reais da pessoa; **Sugestões para você** manteve as linhas com
+  avatar, nome e botão **Seguir** real.
+- Correção de CSS: um bloco de regras mobile havia ficado fora de qualquer
+  media query e era aplicado em todas as larguras. As regras foram reintegradas
+  dentro de `@media (max-width: 520px)`.
+- Responsividade preservada nos breakpoints de 1080 px, 820 px, 520 px, 375 px
+  e 320 px: em telas estreitas a identidade quebra em duas linhas, as abas
+  continuam roláveis na horizontal e a grade mantém duas colunas.
