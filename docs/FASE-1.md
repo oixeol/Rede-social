@@ -10,12 +10,12 @@ A Fase 1 não foi um redesign do zero. O ponto de partida foi o Vibra 2.0 já fu
 
 | Camada | O que existe |
 | --- | --- |
-| Servidor | `server.js` com `node:http`, API JSON, uploads em base64 e SQLite via `node:sqlite` |
-| Banco | `data/vibra.db`, com usuários, posts, stories, seguidores, conversas, namoro e Radar |
-| Regras de namoro | `lib/dating.js`: gate 18+, perfis, questionário, afinidade, matches e consentimento de localização |
-| Cliente | `public/index.html` + módulos ES em `public/js/` |
-| Estilo | `public/styles.css`, com tokens, layout editorial e componentes |
-| QA | `qa/smoke.mjs`, `qa/run-tests.mjs`, `qa/shot.ps1`, `qa/capture.mjs` |
+| Servidor | `backend/node-api/server.js` com `node:http`, API JSON, uploads em base64 e SQLite via `node:sqlite` |
+| Banco | `backend/node-api/data/vibra.db`, com usuários, posts, stories, seguidores, conversas, namoro e Radar |
+| Regras de namoro | `backend/node-api/lib/dating.js`: gate 18+, perfis, questionário, afinidade, matches e consentimento de localização |
+| Cliente | `backend/node-api/public/index.html` + módulos ES em `backend/node-api/public/js/` |
+| Estilo | `backend/node-api/public/styles.css`, com tokens, layout editorial e componentes |
+| QA | `backend/node-api/qa/smoke.mjs`, `backend/node-api/qa/run-tests.mjs`, `backend/node-api/qa/shot.ps1`, `backend/node-api/qa/capture.mjs` |
 | Seed | cinco perfis, publicações, stories, perfis de namoro, um match e duas conversas |
 
 ### Problemas encontrados
@@ -64,7 +64,7 @@ A separação entre `--primary` e `--primary-fill` permite usar o terracota clar
 
 ### Ícones
 
-Os ícones são SVGs inline próprios, centralizados em `public/js/core.js`. O mesmo conjunto é usado no topo, na barra inferior, nos cartões, nos modais e nos estados vazios. Isso evita dependência externa e mantém o traço consistente.
+Os ícones são SVGs inline próprios, centralizados em `backend/node-api/public/js/core.js`. O mesmo conjunto é usado no topo, na barra inferior, nos cartões, nos modais e nos estados vazios. Isso evita dependência externa e mantém o traço consistente.
 
 ## Navegação
 
@@ -120,7 +120,7 @@ Barra inferior fixa com os cinco destinos. Namoro recebe um toque de terracota n
 
 ### Teste de fumaça
 
-`npm test` sobe um servidor isolado com banco temporário e executa `qa/smoke.mjs`. Cobertura atual:
+`npm test` sobe um servidor isolado com banco temporário e executa `backend/node-api/qa/smoke.mjs`. Cobertura atual:
 
 - login demo e cookie de sessão;
 - `/api/me`, feed, explorar, stories, busca e perfil;
@@ -144,7 +144,7 @@ Auditoria da página inicial no navegador integrado:
 
 ### Capturas
 
-As capturas finais ficam em `qa/` e são geradas com Chromium headless via CDP. O script `qa/shot.ps1` usa um perfil temporário, porta CDP aleatória e banco `data/vibra.db`.
+As capturas finais ficam em `backend/node-api/qa/` e são geradas com Chromium headless via CDP. O script `backend/node-api/qa/shot.ps1` usa um perfil temporário, porta CDP aleatória e banco `backend/node-api/data/vibra.db`.
 
 ## Próximos passos sugeridos (Fase 2)
 

@@ -63,6 +63,6 @@ Observação: a pasta `WindowsApps` exige permissão de administrador para leitu
 
 - App funcional: `http://127.0.0.1:4173` (ou a porta definida em `PORT`)
 - Dados de exemplo: opcionais, via `npm run seed:demo` e `VIBRA_DEMO_PASSWORD`
-- Código: `server.js`, `lib/dating.js`, `public/`
-- Testes: `npm test` (servidor isolado) ou `node qa/smoke.mjs` com o servidor em execução
+- Código: `backend/node-api/server.js`, `backend/node-api/lib/dating.js`, `backend/node-api/public/`
+- Testes: `npm test` (servidor isolado) ou `node backend/node-api/qa/smoke.mjs` com o servidor em execução
 - Registro da Fase 1: `docs/FASE-1.md`

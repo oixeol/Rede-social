@@ -15,6 +15,7 @@ __pycache__/
 
 # Banco e uploads são dados de execução, nunca versionados.
 data/
+backend/node-api/data/
 backend/staticfiles/
 backend/media/
 
@@ -27,8 +28,8 @@ backend/media/
 *.log
 
 # Capturas transitórias de QA. As finais (qa/final-*.png) são versionadas.
-qa/*.png
-!qa/final-*.png
+backend/node-api/qa/*.png
+!backend/node-api/qa/final-*.png
 
 .DS_Store
 Thumbs.db

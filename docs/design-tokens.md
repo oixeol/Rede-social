@@ -1,5 +1,7 @@
 # Design Tokens – Vibra (Etapa 3)
 
+> **Nota**: A **Etapa 2** exibia uma página de preview de fundação ("Etapa 2 · Base visual pronta") com tokens/tipografia/componentes na rota `/`. Esta foi **removida** e substituída pela **Landing Page (Etapa 3)** em `frontend/src/components/landing/landing-page.tsx`. A rota `/` agora renderiza a landing; o CTA "Entrar" leva a `/entrar` (login) e, após autenticar, ao app em `/inicio`.
+
 ## Referências visuais
 - **Perfil**: `docs/reference/perfil.png` — captura 1536 × 1024 (aguarda materialização dos bytes do anexo).
 - **Início**: `docs/reference/inicio.png` — captura 1586 × 992 (aguarda materialização dos bytes do anexo).
@@ -13,12 +15,12 @@
 ### Capturas geradas (próprias)
 | Página | Resolução | Arquivo | Página (scroll) | Observações |
 |--------|-----------|---------|-----------------|-------------|
-| Início | 1536 × 1024 | `qa/inicio-1536x1024-final.png` | 9693 px | Visualmente correta; sidebar expandida, topbar completa, composer, feed com tabs "Para você"/"Seguindo", rail com "Quem seguir" e "Assuntos em alta". |
-| Início | 1586 × 992  | `qa/inicio-1586x992-final.png`  | 9693 px | Visualmente correta; mesma estrutura. |
-| Perfil | 1536 × 1024 | `qa/perfil-1536x1024-final.png` | 1091 px | Visualmente correta; banner, avatar com anel, ações, stats, 4 tabs (Publicações/Reels/Fotos/Destaques), grid 2 colunas, "Sobre mim", "Destaques", "Sugestões". |
-| Perfil | 1586 × 992  | `qa/perfil-1586x992-final.png`  | 1091 px | Visualmente correta; mesma estrutura. |
-| Início (mobile) | 390 × 844 | `qa/inicio-390x844-twmerge.png` | 2121 px | Bottom nav visível, sidebar oculta, "Publicar" oculto (corrigido via `tailwind-merge`), busca por ícone. |
-| Perfil (mobile) | 390 × 844 | `qa/perfil-390x844.png` | 993 px | Bottom nav visível, sem "Publicar". |
+| Início | 1536 × 1024 | `backend/node-api/qa/inicio-1536x1024-final.png` | 9693 px | Visualmente correta; sidebar expandida, topbar completa, composer, feed com tabs "Para você"/"Seguindo", rail com "Quem seguir" e "Assuntos em alta". |
+| Início | 1586 × 992  | `backend/node-api/qa/inicio-1586x992-final.png`  | 9693 px | Visualmente correta; mesma estrutura. |
+| Perfil | 1536 × 1024 | `backend/node-api/qa/perfil-1536x1024-final.png` | 1091 px | Visualmente correta; banner, avatar com anel, ações, stats, 4 tabs (Publicações/Reels/Fotos/Destaques), grid 2 colunas, "Sobre mim", "Destaques", "Sugestões". |
+| Perfil | 1586 × 992  | `backend/node-api/qa/perfil-1586x992-final.png`  | 1091 px | Visualmente correta; mesma estrutura. |
+| Início (mobile) | 390 × 844 | `backend/node-api/qa/inicio-390x844-twmerge.png` | 2121 px | Bottom nav visível, sidebar oculta, "Publicar" oculto (corrigido via `tailwind-merge`), busca por ícone. |
+| Perfil (mobile) | 390 × 844 | `backend/node-api/qa/perfil-390x844.png` | 993 px | Bottom nav visível, sem "Publicar". |
 
 ### Comparação com referências
 - **Impossível** até que `docs/reference/perfil.png` e `docs/reference/inicio.png` sejam materializados no disco (bytes ausentes).
@@ -196,9 +198,9 @@ São os valores do `:root` / `[data-theme="dark"]` listados acima.
 | `npm run frontend:typecheck` | 0 erros |
 | `npm run frontend:build` | ✅ OK (Next.js 16.4.4) |
 | `npm test` (root) | ✅ TODOS OS TESTES PASSARAM (218 testes) |
-| `node --check server.js` | ✅ OK |
+| `node --check backend/node-api/server.js` | ✅ OK |
 | `git diff --check` | ✅ Limpo |
-| Capturas desktop (1536×1024, 1586×992) | ✅ Geradas (`qa/*-final.png`) |
+| Capturas desktop (1536×1024, 1586×992) | ✅ Geradas (`backend/node-api/qa/*-final.png`) |
 | Capturas mobile (390×844) | ✅ Geradas |
 | Bug SSR `window is not defined` | ✅ Corrigido (`getCanonicalUrl()` sob demanda) |
 | Bug hydration `nonce` | ✅ Corrigido (`headers().get('x-nonce')` no root layout) |

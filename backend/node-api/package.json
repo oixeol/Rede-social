@@ -9,11 +9,11 @@
     "dev": "node --watch server.js",
     "seed:demo": "node scripts/seed-demo.mjs",
     "test": "node qa/run-tests.mjs",
-    "frontend:dev": "npm --prefix frontend run dev",
-    "frontend:build": "npm --prefix frontend run build",
-    "frontend:start": "npm --prefix frontend run start",
-    "frontend:lint": "npm --prefix frontend run lint",
-    "frontend:typecheck": "npm --prefix frontend run typecheck",
+    "frontend:dev": "npm --prefix ../../frontend run dev",
+    "frontend:build": "npm --prefix ../../frontend run build",
+    "frontend:start": "npm --prefix ../../frontend run start",
+    "frontend:lint": "npm --prefix ../../frontend run lint",
+    "frontend:typecheck": "npm --prefix ../../frontend run typecheck",
     "frontend:check": "npm run frontend:lint && npm run frontend:typecheck && npm run frontend:build"
   },
   "engines": {

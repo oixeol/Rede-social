@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $PSScriptRoot
 $edge = Join-Path $env:LOCALAPPDATA 'ms-playwright\chromium_headless_shell-1228\chrome-headless-shell-win64\chrome-headless-shell.exe'
 if (-not (Test-Path $edge)) { $edge = Join-Path $env:LOCALAPPDATA 'ms-playwright\chromium-1228\chrome-win64\chrome.exe' }
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe' }
@@ -47,7 +48,7 @@ if (-not $ready) { throw 'Edge headless nao iniciou a tempo.' }
 try {
   $env:QA_ACTION = $Action
   $sizeArg = if ($Full) { 'full' } else { 'viewport' }
-  node qa/capture.mjs $Out $Width $Height $sizeArg
+  node (Join-Path $PSScriptRoot 'capture.mjs') $Out $Width $Height $sizeArg
 } finally {
   $ErrorActionPreference = 'Continue'
   try { taskkill /PID $process.Id /T /F 2>$null | Out-Null } catch {}

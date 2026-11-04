@@ -23,85 +23,85 @@ Legenda de estado:
 
 | # | Funcionalidade | Estado | Onde está |
 | --- | --- | --- | --- |
-| 1 | Rede social local com feed, descoberta, perfis, mensagens e notificações | Concluído | `server.js`, `public/js/` |
-| 2 | Marca própria “Vibra”, sem copiar layout, marca ou imagens de Instagram/Tinder | Concluído | `app.config.js`, `public/` |
-| 3 | Identidade visual editorial quente (papel, terracota, verde-teal, serifa + sans-serif) | Concluído | `public/styles.css` |
-| 4 | Layout responsivo para desktop e celular, com os mesmos cinco destinos | Concluído | `public/styles.css`, `public/index.html` |
-| 5 | Áreas obrigatórias: **Início**, **Explorar**, **Namoro**, **Mensagens** e **Perfil** | Concluído | `public/index.html`, `public/js/main.js` |
-| 6 | Estados de carregamento, vazio e erro em todas as áreas | Concluído | componentes em `public/js/` |
-| 7 | Acessibilidade: foco visível, ARIA, teclado, modais com `Esc`, `prefers-reduced-motion` | Concluído | `public/index.html`, `public/styles.css`, `core.js` |
+| 1 | Rede social local com feed, descoberta, perfis, mensagens e notificações | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/` |
+| 2 | Marca própria “Vibra”, sem copiar layout, marca ou imagens de Instagram/Tinder | Concluído | `backend/node-api/app.config.js`, `backend/node-api/public/` |
+| 3 | Identidade visual editorial quente (papel, terracota, verde-teal, serifa + sans-serif) | Concluído | `backend/node-api/public/styles.css` |
+| 4 | Layout responsivo para desktop e celular, com os mesmos cinco destinos | Concluído | `backend/node-api/public/styles.css`, `backend/node-api/public/index.html` |
+| 5 | Áreas obrigatórias: **Início**, **Explorar**, **Namoro**, **Mensagens** e **Perfil** | Concluído | `backend/node-api/public/index.html`, `backend/node-api/public/js/main.js` |
+| 6 | Estados de carregamento, vazio e erro em todas as áreas | Concluído | componentes em `backend/node-api/public/js/` |
+| 7 | Acessibilidade: foco visível, ARIA, teclado, modais com `Esc`, `prefers-reduced-motion` | Concluído | `backend/node-api/public/index.html`, `backend/node-api/public/styles.css`, `backend/node-api/public/js/core.js` |
 
 ### 1.2 Rede social
 
 | # | Funcionalidade | Estado | Onde está |
 | --- | --- | --- | --- |
-| 8 | Cadastro, login, logout e sessão em cookie `HttpOnly` | Concluído | `server.js` |
-| 9 | Feed com publicações de quem a pessoa segue | Concluído | `server.js`, `social.js` |
-| 10 | Publicações com foto ou vídeo, legenda e carrossel de até 10 fotos | Concluído | `server.js`, `social.js` |
-| 11 | Curtir, comentar, apagar os próprios comentários e compartilhar | Concluído | `server.js`, `social.js` |
-| 12 | Stories de 24 h, visualizações, menções, reações e respostas | Concluído | `server.js`, `social.js` |
-| 13 | Perfis com bio, foto, interesses, seguidores, badges e privacidade | Concluído | `server.js`, `social.js` |
-| 13.1 | Perfil redesenhado: capa arredondada, avatar circular sobreposto, identidade/stats/botões centralizados e abas Publicações/Reels/Fotos/Curtidas | Concluído | `social.js`, `styles.css` |
-| 13.2 | Editor de imagem (recorte, zoom, rotação e arraste) para foto de perfil e capa, sem dependências | Concluído | `media-editor.js`, `styles.css` |
-| 13.3 | Compartilhamento de perfil com link copiável e Web Share API | Concluído | `social-actions.js` |
-| 14 | Seguir, deixar de seguir, perfil privado e solicitações de seguimento | Concluído | `server.js`, `social-actions.js` |
-| 15 | Melhores amigos e stories restritos | Concluído | `server.js`, `social-actions.js` |
-| 16 | Explorar e buscar pessoas por nome, usuário, bio ou legenda | Concluído | `server.js`, `social.js` |
-| 17 | Tema claro/escuro | Concluído | `core.js`, `styles.css` |
+| 8 | Cadastro, login, logout e sessão em cookie `HttpOnly` | Concluído | `backend/node-api/server.js` |
+| 9 | Feed com publicações de quem a pessoa segue | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social.js` |
+| 10 | Publicações com foto ou vídeo, legenda e carrossel de até 10 fotos | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social.js` |
+| 11 | Curtir, comentar, apagar os próprios comentários e compartilhar | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social.js` |
+| 12 | Stories de 24 h, visualizações, menções, reações e respostas | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social.js` |
+| 13 | Perfis com bio, foto, interesses, seguidores, badges e privacidade | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social.js` |
+| 13.1 | Perfil redesenhado: capa arredondada, avatar circular sobreposto, identidade/stats/botões centralizados e abas Publicações/Reels/Fotos/Curtidas | Concluído | `backend/node-api/public/js/social.js`, `backend/node-api/public/styles.css` |
+| 13.2 | Editor de imagem (recorte, zoom, rotação e arraste) para foto de perfil e capa, sem dependências | Concluído | `backend/node-api/public/js/media-editor.js`, `backend/node-api/public/styles.css` |
+| 13.3 | Compartilhamento de perfil com link copiável e Web Share API | Concluído | `backend/node-api/public/js/social-actions.js` |
+| 14 | Seguir, deixar de seguir, perfil privado e solicitações de seguimento | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social-actions.js` |
+| 15 | Melhores amigos e stories restritos | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social-actions.js` |
+| 16 | Explorar e buscar pessoas por nome, usuário, bio ou legenda | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social.js` |
+| 17 | Tema claro/escuro | Concluído | `backend/node-api/public/js/core.js`, `backend/node-api/public/styles.css` |
 
 ### 1.3 Namoro verificado (18+)
 
 | # | Funcionalidade | Estado | Onde está |
 | --- | --- | --- | --- |
-| 18 | Namoro separado da rede social; usar o social **não** exige ativar o namoro nem responder o quiz | Concluído | `lib/dating.js`, `dating.js` |
-| 19 | Acesso ao namoro somente após verificação de identidade e idade aprovada no backend | Concluído | `lib/dating.js`, `server.js` |
-| 20 | Bloqueio real de menores de 18 anos e de data de nascimento inconsistente | Concluído | `lib/dating.js`, `server.js` |
-| 21 | Verificação real via provedor quando configurado; sem credenciais, simulação local claramente rotulada | Simulação | `lib/dating.js`, `README.md` |
-| 22 | Data de nascimento já cadastrada não pode ser trocada para burlar a verificação | Concluído | `server.js` |
-| 23 | Perfil de namoro independente do perfil social (bio, fotos, preferências) | Concluído | `lib/dating.js`, `dating-profile.js` |
-| 24 | Fotos do namoro escolhidas entre fotos já publicadas e validadas no backend | Concluído | `lib/dating.js` |
-| 25 | Questionário de compatibilidade com salvamento automático e critérios explicados | Concluído | `lib/dating.js`, `dating-profile.js` |
-| 26 | Preferência de distância de descoberta entre 10 km e 400 km, padrão 50 km | Concluído | `lib/dating.js`, `dating-profile.js` |
-| 27 | Descoberta sem exibir distância antes do match | Concluído | `lib/dating.js`, `dating.js` |
-| 28 | Like/deslike e match apenas com curtida mútua, sem duplicatas ou corrida | Concluído | `lib/dating.js` |
-| 29 | Desfazer match e impedir novas interações após bloqueio ou unmatch | Concluído | `lib/dating.js`, `server.js` |
-| 30 | Conversas de namoro exigem verificação atual dos dois participantes | Concluído | `server.js` |
-| 31 | Desativar perfil de namoro sem apagar a conta social | Concluído | `lib/dating.js`, `dating-profile.js` |
+| 18 | Namoro separado da rede social; usar o social **não** exige ativar o namoro nem responder o quiz | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/public/js/dating.js` |
+| 19 | Acesso ao namoro somente após verificação de identidade e idade aprovada no backend | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/server.js` |
+| 20 | Bloqueio real de menores de 18 anos e de data de nascimento inconsistente | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/server.js` |
+| 21 | Verificação real via provedor quando configurado; sem credenciais, simulação local claramente rotulada | Simulação | `backend/node-api/lib/dating.js`, `README.md` |
+| 22 | Data de nascimento já cadastrada não pode ser trocada para burlar a verificação | Concluído | `backend/node-api/server.js` |
+| 23 | Perfil de namoro independente do perfil social (bio, fotos, preferências) | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/public/js/dating-profile.js` |
+| 24 | Fotos do namoro escolhidas entre fotos já publicadas e validadas no backend | Concluído | `backend/node-api/lib/dating.js` |
+| 25 | Questionário de compatibilidade com salvamento automático e critérios explicados | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/public/js/dating-profile.js` |
+| 26 | Preferência de distância de descoberta entre 10 km e 400 km, padrão 50 km | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/public/js/dating-profile.js` |
+| 27 | Descoberta sem exibir distância antes do match | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/public/js/dating.js` |
+| 28 | Like/deslike e match apenas com curtida mútua, sem duplicatas ou corrida | Concluído | `backend/node-api/lib/dating.js` |
+| 29 | Desfazer match e impedir novas interações após bloqueio ou unmatch | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/server.js` |
+| 30 | Conversas de namoro exigem verificação atual dos dois participantes | Concluído | `backend/node-api/server.js` |
+| 31 | Desativar perfil de namoro sem apagar a conta social | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/public/js/dating-profile.js` |
 
 ### 1.4 Radar de proximidade consensual
 
 | # | Funcionalidade | Estado | Onde está |
 | --- | --- | --- | --- |
-| 32 | Radar disponível apenas entre pessoas com match | Concluído | `lib/dating.js` |
-| 33 | Consentimento separado por match, além do consentimento global do Radar | Concluído | `lib/dating.js`, `dating-profile.js` |
-| 34 | Radar desativado por padrão em perfis novos | Concluído | `lib/dating.js` |
-| 35 | Localização aproximada, nunca coordenadas exatas, e sem distância antes do match | Concluído | `lib/dating.js` |
-| 36 | Pausar/desativar Radar e revogar consentimento a qualquer momento | Concluído | `lib/dating.js`, `dating-profile.js` |
-| 37 | Apagar localização revoga todos os consentimentos de Radar da pessoa | Concluído | `lib/dating.js`, `server.js` |
-| 38 | Alertas de proximidade respeitam consentimento e estado global dos dois lados | Concluído | `lib/dating.js` |
+| 32 | Radar disponível apenas entre pessoas com match | Concluído | `backend/node-api/lib/dating.js` |
+| 33 | Consentimento separado por match, além do consentimento global do Radar | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/public/js/dating-profile.js` |
+| 34 | Radar desativado por padrão em perfis novos | Concluído | `backend/node-api/lib/dating.js` |
+| 35 | Localização aproximada, nunca coordenadas exatas, e sem distância antes do match | Concluído | `backend/node-api/lib/dating.js` |
+| 36 | Pausar/desativar Radar e revogar consentimento a qualquer momento | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/public/js/dating-profile.js` |
+| 37 | Apagar localização revoga todos os consentimentos de Radar da pessoa | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/server.js` |
+| 38 | Alertas de proximidade respeitam consentimento e estado global dos dois lados | Concluído | `backend/node-api/lib/dating.js` |
 
 ### 1.5 Privacidade, segurança e moderação
 
 | # | Funcionalidade | Estado | Onde está |
 | --- | --- | --- | --- |
-| 39 | Bloquear, desbloquear e listar pessoas bloqueadas | Concluído | `server.js`, `social-actions.js` |
-| 40 | Bloqueio encerra interações, mensagens e visibilidade entre as partes | Concluído | `server.js`, `lib/dating.js` |
-| 41 | Denunciar publicações, comentários, stories, perfis e mensagens | Concluído | `server.js`, `social-actions.js`, `messages.js` |
-| 42 | Fila de moderação protegida por `ADMIN_TOKEN` | Concluído | `server.js` |
-| 43 | Validação de upload por tipo, tamanho e conteúdo; nomes de arquivo seguros | Concluído | `server.js` |
-| 44 | Limite de taxa nas rotas sensíveis (login, cadastro, envio, denúncias etc.) | Concluído | `server.js` |
-| 45 | Sessões protegidas: token aleatório, hash no banco, expiração e invalidação | Concluído | `server.js` |
-| 46 | Retenção LGPD: limpeza de localizações, sessões, alertas, notificações e consentimentos encerrados | Concluído | `server.js` |
-| 47 | Logs sem senhas, tokens, documentos ou coordenadas sensíveis | Concluído | `server.js` |
-| 48 | Preferências, respostas do quiz, matches e localização privados do perfil social | Concluído | `lib/dating.js`, `server.js` |
-| 49 | Regras de mensagem configuráveis e bloqueio de contato indesejado | Concluído | `server.js` |
+| 39 | Bloquear, desbloquear e listar pessoas bloqueadas | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social-actions.js` |
+| 40 | Bloqueio encerra interações, mensagens e visibilidade entre as partes | Concluído | `backend/node-api/server.js`, `backend/node-api/lib/dating.js` |
+| 41 | Denunciar publicações, comentários, stories, perfis e mensagens | Concluído | `backend/node-api/server.js`, `backend/node-api/public/js/social-actions.js`, `backend/node-api/public/js/messages.js` |
+| 42 | Fila de moderação protegida por `ADMIN_TOKEN` | Concluído | `backend/node-api/server.js` |
+| 43 | Validação de upload por tipo, tamanho e conteúdo; nomes de arquivo seguros | Concluído | `backend/node-api/server.js` |
+| 44 | Limite de taxa nas rotas sensíveis (login, cadastro, envio, denúncias etc.) | Concluído | `backend/node-api/server.js` |
+| 45 | Sessões protegidas: token aleatório, hash no banco, expiração e invalidação | Concluído | `backend/node-api/server.js` |
+| 46 | Retenção LGPD: limpeza de localizações, sessões, alertas, notificações e consentimentos encerrados | Concluído | `backend/node-api/server.js` |
+| 47 | Logs sem senhas, tokens, documentos ou coordenadas sensíveis | Concluído | `backend/node-api/server.js` |
+| 48 | Preferências, respostas do quiz, matches e localização privados do perfil social | Concluído | `backend/node-api/lib/dating.js`, `backend/node-api/server.js` |
+| 49 | Regras de mensagem configuráveis e bloqueio de contato indesejado | Concluído | `backend/node-api/server.js` |
 
 ### 1.6 Qualidade, testes e documentação
 
 | # | Funcionalidade | Estado | Onde está |
 | --- | --- | --- | --- |
-| 50 | Testes automatizados de verificação, compatibilidade, matches, Radar e fluxos sociais | Concluído | `qa/run-tests.mjs`, `qa/smoke.mjs`, `qa/dating-tests.mjs`, `qa/retention-tests.mjs` |
-| 51 | Teste isolado com banco temporário e porta própria | Concluído | `qa/run-tests.mjs` |
+| 50 | Testes automatizados de verificação, compatibilidade, matches, Radar e fluxos sociais | Concluído | `backend/node-api/qa/run-tests.mjs`, `backend/node-api/qa/smoke.mjs`, `backend/node-api/qa/dating-tests.mjs`, `backend/node-api/qa/retention-tests.mjs` |
+| 51 | Teste isolado com banco temporário e porta própria | Concluído | `backend/node-api/qa/run-tests.mjs` |
 | 52 | Documentação com instruções, variáveis de ambiente, limitações e integrações ausentes | Concluído | `README.md` |
 | 53 | Registro contínuo de funcionalidades e atualizações | Concluído | este arquivo |
 
@@ -122,7 +122,7 @@ limitações:
 
 - Provedor real de verificação de identidade/idade (hoje há contrato de webhook,
   mas nenhuma credencial configurada; o modo local é explicitamente simulado).
-- Armazenamento de objetos/CDN para uploads (hoje os arquivos ficam em `data/uploads/`).
+- Armazenamento de objetos/CDN para uploads (hoje os arquivos ficam em `backend/node-api/data/uploads/`).
 - Envio real de e-mail, push ou SMS.
 - Moderação humana 24/7 e revisão de denúncias fora do painel local.
 - Banco gerenciado, backups, múltiplas instâncias e HTTPS/reverse proxy.
@@ -154,7 +154,7 @@ Modelo para novas entradas:
 
 ### 2026-10-28 — Atualização 002 — Reparação de codificação do frontend
 
-- Corrigida a codificação de `public/js/social.js`, que estava com caracteres
+- Corrigida a codificação de `backend/node-api/public/js/social.js`, que estava com caracteres
   duplicados/mojibake em textos e expressões.
 - Arquivo reprocessado de Latin-1 para UTF-8; removidos caracteres de substituição.
 - Interface voltou a exibir acentos, emojis e textos em português corretamente.
@@ -245,7 +245,7 @@ Modelo para novas entradas:
 
 ### 2026-10-30 — Atualização 016 — Runner de testes isolado
 
-- Criado `qa/run-tests.mjs` para subir um servidor próprio com banco temporário,
+- Criado `backend/node-api/qa/run-tests.mjs` para subir um servidor próprio com banco temporário,
   porta aleatória e limpeza ao final.
 - `npm test` passou a executar o runner em vez de depender de um servidor já aberto.
 
@@ -269,7 +269,7 @@ Modelo para novas entradas:
 
 ### 2026-10-30 — Atualização 020 — Suíte de testes do Namoro e retenção
 
-- Criado `qa/dating-tests.mjs`, com mais de 90 asserções cobrindo:
+- Criado `backend/node-api/qa/dating-tests.mjs`, com mais de 90 asserções cobrindo:
   cadastro social sem namoro, bloqueio de menores, data de nascimento
   imutável, webhook com assinatura HMAC, aprovação real sem simulação, quiz,
   perfil independente, pontuação de compatibilidade, descoberta sem distância,
@@ -277,9 +277,9 @@ Modelo para novas entradas:
   simultâneas, conversa de namoro, expiração de verificação, Radar bilateral,
   revogação de consentimento, exclusão de localização, bloqueio, desbloqueio,
   denúncias, moderação, unmatch, fotos validadas e proteção de sessão.
-- Criado `qa/retention-tests.mjs`, que sobe um servidor com retenção curta e
+- Criado `backend/node-api/qa/retention-tests.mjs`, que sobe um servidor com retenção curta e
   verifica a remoção de localização e a invalidação de sessão expirada.
-- `qa/run-tests.mjs` passou a configurar verificação por webhook, `ADMIN_TOKEN`
+- `backend/node-api/qa/run-tests.mjs` passou a configurar verificação por webhook, `ADMIN_TOKEN`
   e limpeza controlada, executando fumaça, namoro e retenção em sequência.
 
 ### 2026-10-30 — Atualização 021 — Revisão visual desktop e mobile
@@ -311,7 +311,7 @@ Modelo para novas entradas:
   sem `Secure`. Aprovações simuladas existentes não liberam o Namoro.
 - Removidos o botão, a ação e as credenciais de demonstração da interface, da
   configuração e da saída do console.
-- Adicionados `.gitignore`, `.env.example` e `qa/production-tests.mjs`.
+- Adicionados `.gitignore`, `.env.example` e `backend/node-api/qa/production-tests.mjs`.
 - Os testes que dependem dos perfis de exemplo agora habilitam o seed de forma
   explícita e recebem uma senha aleatória.
 
@@ -336,7 +336,7 @@ Modelo para novas entradas:
   canto inferior direito do avatar: invisível por padrão, aparece no hover do
   avatar, no foco por teclado e fica sempre visível em dispositivos sem hover
   (área de toque de 44×44 px).
-- Testes automatizados novos em `qa/smoke.mjs`: rejeição de `username` e
+- Testes automatizados novos em `backend/node-api/qa/smoke.mjs`: rejeição de `username` e
   `user_id`, edição de perfil alheio, persistência de nome/bio e preservação de
   foto e interesses ao salvar a conta.
 
@@ -354,7 +354,7 @@ Modelo para novas entradas:
   para o dispositivo atual e o botão **Encerrar** para os demais.
 - O subtítulo da lista mostra quantos dispositivos estão conectados, e a lista
   é anunciada de forma acessível via `aria-live="polite"`.
-- Testes automatizados novos em `qa/smoke.mjs`: `GET /api/sessions` devolve as
+- Testes automatizados novos em `backend/node-api/qa/smoke.mjs`: `GET /api/sessions` devolve as
   sessões com o dispositivo identificado, a sessão atual é destacada e não pode
   ser encerrada pelo atalho (o próprio endpoint responde **400**).
 
@@ -370,7 +370,7 @@ Modelo para novas entradas:
 - O perfil ganhou as abas **Publicações**, **Reels**, **Fotos** e **Curtidas**,
   com sublinhado laranja na aba ativa. A aba **Curtidas** aparece apenas no
   próprio perfil.
-- Novo módulo `public/js/media-editor.js` com o componente `Cropper`: recorte
+- Novo módulo `backend/node-api/public/js/media-editor.js` com o componente `Cropper`: recorte
   em `<canvas>`, zoom (botões e slider), rotação de 90° e deslocamento por
   arraste, sem dependências externas.
 - Editor de foto de perfil: preview circular, controles de zoom à esquerda,
@@ -384,7 +384,7 @@ Modelo para novas entradas:
   curtidas aplicando os filtros de bloqueio e de privacidade dos autores. Como
   a aba **Curtidas** só existe no próprio perfil, a rota responde **403** para
   consulta a outro usuário.
-- Testes automatizados novos em `qa/smoke.mjs`: listagem das curtidas do
+- Testes automatizados novos em `backend/node-api/qa/smoke.mjs`: listagem das curtidas do
   próprio perfil, consistência dos dados das publicações, privacidade das
   curtidas de terceiros e resposta **404** para perfil inexistente.
 

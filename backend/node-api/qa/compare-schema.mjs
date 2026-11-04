@@ -12,7 +12,8 @@ import pg from 'pg';
 
 const { Client } = pg;
 
-const DB_PATH = process.env.SUPABASE_DB_PATH || path.resolve('data/vibra.db');
+const DB_PATH =
+  process.env.SUPABASE_DB_PATH || path.resolve(import.meta.dirname, '..', 'data', 'vibra.db');
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 if (!DATABASE_URL) {

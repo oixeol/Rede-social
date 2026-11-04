@@ -31,11 +31,11 @@ supabase init
 ```
 
 ### 2. Configurar credenciais
-Criar `frontend/.env.local`:
+Copiar `.env.example` para `.env` na raiz e preencher:
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_sua_chave
+SUPABASE_SECRET_KEY=sb_secret_sua_chave
 ```
 
 ### 3. Aplicar schema ao Supabase
@@ -49,12 +49,12 @@ supabase db push --file supabase/migrations/20261103000000_initial_schema.sql
 
 ### 4. Executar migração de dados
 ```bash
-# Do diretório do projeto
-cd /c/Vibe
+# Do diretório da API Node
+cd backend/node-api
 node qa/migrate-sqlite-to-supabase.mjs
 
 # Ou manualmente com psql:
-# 1. Exportar SQLite: sqlite3 data/vibra.db ".dump" > dump.sql
+# 1. Exportar SQLite: sqlite3 backend/node-api/data/vibra.db ".dump" > dump.sql
 # 2. Importar dados temporariamente como tabelas _sqlite_*
 # 3. Executar o template de INSERT
 ```
@@ -89,19 +89,19 @@ O Supabase Auth substitui a autenticação customizada:
 
 **Antes (SQLite):**
 - Tokens de sessão em cookies `HttpOnly`
-- Verificação via `server.js`
+- Verificação via `backend/node-api/server.js`
 
 **Depois (Supabase Auth):**
 - Usar `supabase.auth.getUser()` no middleware
 - Atualizar `middleware.ts` para usar `@supabase/ssr`
 
 ### 9. Atualizar API do backend
-O `server.js` atual precisa ser adaptado:
+O `backend/node-api/server.js` atual precisa ser adaptado:
 - Substituir chamadas SQLite por `@supabase/supabase-js` (service_role)
 - Ou manter como proxy para Supabase via `supabaseEdgeFunctions`
 
 ### 10. Migração de imagens
-- As imagens permanecem em `data/uploads/` localmente
+- As imagens permanecem em `backend/node-api/data/uploads/` localmente
 - Para migrar para Supabase Storage:
   1. Criar bucket `uploads`
   2. Upload assíncrono dos arquivos
@@ -110,8 +110,8 @@ O `server.js` atual precisa ser adaptado:
 ## Considerações importantes
 
 ### Segurança
-- ⚠️ **NUNCA** exponha `SUPABASE_SERVICE_ROLE_KEY` no frontend
-- Use apenas `NEXT_PUBLIC_SUPABASE_ANON_KEY` no cliente
+- ⚠️ **NUNCA** exponha `SUPABASE_SECRET_KEY` no frontend
+- Use apenas `SUPABASE_PUBLISHABLE_KEY` no cliente
 - As políticas RLS são cruciais
 
 ### Dados
