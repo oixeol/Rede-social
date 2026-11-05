@@ -8,7 +8,6 @@ RUN npm ci --omit=dev
 
 COPY server.js app.config.js ./
 COPY lib ./lib
-COPY public ./public
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
