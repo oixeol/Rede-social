@@ -4,7 +4,7 @@ import { AlertCircle, LoaderCircle, Eye, EyeOff, ChevronDown } from 'lucide-reac
 import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
 import type { FormEvent, ChangeEvent } from 'react';
-import { useId, useRef, useState, useEffect } from 'react';
+import { useId, useRef, useState, useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -100,7 +100,7 @@ export function SignupForm() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
-  const [gender, setGender] = useState<GenderValue>('');
+  const [gender, setGender] = useState<GenderValue | ''>('');
   const [country, setCountry] = useState('');
   const [state, setState] = useState('');
   const [password, setPassword] = useState('');
@@ -112,19 +112,11 @@ export function SignupForm() {
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const [submittingRef, setSubmittingRef] = useState(false);
 
-  // Estados para países/estados
-  const [states, setStates] = useState<State[]>([]);
-
-  // Atualizar estados quando o país mudar
-  useEffect(() => {
-    if (country) {
-      const countryStates = getStatesByCountry(country);
-      setStates(countryStates);
-      setState(''); // Resetar estado selecionado
-    } else {
-      setStates([]);
-    }
-  }, [country]);
+  // Estados/regiões derivados do país selecionado (sem efeito colateral)
+  const states = useMemo<State[]>(
+    () => (country ? getStatesByCountry(country) : []),
+    [country]
+  );
 
   // Gerar username automático baseado no nome
   const username = generateUsername(firstName, lastName);
@@ -237,7 +229,11 @@ export function SignupForm() {
     if (submittingRef) return;
 
     // Validar todos os campos
-    const fields: { field: FieldName; value: string; ref: React.RefObject<HTMLInputElement | HTMLSelectElement> }[] = [
+    const fields: {
+      field: FieldName;
+      value: string;
+      ref: React.RefObject<HTMLInputElement | HTMLSelectElement | null>;
+    }[] = [
       { field: 'firstName', value: firstName, ref: firstNameRef },
       { field: 'lastName', value: lastName, ref: lastNameRef },
       { field: 'email', value: email, ref: emailRef },
@@ -447,7 +443,10 @@ export function SignupForm() {
                 ref={countryRef}
                 name="country"
                 value={country}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setCountry(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                  setCountry(e.target.value);
+                  setState(''); // Estado não é válido para outro país
+                }}
                 onBlur={(e) => handleBlur('country', e.target.value)}
                 required
                 disabled={pending}
