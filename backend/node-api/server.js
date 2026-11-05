@@ -6,7 +6,7 @@
  *
  * Arquitetura do módulo:
  * - O servidor HTTP nativo é criado por `http.createServer()` no final do arquivo.
- * - O callback normaliza `req.url`, separa API, uploads e arquivos estáticos.
+ * - O callback normaliza `req.url` e separa API de uploads.
  * - `handleApi()` despacha as rotas sequencialmente por método e `pathname`;
  *   `matchRoute()` interpreta parâmetros como `:id` e `:username`.
  * - O estado persistente fica em SQLite, acessado de forma síncrona por
@@ -16,21 +16,18 @@
  * - `VIBRA_DATA_DIR` define `DATA_DIR`; por padrão, `./data`.
  * - O banco SQLite é `DATA_DIR/vibra.db`.
  * - Uploads são gravados em `DATA_DIR/uploads` e expostos por `/uploads/`.
- * - O frontend estático é servido de `./public`.
+ * - O frontend React (Next.js) é servido pelo serviço `frontend`; esta API
+ *   responde apenas `/api/*` e `/uploads/*`.
  *
  * Mapa aproximado das seções:
  * - 20-120: configuração, ambiente e validação de inicialização.
  * - 120-410: banco SQLite, esquema e migrações aditivas.
  * - 410-1210: helpers, segurança, privacidade, DTOs e uploads.
- * - 1210-1330: consultas e transformation de publicações.
+ * - 1210-1330: consultas e transformação de publicações.
  * - 1330-2740: roteador e handlers da API.
  * - 2740-2780: arquivos estáticos e proteção contra path traversal.
  * - 2780-3370: seed de demonstração e dados sintéticos.
  * - 3370-3460: ciclo de vida do servidor HTTP.
- *
- * Aviso de migração: este módulo monolítico será substituído por Django/DRF
- * durante a migração para stack em Python. A API deve permanecer compatível
- * com o frontend durante essa transição.
  */
 
 const http = require('node:http');
@@ -51,7 +48,6 @@ const PORT = Number(process.env.PORT) || 4173;
 const HOST = process.env.HOST || '127.0.0.1';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const ROOT = __dirname;
-const PUBLIC_DIR = path.join(ROOT, 'public');
 const DATA_DIR = process.env.VIBRA_DATA_DIR
   ? path.resolve(process.env.VIBRA_DATA_DIR)
   : path.join(ROOT, 'data');
@@ -548,7 +544,7 @@ const POST_TOPIC_LABELS = {
  * arbitrário nem precisa armazenar cores.
  */
 const DEFAULT_THEME_PALETTE = 'orange';
-const THEME_PALETTE_PRESETS = new Set(['orange', 'blue', 'green', 'purple']);
+const THEME_PALETTE_PRESETS = new Set(['orange', 'black', 'white']);
 /* Statuses internos que representam uma assinatura utilizável. */
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'subscribed']);
 /* Idade máxima aceita. Acima disso a data de nascimento é tratada como inválida. */
@@ -3440,11 +3436,11 @@ function sceneSunset() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('sky', [[0, '#24124a'], [0.55, '#d94f70'], [1, '#ffb26b']])}</defs>
+    `<defs>${linear('sky', [[0, '#050505'], [0.55, '#242424'], [1, '#FF6A00']])}</defs>
      <rect width="1080" height="1080" fill="url(#sky)"/>
-     <circle cx="540" cy="610" r="150" fill="#ffd166" opacity="0.95"/>
-     <path d="M0 790 L250 600 L470 770 L670 640 L890 800 L1080 700 L1080 1080 L0 1080Z" fill="#1c0f36"/>
-     <path d="M0 880 L310 760 L570 890 L830 780 L1080 860 L1080 1080 L0 1080Z" fill="#100820"/>`
+     <circle cx="540" cy="610" r="150" fill="#FF8C00" opacity="0.95"/>
+     <path d="M0 790 L250 600 L470 770 L670 640 L890 800 L1080 700 L1080 1080 L0 1080Z" fill="#242424"/>
+     <path d="M0 880 L310 760 L570 890 L830 780 L1080 860 L1080 1080 L0 1080Z" fill="#101010"/>`
   );
 }
 
@@ -3452,14 +3448,14 @@ function sceneMountain() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('sky', [[0, '#0b1d26'], [0.6, '#2c5364'], [1, '#7aa8a3']])}
-      ${linear('snow', [[0, '#f4fbfa'], [1, '#b9d6d2']])}</defs>
+    `<defs>${linear('sky', [[0, '#050505'], [0.6, '#242424'], [1, '#A1A1AA']])}
+      ${linear('snow', [[0, '#FFFFFF'], [1, '#A1A1AA']])}</defs>
      <rect width="1080" height="1080" fill="url(#sky)"/>
-     <circle cx="790" cy="250" r="80" fill="#f4fbfa" opacity="0.85"/>
-     <path d="M0 1080 L330 420 L560 760 L720 520 L1080 1080Z" fill="#122c33"/>
+     <circle cx="790" cy="250" r="80" fill="#FFFFFF" opacity="0.85"/>
+     <path d="M0 1080 L330 420 L560 760 L720 520 L1080 1080Z" fill="#242424"/>
      <path d="M330 420 L420 570 L350 540 L300 590 L250 540 L210 560Z" fill="url(#snow)"/>
      <path d="M720 520 L790 630 L735 600 L700 640 L660 600 L620 615Z" fill="url(#snow)" opacity="0.9"/>
-     <path d="M0 1080 L260 780 L520 920 L780 820 L1080 980 L1080 1080Z" fill="#091a20"/>`
+     <path d="M0 1080 L260 780 L520 920 L780 820 L1080 980 L1080 1080Z" fill="#101010"/>`
   );
 }
 
@@ -3467,12 +3463,12 @@ function sceneOcean() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('sea', [[0, '#f7b267'], [0.42, '#3d7ea6'], [1, '#082c46']])}</defs>
+    `<defs>${linear('sea', [[0, '#FF8C00'], [0.42, '#FF6A00'], [1, '#101010']])}</defs>
      <rect width="1080" height="1080" fill="url(#sea)"/>
-     <circle cx="540" cy="380" r="110" fill="#ffe29a"/>
-     <path d="M0 560 Q180 500 360 560 T720 560 T1080 560 L1080 1080 L0 1080Z" fill="#0d3b5c" opacity="0.55"/>
-     <path d="M0 680 Q220 600 440 680 T880 680 T1320 680 L1320 1080 L0 1080Z" fill="#0a2f4b" opacity="0.75"/>
-     <path d="M0 830 Q260 740 520 830 T1040 830 T1560 830 L1560 1080 L0 1080Z" fill="#071f33"/>`
+     <circle cx="540" cy="380" r="110" fill="#FFFFFF" opacity="0.85"/>
+     <path d="M0 560 Q180 500 360 560 T720 560 T1080 560 L1080 1080 L0 1080Z" fill="#242424" opacity="0.55"/>
+     <path d="M0 680 Q220 600 440 680 T880 680 T1320 680 L1320 1080 L0 1080Z" fill="#101010" opacity="0.75"/>
+     <path d="M0 830 Q260 740 520 830 T1040 830 T1560 830 L1560 1080 L0 1080Z" fill="#050505"/>`
   );
 }
 
@@ -3480,17 +3476,17 @@ function sceneForest() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('fog', [[0, '#d8f3dc'], [0.45, '#74c69d'], [1, '#1b4332']])}</defs>
+    `<defs>${linear('fog', [[0, '#A1A1AA'], [0.45, '#242424'], [1, '#050505']])}</defs>
      <rect width="1080" height="1080" fill="url(#fog)"/>
-     <g fill="#1b4332" opacity="0.9">
+     <g fill="#101010" opacity="0.9">
        <path d="M180 900 L300 430 L420 900Z"/><path d="M380 900 L520 350 L660 900Z"/>
        <path d="M650 900 L760 470 L870 900Z"/><path d="M810 900 L930 390 L1050 900Z"/>
      </g>
-     <g fill="#2d6a4f">
+     <g fill="#242424">
        <path d="M120 940 L240 560 L360 940Z"/><path d="M470 940 L600 520 L730 940Z"/>
        <path d="M740 940 L860 600 L980 940Z"/>
      </g>
-     <rect y="940" width="1080" height="140" fill="#081c15"/>`
+     <rect y="940" width="1080" height="140" fill="#050505"/>`
   );
 }
 
@@ -3498,15 +3494,15 @@ function sceneCity() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('night', [[0, '#0f172a'], [0.6, '#1e1b4b'], [1, '#4c1d95']])}</defs>
+    `<defs>${linear('night', [[0, '#050505'], [0.6, '#101010'], [1, '#242424']])}</defs>
      <rect width="1080" height="1080" fill="url(#night)"/>
-     <circle cx="820" cy="220" r="90" fill="#e9d5ff" opacity="0.9"/>
-     <g fill="#0b1020">
+     <circle cx="820" cy="220" r="90" fill="#FFFFFF" opacity="0.9"/>
+     <g fill="#050505">
        <rect x="60" y="560" width="150" height="520"/><rect x="240" y="440" width="130" height="640"/>
        <rect x="400" y="620" width="170" height="460"/><rect x="600" y="380" width="140" height="700"/>
        <rect x="770" y="520" width="120" height="560"/><rect x="910" y="650" width="140" height="430"/>
      </g>
-     <g fill="#fbbf24" opacity="0.85">
+     <g fill="#FF8C00" opacity="0.9">
        <rect x="85" y="600" width="28" height="28"/><rect x="140" y="600" width="28" height="28"/>
        <rect x="265" y="490" width="26" height="26"/><rect x="315" y="490" width="26" height="26"/>
        <rect x="265" y="550" width="26" height="26"/><rect x="430" y="670" width="30" height="30"/>
@@ -3521,12 +3517,12 @@ function sceneDesert() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('dune', [[0, '#ffd6a5'], [0.5, '#f4a261'], [1, '#9c4f2e']])}</defs>
+    `<defs>${linear('dune', [[0, '#FFFFFF'], [0.5, '#FF8C00'], [1, '#FF4500']])}</defs>
      <rect width="1080" height="1080" fill="url(#dune)"/>
-     <circle cx="300" cy="300" r="100" fill="#fff3c4" opacity="0.9"/>
-     <path d="M0 700 Q270 560 540 700 T1080 700 L1080 1080 L0 1080Z" fill="#c96f3b"/>
-     <path d="M0 830 Q300 690 620 840 T1200 810 L1200 1080 L0 1080Z" fill="#8f4a2a"/>
-     <path d="M0 950 Q360 850 720 960 T1320 940 L1320 1080 L0 1080Z" fill="#5e2f1c"/>`
+     <circle cx="300" cy="300" r="100" fill="#FFFFFF" opacity="0.9"/>
+     <path d="M0 700 Q270 560 540 700 T1080 700 L1080 1080 L0 1080Z" fill="#242424"/>
+     <path d="M0 830 Q300 690 620 840 T1200 810 L1200 1080 L0 1080Z" fill="#101010"/>
+     <path d="M0 950 Q360 850 720 960 T1320 940 L1320 1080 L0 1080Z" fill="#050505"/>`
   );
 }
 
@@ -3534,12 +3530,12 @@ function sceneAbstract() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('art', [[0, '#7c3aed'], [0.5, '#ec4899'], [1, '#f59e0b']], 0, 0, 1, 1)}</defs>
+    `<defs>${linear('art', [[0, '#050505'], [0.5, '#FF6A00'], [1, '#FF8C00']], 0, 0, 1, 1)}</defs>
      <rect width="1080" height="1080" fill="url(#art)"/>
-     <circle cx="380" cy="420" r="230" fill="#ffffff" opacity="0.16"/>
-     <circle cx="720" cy="640" r="300" fill="#111827" opacity="0.2"/>
-     <circle cx="700" cy="330" r="120" fill="#ffffff" opacity="0.28"/>
-     <path d="M0 860 Q270 700 540 860 T1080 860 L1080 1080 L0 1080Z" fill="#111827" opacity="0.35"/>`
+     <circle cx="380" cy="420" r="230" fill="#FFFFFF" opacity="0.16"/>
+     <circle cx="720" cy="640" r="300" fill="#050505" opacity="0.2"/>
+     <circle cx="700" cy="330" r="120" fill="#FFFFFF" opacity="0.28"/>
+     <path d="M0 860 Q270 700 540 860 T1080 860 L1080 1080 L0 1080Z" fill="#050505" opacity="0.35"/>`
   );
 }
 
@@ -3547,13 +3543,13 @@ function sceneCoffee() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('table', [[0, '#e7c9a9'], [1, '#b08968']])}</defs>
+    `<defs>${linear('table', [[0, '#242424'], [1, '#050505']])}</defs>
      <rect width="1080" height="1080" fill="url(#table)"/>
-     <circle cx="540" cy="540" r="330" fill="#f8f1e5"/>
-     <circle cx="540" cy="540" r="250" fill="#6f4e37"/>
-     <circle cx="540" cy="540" r="190" fill="#3f2a1d" opacity="0.55"/>
-     <path d="M540 350 C610 430 610 650 540 730 C470 650 470 430 540 350Z" fill="#f8f1e5" opacity="0.65"/>
-     <circle cx="845" cy="700" r="70" fill="#f8f1e5" opacity="0.9"/>`
+     <circle cx="540" cy="540" r="330" fill="#FFFFFF"/>
+     <circle cx="540" cy="540" r="250" fill="#101010"/>
+     <circle cx="540" cy="540" r="190" fill="#050505" opacity="0.55"/>
+     <path d="M540 350 C610 430 610 650 540 730 C470 650 470 430 540 350Z" fill="#FF8C00" opacity="0.65"/>
+     <circle cx="845" cy="700" r="70" fill="#FFFFFF" opacity="0.9"/>`
   );
 }
 
@@ -3561,11 +3557,11 @@ function sceneWaves() {
   return svgDoc(
     1080,
     1080,
-    `<defs>${linear('wave', [[0, '#a5f3fc'], [0.5, '#0ea5e9'], [1, '#1e3a8a']])}</defs>
+    `<defs>${linear('wave', [[0, '#FF8C00'], [0.5, '#FF6A00'], [1, '#050505']])}</defs>
      <rect width="1080" height="1080" fill="url(#wave)"/>
-     <path d="M0 560 C240 440 420 680 660 560 C840 470 960 560 1080 520 L1080 1080 L0 1080Z" fill="#0369a1" opacity="0.65"/>
-     <path d="M0 700 C260 580 440 820 700 700 C880 620 980 700 1080 670 L1080 1080 L0 1080Z" fill="#075985" opacity="0.8"/>
-     <path d="M0 850 C280 740 500 950 760 850 C920 790 1000 850 1080 830 L1080 1080 L0 1080Z" fill="#0c4a6e"/>`
+     <path d="M0 560 C240 440 420 680 660 560 C840 470 960 560 1080 520 L1080 1080 L0 1080Z" fill="#FF4500" opacity="0.65"/>
+     <path d="M0 700 C260 580 440 820 700 700 C880 620 980 700 1080 670 L1080 1080 L0 1080Z" fill="#242424" opacity="0.8"/>
+     <path d="M0 850 C280 740 500 950 760 850 C920 790 1000 850 1080 830 L1080 1080 L0 1080Z" fill="#101010"/>`
   );
 }
 
@@ -3576,7 +3572,7 @@ function avatarSvg(initials, from, to) {
     `<defs>${linear('a', [[0, from], [1, to]], 0, 0, 1, 1)}</defs>
      <rect width="400" height="400" fill="url(#a)"/>
      <circle cx="200" cy="200" r="200" fill="url(#a)"/>
-     <text x="200" y="212" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="140" font-weight="700" fill="#ffffff" opacity="0.95">${initials}</text>`
+     <text x="200" y="212" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="140" font-weight="700" fill="#FFFFFF" opacity="0.95">${initials}</text>`
   );
 }
 
@@ -3584,14 +3580,14 @@ function storySvg(title, subtitle, from, to) {
   return svgDoc(
     1080,
     1920,
-    `<defs>${linear('s', [[0, from], [0.55, to], [1, '#0f172a']])}
-      ${linear('glow', [[0, '#ffffff'], [1, '#ffffff']])}</defs>
+    `<defs>${linear('s', [[0, from], [0.55, to], [1, '#050505']])}
+      ${linear('glow', [[0, '#FFFFFF'], [1, '#FFFFFF']])}</defs>
      <rect width="1080" height="1920" fill="url(#s)"/>
-     <circle cx="240" cy="380" r="260" fill="#ffffff" opacity="0.12"/>
-     <circle cx="860" cy="1420" r="340" fill="#ffffff" opacity="0.1"/>
+     <circle cx="240" cy="380" r="260" fill="#FFFFFF" opacity="0.12"/>
+     <circle cx="860" cy="1420" r="340" fill="#FFFFFF" opacity="0.1"/>
      <circle cx="540" cy="900" r="300" fill="url(#glow)" opacity="0.08"/>
-     <text x="90" y="980" font-family="Arial, Helvetica, sans-serif" font-size="96" font-weight="700" fill="#ffffff">${title}</text>
-     <text x="94" y="1070" font-family="Arial, Helvetica, sans-serif" font-size="44" fill="#ffffff" opacity="0.8">${subtitle}</text>`
+     <text x="90" y="980" font-family="Arial, Helvetica, sans-serif" font-size="96" font-weight="700" fill="#FFFFFF">${title}</text>
+     <text x="94" y="1070" font-family="Arial, Helvetica, sans-serif" font-size="44" fill="#FFFFFF" opacity="0.8">${subtitle}</text>`
   );
 }
 
@@ -3614,15 +3610,15 @@ function seedIfEmpty() {
   writeSeedImage('seed-coffee.svg', sceneCoffee());
   writeSeedImage('seed-waves.svg', sceneWaves());
 
-  writeSeedImage('avatar-vibe.svg', avatarSvg('V', '#d9583b', '#eab04b'));
-  writeSeedImage('avatar-ana.svg', avatarSvg('AS', '#d9583b', '#e0a458'));
-  writeSeedImage('avatar-bruno.svg', avatarSvg('BL', '#147d76', '#7fb069'));
-  writeSeedImage('avatar-carla.svg', avatarSvg('CN', '#a8553c', '#d98c6a'));
-  writeSeedImage('avatar-diego.svg', avatarSvg('DA', '#7c5c3e', '#c1872f'));
+  writeSeedImage('avatar-vibe.svg', avatarSvg('V', '#FF8C00', '#FF4500'));
+  writeSeedImage('avatar-ana.svg', avatarSvg('AS', '#FF6A00', '#FF8C00'));
+  writeSeedImage('avatar-bruno.svg', avatarSvg('BL', '#242424', '#050505'));
+  writeSeedImage('avatar-carla.svg', avatarSvg('CN', '#A1A1AA', '#242424'));
+  writeSeedImage('avatar-diego.svg', avatarSvg('DA', '#101010', '#242424'));
 
-  writeSeedImage('story-ana.svg', storySvg('Bom dia', 'luz de domingo', '#e0a458', '#c25b3e'));
-  writeSeedImage('story-bruno.svg', storySvg('Na trilha', 'subindo sem pressa', '#147d76', '#2f5d3a'));
-  writeSeedImage('story-carla.svg', storySvg('Estúdio', 'novas camadas hoje', '#a8553c', '#d98c6a'));
+  writeSeedImage('story-ana.svg', storySvg('Bom dia', 'luz de domingo', '#FF8C00', '#FF4500'));
+  writeSeedImage('story-bruno.svg', storySvg('Na trilha', 'subindo sem pressa', '#242424', '#050505'));
+  writeSeedImage('story-carla.svg', storySvg('Estúdio', 'novas camadas hoje', '#FF6A00', '#FF4500'));
 
   const password = hashPassword(DEMO_PASSWORD);
   const t = now();
@@ -3630,7 +3626,7 @@ function seedIfEmpty() {
   const seedUsers = [
     { username: 'vibra', name: 'Vibra', bio: 'Seu cantinho visual. Compartilhe o que te inspira.', avatar: '/uploads/avatar-vibe.svg', birthDate: '1997-05-14', interests: ['fotografia', 'cafe', 'musica', 'viagens', 'tecnologia'] },
     { username: 'ana.souza', name: 'Ana Souza', bio: 'Fotografia, café e fins de tarde.', avatar: '/uploads/avatar-ana.svg', birthDate: '1996-08-22', interests: ['fotografia', 'cafe', 'arte', 'natureza', 'viagens', 'musica'] },
-    { username: 'bruno.dev', name: 'Bruno Lima', bio: 'Código, trilhas e céu azul.', avatar: '/uploads/avatar-bruno.svg', birthDate: '1994-03-09', interests: ['tecnologia', 'trilhas', 'games', 'musica', 'natureza', 'corrida'] },
+    { username: 'bruno.dev', name: 'Bruno Lima', bio: 'Código, trilhas e céu aberto.', avatar: '/uploads/avatar-bruno.svg', birthDate: '1994-03-09', interests: ['tecnologia', 'trilhas', 'games', 'musica', 'natureza', 'corrida'] },
     { username: 'carla.arte', name: 'Carla Nunes', bio: 'Ilustração, cor e experimentação.', avatar: '/uploads/avatar-carla.svg', birthDate: '1998-11-02', interests: ['arte', 'design', 'filmes', 'musica', 'livros', 'fotografia'] },
     { username: 'diego.foto', name: 'Diego Alves', bio: 'Luz natural, sempre.', avatar: '/uploads/avatar-diego.svg', birthDate: '1992-01-17', interests: ['fotografia', 'praia', 'viagens', 'cinema', 'musica', 'culinaria'] },
   ];
@@ -3673,8 +3669,8 @@ function seedIfEmpty() {
     { user: 4, image: 'seed-ocean.svg', caption: 'O som do mar como trilha sonora do dia.', minutes: 420, topic: 'natureza' },
     { user: 0, image: 'seed-city.svg', caption: 'Luzes da cidade. A noite tem outra paleta.', minutes: 600, topic: 'fotografia' },
     { user: 1, image: 'seed-desert.svg', caption: 'Texturas que parecem pintura.', minutes: 900, topic: 'viagens' },
-    { user: 2, image: 'seed-forest.svg', caption: 'Silêncio verde.', minutes: 1200, topic: 'natureza' },
-    { user: 3, image: 'seed-waves.svg', caption: 'Água, movimento e azul.', minutes: 1500, topic: 'arte' },
+    { user: 2, image: 'seed-forest.svg', caption: 'Silêncio na mata.', minutes: 1200, topic: 'natureza' },
+    { user: 3, image: 'seed-waves.svg', caption: 'Água, movimento e luz.', minutes: 1500, topic: 'arte' },
     { user: 4, image: 'seed-coffee.svg', caption: 'Pausa obrigatória no meio da tarde.', minutes: 1800, topic: 'gastronomia' },
   ];
 
@@ -3711,7 +3707,7 @@ function seedIfEmpty() {
     [[2, 'A cidade rende boas fotos.']],
     [[3, 'Parece outro planeta.']],
     [[0, 'Que paz.']],
-    [[1, 'Azul favorito.']],
+    [[1, 'Laranja favorito.']],
     [[0, 'Café sempre.']],
   ];
   const insertComment = db.prepare('INSERT INTO comments (post_id, user_id, text, created_at) VALUES (?, ?, ?, ?)');
@@ -4040,13 +4036,7 @@ const server = http.createServer(async (req, res) => {
       return serveFile(res, file, 'public, max-age=31536000, immutable');
     }
 
-    if (pathname === '/' || pathname === '/index.html') {
-      return serveFile(res, path.join(PUBLIC_DIR, 'index.html'));
-    }
-
-    const file = resolveInside(PUBLIC_DIR, pathname.replace(/^\/+/, ''));
-    if (!file) return json(res, 403, { error: 'Acesso negado.' });
-    return serveFile(res, file);
+    return json(res, 404, { error: 'Rota não encontrada.' });
   } catch (error) {
     if (res.headersSent) {
       res.end();

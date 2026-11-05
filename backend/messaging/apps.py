@@ -1,9 +1,0 @@
-"""Configuração do app de mensagens."""
-
-from django.apps import AppConfig
-
-
-class MessagingConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'messaging'
-    verbose_name = 'Mensagens'

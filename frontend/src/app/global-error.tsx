@@ -33,8 +33,8 @@ export default function GlobalError({ error, retry }: GlobalErrorProps) {
           html { color-scheme: light dark; }
           body {
             min-height: 100vh;
-            background: #080808;
-            color: #f7f5f2;
+            background: #050505;
+            color: #FFFFFF;
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             -webkit-font-smoothing: antialiased;
             display: grid;
@@ -45,14 +45,14 @@ export default function GlobalError({ error, retry }: GlobalErrorProps) {
             font: inherit;
             cursor: pointer;
             border: none;
-            background: #f97316;
-            color: #111111;
+            background: #FF6A00;
+            color: #0A0A0A;
             padding: 0.75rem 1.5rem;
             border-radius: 999px;
             font-weight: 700;
           }
           button:focus-visible {
-            outline: 3px solid color-mix(in srgb, #f97316 68%, transparent);
+            outline: 3px solid color-mix(in srgb, #FF6A00 68%, transparent);
             outline-offset: 3px;
           }
           @media (prefers-reduced-motion: reduce) {

@@ -178,7 +178,7 @@ export function Composer({ user }: ComposerProps) {
                     muted
                     playsInline
                     controls
-                    className="max-h-[420px] w-full bg-black object-contain"
+                    className="max-h-[420px] w-full bg-background object-contain"
                   >
                     <track kind="captions" />
                   </video>

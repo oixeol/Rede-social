@@ -3,7 +3,7 @@
  * All fields use camelCase as returned by the API.
  */
 
-export type ThemePalette = 'orange' | 'blue' | 'green' | 'purple';
+export type ThemePalette = 'orange' | 'black' | 'white';
 
 export type MessagePolicy = 'everyone' | 'connections' | 'nobody';
 

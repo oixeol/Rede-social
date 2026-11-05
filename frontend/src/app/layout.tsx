@@ -17,10 +17,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
+  colorScheme: 'dark light',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#080808' },
+    { media: '(prefers-color-scheme: light)', color: '#FAFAFA' },
+    { media: '(prefers-color-scheme: dark)', color: '#050505' },
   ],
 };
 
@@ -29,7 +29,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
-    <html lang="pt-BR" data-theme="light" suppressHydrationWarning>
+    <html lang="pt-BR" data-theme="dark" suppressHydrationWarning>
       <body className={`${inter.variable} ${lora.variable}`}>
         <Script src="/theme-init.js" strategy="beforeInteractive" nonce={nonce} />
         <a className="skip-link" href="#conteudo">

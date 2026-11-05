@@ -5,6 +5,7 @@
   --font-display: var(--font-lora);
 
   --color-background: var(--vibra-background);
+  --color-background-secondary: var(--vibra-background-secondary);
   --color-surface: var(--vibra-surface);
   --color-surface-raised: var(--vibra-surface-raised);
   --color-surface-subtle: var(--vibra-surface-subtle);
@@ -21,161 +22,200 @@
   --color-on-brand: var(--vibra-on-brand);
   --color-accent: var(--vibra-accent);
   --color-accent-soft: var(--vibra-accent-soft);
-  --color-navy: var(--vibra-navy);
-  --color-gold: var(--vibra-gold);
-  --color-lilac: var(--vibra-lilac);
   --color-success: var(--vibra-success);
   --color-danger: var(--vibra-danger);
   --color-danger-soft: var(--vibra-danger-soft);
 
   --radius-pill: 999px;
-  --radius-card: 1.25rem;
-  --radius-panel: 1.5rem;
+  --radius-card: 1rem;
+  --radius-panel: 1.25rem;
 
   --shadow-card: 0 14px 34px rgb(0 0 0 / 0.08);
   --shadow-float: 0 18px 50px rgb(0 0 0 / 0.16);
+  --shadow-brand: 0 10px 30px rgb(255 106 0 / 0.22);
 }
+
+/* =============================================================================
+   TOKENS DE TEMA — Visual Vibra (Preto / Laranja / Branco)
+   Paleta da referência:
+   - Fundo geral:        #050505
+   - Fundo secundário:   #0B0B0B
+   - Cards:              #101010
+   - Borda:              1px #242424
+   - Laranja principal:  #FF6A00
+   - Laranja secundário: #FF8C00
+   - Laranja intenso:    #FF4500
+   - Texto principal:    #FFFFFF
+   - Texto secundário:   #A1A1AA
+   - Verde online:       #22C55E
+   - Vermelho notif:     #EF4444
+   ============================================================================= */
 
 :root {
-  color-scheme: light;
-
-  --vibra-background: #fffaf2;
-  --vibra-surface: #fffdf8;
-  --vibra-surface-raised: #ffffff;
-  --vibra-surface-subtle: #f5ede3;
-  --vibra-foreground: #111111;
-  --vibra-muted: #625b54;
-  --vibra-subtle: #6b645d;
-  --vibra-border: #eadfd2;
-  --vibra-border-strong: #d7c8b7;
-  --vibra-brand: #a83f00;
-  --vibra-brand-hover: #8f3500;
-  --vibra-brand-fill: #f97316;
-  --vibra-brand-fill-hover: #ea580c;
-  --vibra-brand-soft: #ffead4;
-  --vibra-on-brand: #111111;
-  --vibra-accent: #8a3d00;
-  --vibra-accent-soft: #ffefdc;
-  --vibra-navy: #000000;
-  --vibra-gold: #b45309;
-  --vibra-lilac: #9a3412;
-  --vibra-success: #176b4c;
-  --vibra-danger: #b42318;
-  --vibra-danger-soft: #fee4e2;
-}
-
-[data-theme="dark"] {
   color-scheme: dark;
 
-  --vibra-background: #080808;
-  --vibra-surface: #111111;
-  --vibra-surface-raised: #171717;
-  --vibra-surface-subtle: #202020;
-  --vibra-foreground: #f7f5f2;
-  --vibra-muted: #bdb8b0;
-  --vibra-subtle: #a59f97;
-  --vibra-border: #2c2c2c;
-  --vibra-border-strong: #3d3d3d;
-  --vibra-brand: #ff8a1f;
-  --vibra-brand-hover: #ffa04a;
-  --vibra-brand-fill: #f97316;
-  --vibra-brand-fill-hover: #fb923c;
-  --vibra-brand-soft: #3a1e08;
-  --vibra-on-brand: #111111;
-  --vibra-accent: #ffb15c;
-  --vibra-accent-soft: #35230f;
-  --vibra-navy: #000000;
-  --vibra-gold: #f59e0b;
-  --vibra-lilac: #c2410c;
-  --vibra-success: #55c79a;
-  --vibra-danger: #f97066;
-  --vibra-danger-soft: #411916;
+  /* Superfícies */
+  --vibra-background: #050505;
+  --vibra-background-secondary: #0B0B0B;
+  --vibra-surface: #101010;
+  --vibra-surface-raised: #101010;
+  --vibra-surface-subtle: #181818;
+  --vibra-foreground: #FFFFFF;
+  --vibra-muted: #A1A1AA;
+  --vibra-subtle: #71717A;
+  --vibra-border: #242424;
+  --vibra-border-strong: #3F3F46;
+
+  /* Brand: laranja vibrante */
+  --vibra-brand: #FF6A00;
+  --vibra-brand-hover: #FF8C00;
+  --vibra-brand-fill: #FF6A00;
+  --vibra-brand-fill-hover: #FF4500;
+  --vibra-brand-soft: #3A1600;
+  --vibra-on-brand: #0A0A0A;
+
+  /* Accent: laranja secundário */
+  --vibra-accent: #FF8C00;
+  --vibra-accent-soft: #3A1600;
+
+  --vibra-success: #22C55E;
+  --vibra-danger: #EF4444;
+  --vibra-danger-soft: #3A1414;
+
+  /* Pills de navegação (item ativo) */
+  --vibra-nav-active-bg: #3A1600;
+  --vibra-nav-active-border: #FF6A00;
+  --vibra-nav-active-text: #FF8C00;
+
+  /* Botão "Seguir" da referência: fundo claro, texto preto bold */
+  --vibra-follow-bg: #E4E4E7;
+  --vibra-follow-text: #09090B;
+
+  /* Gradiente laranja do logo e do botão "Assinar agora" */
+  --vibra-premium-from: #FF8C00;
+  --vibra-premium-to: #FF4500;
+
+  /* Ondas laranja decorativas */
+  --vibra-wave-from: #FF6A00;
+  --vibra-wave-to: #FF8C00;
+}
+
+/*
+ * Variante clara. Mantém mesma função e estrutura do tema escuro, com
+ * superfícies brancas, texto preto e o mesmo núcleo de identidade laranja.
+ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --vibra-background: #FAFAFA;
+  --vibra-background-secondary: #F4F4F5;
+  --vibra-surface: #FFFFFF;
+  --vibra-surface-raised: #FFFFFF;
+  --vibra-surface-subtle: #F4F4F5;
+  --vibra-foreground: #111111;
+  --vibra-muted: #52525B;
+  --vibra-subtle: #71717A;
+  --vibra-border: #E4E4E7;
+  --vibra-border-strong: #D4D4D8;
+
+  --vibra-brand: #FF6A00;
+  --vibra-brand-hover: #FF4500;
+  --vibra-brand-fill: #FF6A00;
+  --vibra-brand-fill-hover: #FF4500;
+  --vibra-brand-soft: #FFEDD5;
+  --vibra-on-brand: #0A0A0A;
+
+  --vibra-accent: #FF4500;
+  --vibra-accent-soft: #FFEDD5;
+
+  --vibra-success: #16A34A;
+  --vibra-danger: #DC2626;
+  --vibra-danger-soft: #FEE2E2;
+
+  --vibra-nav-active-bg: #FFEDD5;
+  --vibra-nav-active-border: #FF6A00;
+  --vibra-nav-active-text: #FF4500;
+
+  --vibra-follow-bg: #E4E4E7;
+  --vibra-follow-text: #09090B;
+
+  --vibra-premium-from: #FF8C00;
+  --vibra-premium-to: #FF4500;
+
+  --vibra-wave-from: #FF6A00;
+  --vibra-wave-to: #FF8C00;
 }
 
 /*
  * Paletas de assinatura.
- *
- * O backend limita `theme_palette` à lista allow-list e restaura `orange`
- * quando a assinatura expira. Esses seletores são a única fonte de verdade
- * para a personalização; alterações/manipulação no DOM não ampliam o
- * entitlement, que continua sendo validado no servidor.
+ * O backend limita `theme_palette` à allow-list e restaura `orange`
+ * quando a assinatura expira. A paleta escolhe o accent principal;
+ * fundos, superfícies e texto permanecem neutros conforme o modo.
  */
-[data-palette="blue"] {
-  --vibra-brand: #1d4ed8;
-  --vibra-brand-hover: #1e40af;
-  --vibra-brand-fill: #2563eb;
-  --vibra-brand-fill-hover: #1d4ed8;
-  --vibra-brand-soft: #dbeafe;
-  --vibra-on-brand: #ffffff;
-  --vibra-accent: #1e3a8a;
-  --vibra-accent-soft: #e0e7ff;
-  --vibra-gold: #a16207;
-  --vibra-lilac: #6d28d9;
+[data-palette="orange"] {
+  --vibra-brand: #FF6A00;
+  --vibra-brand-hover: #FF8C00;
+  --vibra-brand-fill: #FF6A00;
+  --vibra-brand-fill-hover: #FF4500;
+  --vibra-brand-soft: #3A1600;
+  --vibra-on-brand: #0A0A0A;
+  --vibra-accent: #FF8C00;
+  --vibra-accent-soft: #3A1600;
 }
 
-[data-palette="green"] {
-  --vibra-brand: #166534;
-  --vibra-brand-hover: #14532d;
-  --vibra-brand-fill: #16a34a;
-  --vibra-brand-fill-hover: #15803d;
-  --vibra-brand-soft: #dcfce7;
-  --vibra-on-brand: #ffffff;
-  --vibra-accent: #14532d;
-  --vibra-accent-soft: #dcfce7;
-  --vibra-gold: #a16207;
-  --vibra-lilac: #7e22ce;
+[data-theme="light"] [data-palette="orange"] {
+  --vibra-brand: #FF6A00;
+  --vibra-brand-hover: #FF4500;
+  --vibra-brand-fill: #FF6A00;
+  --vibra-brand-fill-hover: #FF4500;
+  --vibra-brand-soft: #FFEDD5;
+  --vibra-on-brand: #0A0A0A;
+  --vibra-accent: #FF4500;
+  --vibra-accent-soft: #FFEDD5;
 }
 
-[data-palette="purple"] {
-  --vibra-brand: #6b21a8;
-  --vibra-brand-hover: #581c87;
-  --vibra-brand-fill: #9333ea;
-  --vibra-brand-fill-hover: #7e22ce;
-  --vibra-brand-soft: #f3e8ff;
-  --vibra-on-brand: #ffffff;
-  --vibra-accent: #581c87;
-  --vibra-accent-soft: #f3e8ff;
-  --vibra-gold: #a16207;
-  --vibra-lilac: #7e22ce;
+[data-palette="black"] {
+  --vibra-brand: #F5F5F5;
+  --vibra-brand-hover: #FFFFFF;
+  --vibra-brand-fill: #101010;
+  --vibra-brand-fill-hover: #242424;
+  --vibra-brand-soft: #242424;
+  --vibra-on-brand: #FFFFFF;
+  --vibra-accent: #FFFFFF;
+  --vibra-accent-soft: #242424;
 }
 
-[data-theme="dark"] [data-palette="blue"] {
-  --vibra-brand: #93c5fd;
-  --vibra-brand-hover: #bfdbfe;
-  --vibra-brand-fill: #3b82f6;
-  --vibra-brand-fill-hover: #60a5fa;
-  --vibra-brand-soft: #172554;
-  --vibra-on-brand: #ffffff;
-  --vibra-accent: #bfdbfe;
-  --vibra-accent-soft: #172554;
-  --vibra-gold: #fbbf24;
-  --vibra-lilac: #c084fc;
+[data-theme="light"] [data-palette="black"] {
+  --vibra-brand: #111111;
+  --vibra-brand-hover: #242424;
+  --vibra-brand-fill: #111111;
+  --vibra-brand-fill-hover: #242424;
+  --vibra-brand-soft: #E4E4E7;
+  --vibra-on-brand: #FFFFFF;
+  --vibra-accent: #111111;
+  --vibra-accent-soft: #E4E4E7;
 }
 
-[data-theme="dark"] [data-palette="green"] {
-  --vibra-brand: #86efac;
-  --vibra-brand-hover: #bbf7d0;
-  --vibra-brand-fill: #22c55e;
-  --vibra-brand-fill-hover: #4ade80;
-  --vibra-brand-soft: #052e16;
-  --vibra-on-brand: #052e16;
-  --vibra-accent: #bbf7d0;
-  --vibra-accent-soft: #052e16;
-  --vibra-gold: #fbbf24;
-  --vibra-lilac: #c084fc;
+[data-palette="white"] {
+  --vibra-brand: #FFFFFF;
+  --vibra-brand-hover: #E4E4E7;
+  --vibra-brand-fill: #FFFFFF;
+  --vibra-brand-fill-hover: #E4E4E7;
+  --vibra-brand-soft: #242424;
+  --vibra-on-brand: #111111;
+  --vibra-accent: #FFFFFF;
+  --vibra-accent-soft: #242424;
 }
 
-[data-theme="dark"] [data-palette="purple"] {
-  --vibra-brand: #d8b4fe;
-  --vibra-brand-hover: #e9d5ff;
-  --vibra-brand-fill: #a855f7;
-  --vibra-brand-fill-hover: #9333ea;
-  --vibra-brand-soft: #2e1065;
-  --vibra-on-brand: #ffffff;
-  --vibra-accent: #e9d5ff;
-  --vibra-accent-soft: #2e1065;
-  --vibra-gold: #fbbf24;
-  --vibra-lilac: #c084fc;
+[data-theme="light"] [data-palette="white"] {
+  --vibra-brand: #52525B;
+  --vibra-brand-hover: #242424;
+  --vibra-brand-fill: #FFFFFF;
+  --vibra-brand-fill-hover: #E4E4E7;
+  --vibra-brand-soft: #E4E4E7;
+  --vibra-on-brand: #111111;
+  --vibra-accent: #52525B;
+  --vibra-accent-soft: #E4E4E7;
 }
 
 * {

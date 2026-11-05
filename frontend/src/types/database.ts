@@ -9,6 +9,7 @@ export type Database = {
       users: {
         Row: {
           id: number;
+          auth_uid: string | null;
           username: string;
           name: string;
           bio: string;
@@ -26,11 +27,14 @@ export type Database = {
           theme_palette: string;
         };
         Insert: {
+          id?: number;
+          auth_uid?: string | null;
           username: string;
           name: string;
           bio?: string;
           avatar?: string | null;
           password_hash: string;
+          created_at: number;
           birth_date?: string | null;
           interests?: string;
           message_policy?: string;
@@ -43,6 +47,7 @@ export type Database = {
         };
         Update: Partial<{
           id: number;
+          auth_uid: string | null;
           username: string;
           name: string;
           bio: string;
@@ -754,7 +759,35 @@ export type Database = {
         Delete: {};
       };
     };
-    Views: {};
+    Views: {
+      /**
+       * View pública de usuários (security_invoker = true).
+       * Projeta apenas colunas públicas; `password_hash` e `auth_uid` ficam
+       * de fora do schema. Use esta view para leituras diretas via Data API.
+       */
+      users_public: {
+        Row: {
+          id: number;
+          username: string;
+          name: string;
+          bio: string;
+          avatar: string | null;
+          banner: string | null;
+          birth_date: string | null;
+          interests: string;
+          message_policy: string;
+          is_private: number;
+          last_active_at: number | null;
+          theme_palette: string;
+          subscription_status: string;
+          subscription_ends_at: number | null;
+          created_at: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+    };
     Functions: {};
     Enums: {
       report_target_type: 'user' | 'post' | 'story' | 'message';

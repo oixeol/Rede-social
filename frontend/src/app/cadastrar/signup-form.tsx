@@ -301,7 +301,7 @@ export function SignupForm() {
     'focus:border-brand focus:ring-2 focus:ring-brand/20',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'bg-no-repeat bg-right pr-10',
-    "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b645d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")] bg-center"
+    "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")] bg-center"
   );
 
   const labelClass = 'block text-sm font-medium text-foreground mb-1.5';

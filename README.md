@@ -2,64 +2,68 @@
 
 Rede social local com descoberta de afinidades e uma área de namoro separada, verificada e baseada em consentimento. O projeto é original: não usa código, marca, layout ou imagens do Instagram ou do Tinder.
 
-O escopo completo e o histórico de cada alteração ficam em [`docs/FUNCIONALIDADES.md`](docs/FUNCIONALIDADES.md).
-
-![Início do Vibra](backend/node-api/qa/final-feed.png)
+![Perfil do Vibra](docs/landing/index.html)
 
 Repositório: [`github.com/oixeol/Rede-social`](https://github.com/oixeol/Rede-social)
 
 ---
 
-## Estrutura do projeto (após reorganização)
+## Estrutura do projeto
 
 ```
 minha-rede-social/
 │
-├── frontend/                # Aplicação Next.js (React 19)
+├── frontend/                # Aplicação Next.js (React 19, App Router)
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   ├── package.json
 │   ├── next.config.ts
+│   ├── scripts/             # Gerador de placeholders de imagem
 │   ├── src/
+│   │   ├── app/             # Rotas (App Router) + globals.css (tokens)
+│   │   ├── components/
+│   │   │   ├── landing/     # Landing page (rota /)
+│   │   │   ├── profile/     # Tela de PERFIL (coluna central + lateral)
+│   │   │   ├── shell/       # Sidebar, topbar, logo
+│   │   │   └── ui/          # Componentes base
+│   │   ├── lib/             # API, Supabase (browser/server), mocks tipados
+│   │   └── types/           # Tipos do schema Supabase
 │   └── public/
+│       ├── images/          # Placeholders do perfil (banner, avatar, posts)
+│       └── theme-init.js
 │
-├── backend/                 # Gateway FastAPI + código Django (WIP)
+├── backend/                 # Gateway FastAPI
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   ├── main.py              # Entrada FastAPI (uvicorn main:app)
-│   ├── requirements.txt     # FastAPI, uvicorn, Django, supabase, etc.
-│   ├── manage.py            # Django (migração em andamento)
-│   ├── vibra/               # Config Django
-│   ├── accounts/, common/, social/, messaging/, dating/  # Apps Django
+│   ├── requirements.txt     # FastAPI, uvicorn, httpx, supabase
 │   │
-│   └── node-api/            # Implementação Node.js funcional (fonte de verdade atual)
+│   └── node-api/            # Implementação Node.js funcional (fonte de verdade da API)
 │       ├── Dockerfile
 │       ├── .dockerignore
-│       ├── server.js        # Servidor HTTP + API JSON + SQLite
+│       ├── server.js        # Servidor HTTP + API JSON + SQLite (sem frontend estático)
 │       ├── app.config.js
 │       ├── package.json
 │       ├── lib/
-│       ├── public/          # Frontend estático legado
-│       ├── qa/              # Testes automatizados + capturas
+│       ├── qa/              # Suítes de teste automatizado
 │       └── scripts/         # Seed de demonstração
 │
-├── compose.yaml             # (ou docker-compose.yml) Orquestração completa
-├── docker-compose.yml       # Arquivo principal de ambiente
+├── docker-compose.yml       # Orquestração completa
 ├── .env.example             # Modelo de variáveis de ambiente
 ├── .gitignore
 ├── .gitattributes
 ├── README.md
 ├── docs/
-│   ├── FUNCIONALIDADES.md   # Escopo e histórico
-│   ├── FASE-1.md            # Registro da Fase 1
-│   └── design-tokens.md
+│   ├── design-tokens.md     # Tokens, tipografia, paletas, acessibilidade
+│   └── landing/
 └── supabase/
     ├── config.toml
-    ├── migrations/          # Schema PostgreSQL (Supabase)
-    └── ...
+    ├── migrations/          # Schema, RLS, grants, view users_public
+    ├── MIGRATION_GUIDE.md
+    └── ENVIRONMENT.md
 ```
 
-> **Nota:** a árvore acima lista os diretórios principais. Arquivos de infraestrutura como `.gitattributes` e pastas `docs/`, `supabase/` permanecem na raiz.
+> **Nota:** o código legacy (frontend vanilla em `backend/node-api/public/`, esqueleto Django e documentação antiga) foi removido. O frontend em React/Next.js é a única interface web do projeto.
 
 ---
 
@@ -67,15 +71,16 @@ minha-rede-social/
 
 | Componente | Estado | Observações |
 | --- | --- | --- |
-| Frontend Next.js (porta 3000) | **Funcional** | `npm run dev` com Turbopack, rewrites `/api/*` → backend |
+| Frontend Next.js (porta 3000) | **Funcional** | App Router + React 19 + TypeScript + Tailwind v4, rewrites `/api/*` → backend |
+| Tela de PERFIL | **Funcional** | Shell novo (sidebar + topbar) + 3 colunas; `/perfil/vibra` usa mock tipado, demais usernames usam a API |
 | Backend FastAPI (porta 8000) | **Funcional** | Gateway que repassa `/api/*` e `/uploads/*` para a API Node |
 | API Node.js (porta 4173) | **Funcional** | Servidor HTTP + SQLite + seed opcional (fonte de verdade da API) |
 | PostgreSQL 18.6 (porta 5432) | **Pronto** | Container com healthcheck e volume `vibra_postgres_data` |
-| Django 5.2 + DRF | **Em preparação** | Configuração inicial; apps, models, urls, migrations pendentes |
+| Supabase | **Migrado** | Cliente browser + server no React, RLS ativo nas migrations, secret só no backend |
 | Testes automatizados | **Disponíveis** | Suítes fumaça, configuração, Namoro e retenção |
 | Landing page (Etapa 3) | **Concluída** | `frontend/src/components/landing/landing-page.tsx` — rota `/` renderiza a landing; CTA "Entrar" → `/entrar` |
 
-> A aplicação web completa (frontend + API) roda hoje via **Node.js + SQLite nativo** (`backend/node-api/server.js`). O backend Python (FastAPI + Django) está em fase de migração; o gateway FastAPI expõe a API na porta 8000 e encaminha para a implementação Node existente, mantendo o contrato estável.
+> A aplicação web completa (frontend + API) roda via **Node.js + SQLite nativo** (`backend/node-api/server.js`). O gateway FastAPI expõe a API na porta 8000 e encaminha para a implementação Node existente, mantendo o contrato estável. O Supabase é a camada de persistência/auth em migração: schema, RLS e view `users_public` já estão versionados em `supabase/migrations/`.
 
 ---
 
@@ -146,7 +151,7 @@ Para usar outra porta:
 $env:PORT=8080; npm start
 ```
 
-### Backend Python (FastAPI + Django WIP)
+### Backend Python (FastAPI gateway)
 
 ```powershell
 cd C:\Rede-social\backend
@@ -156,7 +161,7 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-O Django está em `backend/manage.py` e `backend/vibra/`. Os apps (`accounts`, `social`, `messaging`, `dating`) têm models, mas **faltam os `urls.py` de cada app** — a API Django não está pronta. O gateway FastAPI (`main.py`) já serve a API encaminhando para a API Node.
+O gateway FastAPI (`main.py`) serve a API encaminhando para a API Node. Não há código Django no repositório: os apps Django e o `manage.py` foram removidos, e `requirements.txt` mantém apenas FastAPI, uvicorn, httpx e supabase.
 
 ---
 
@@ -165,8 +170,8 @@ O Django está em `backend/manage.py` e `backend/vibra/`. Os apps (`accounts`, `
 | Variável | Padrão | Uso |
 | --- | --- | --- |
 | `SUPABASE_URL` | — | URL do projeto Supabase (frontend + backend) |
-| `SUPABASE_PUBLISHABLE_KEY` | — | Chave anônima para cliente frontend |
-| `SUPABASE_SECRET_KEY` | — | Service role key (backend/migração) |
+| `SUPABASE_PUBLISHABLE_KEY` | — | Chave anônima (`sb_publishable_…`) para o cliente frontend |
+| `SUPABASE_SECRET_KEY` | — | Service role key — **somente backend**, nunca no navegador |
 | `DATABASE_URL` | — | Conexão Postgres direta (migração) |
 | `VIBRA_API_ORIGIN` | `http://backend:8000` | Origem da API para rewrites Next.js |
 | `NODE_API_URL` | `http://node-api:4173` | Upstream da API Node (backend gateway) |
@@ -184,6 +189,17 @@ O Django está em `backend/manage.py` e `backend/vibra/`. Os apps (`accounts`, `
 | `VIBRA_TZ` | `UTC` | Fuso horário |
 
 > O arquivo `.env` real **não deve ser versionado**. Copie `.env.example` para `.env` e preencha as chaves.
+
+### Supabase no React
+
+| Arquivo | Ambiente | Chave usada |
+| --- | --- | --- |
+| `frontend/src/lib/supabase.ts` | Browser (Client Components) | `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| `frontend/src/lib/supabase-server.ts` | Server Components / Route Handlers | Mesma chave pública, sessão via cookies (`getAll` / `setAll`) |
+
+- `SUPABASE_SECRET_KEY` (service role) fica **apenas** no serviço `backend` do Compose. Nunca é exposta como `NEXT_PUBLIC_*` e nunca entra no bundle do navegador.
+- As políticas de RLS estão versionadas em `supabase/migrations/20261103000001_rls_policies.sql` e a view `users_public` em `20261103000003_users_public_view.sql`. A resolução do usuário autenticado usa `users.auth_uid` + `private.current_vibra_user_id()`; o schema `private` não é exposto pela Data API.
+- `docker-compose.yml` injeta no frontend apenas URL e chave pública do Supabase.
 
 ---
 
@@ -232,15 +248,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File qa/shot.ps1 -Out qa/tela.png
 
 ## Identidade visual
 
-O Vibra usa uma linguagem editorial própria:
+O Vibra usa linguagem visual própria:
 
-- papel quente, terracota e verde-teal como cores principais;
+- preto, branco e laranja como paleta principal;
 - títulos em serifa e texto em sans-serif;
 - cartões com bordas suaves, sombras discretas e cantos generosos;
 - ícones SVG próprios, desenhados para a interface;
 - grade de publicações e cartões de perfil em vez de pilha de swipe.
 
-Os tokens de cor, tipografia e espaçamento ficam no início de `backend/node-api/public/styles.css`.
+Os tokens ficam em `frontend/src/app/globals.css`. Paletas de assinatura disponíveis: `orange`, `black` e `white`.
 
 ---
 

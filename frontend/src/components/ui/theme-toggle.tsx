@@ -17,7 +17,7 @@ function readStoredTheme(): Theme {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved === 'light' || saved === 'dark') return saved;
   } catch {}
-  return 'light';
+  return 'dark';
 }
 
 function ensureTheme(): Theme {
@@ -30,9 +30,9 @@ function getSnapshot(): Theme {
 }
 
 function getServerSnapshot(): Theme {
-  // The server always renders light so the first client render matches the
+  // The server always renders dark so the first client render matches the
   // server markup and no hydration mismatch is produced.
-  return 'light';
+  return 'dark';
 }
 
 function subscribe(listener: () => void) {
@@ -82,9 +82,9 @@ export function ThemeToggle() {
       label="Alternar tema"
       pressed={isDark}
       icon={isDark ? (
-        <MoonStar className="size-[18px]" aria-hidden="true" />
-      ) : (
         <Sun className="size-[18px]" aria-hidden="true" />
+      ) : (
+        <MoonStar className="size-[18px]" aria-hidden="true" />
       )}
       onClick={toggleTheme}
     />

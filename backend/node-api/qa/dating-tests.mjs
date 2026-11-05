@@ -18,7 +18,7 @@ const PNG =
 const SOCIAL_BIO = 'Bio social pública do teste automatizado.';
 const DATING_BIO_A = 'Bio de namoro privada e exclusiva do QA Alfa.';
 const DATING_BIO_B = 'Bio de namoro privada e exclusiva do QA Beta.';
-const PASSWORD = 'qa-senha-123';
+const PASSWORD = 'QaSenha123!';
 
 let failures = 0;
 

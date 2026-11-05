@@ -14,10 +14,9 @@ interface ConfiguracoesViewProps {
 }
 
 const PALETTE_OPTIONS: { value: ThemePalette; label: string; color: string }[] = [
-  { value: 'orange', label: 'Laranja', color: '#f97316' },
-  { value: 'blue', label: 'Azul', color: '#3b82f6' },
-  { value: 'green', label: 'Verde', color: '#22c55e' },
-  { value: 'purple', label: 'Roxo', color: '#a855f7' },
+  { value: 'orange', label: 'Laranja', color: '#FF6A00' },
+  { value: 'black', label: 'Preto', color: '#101010' },
+  { value: 'white', label: 'Branco', color: '#FFFFFF' },
 ];
 
 export function ConfiguracoesView({ me }: ConfiguracoesViewProps) {
@@ -185,7 +184,7 @@ export function ConfiguracoesView({ me }: ConfiguracoesViewProps) {
                     />
                     <span
                       aria-hidden="true"
-                      className="size-9 rounded-full border border-black/10"
+                      className="size-9 rounded-full border border-border"
                       style={{ backgroundColor: option.color }}
                     />
                     <span className="text-xs font-semibold text-foreground">{option.label}</span>

@@ -2,10 +2,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Loading() {
   return (
-    <div className="mx-auto w-full max-w-[1180px]" role="status" aria-live="polite" aria-busy="true">
+    <div className="mx-auto w-full max-w-[1291px]" role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">Carregando perfil…</span>
 
-      <div className="grid items-start gap-7 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid items-start gap-7 xl:grid-cols-[minmax(0,1fr)_355px]">
         <section className="min-w-0" aria-label="Carregando conteúdo do perfil">
           {/* Capa do perfil */}
           <Skeleton
@@ -56,7 +56,7 @@ export default function Loading() {
               ))}
             </div>
 
-            {/* Grid de publicações */}
+            {/* Grade de publicações */}
             <div
               className="mt-6 grid grid-cols-2 gap-3 sm:gap-4"
               role="list"
@@ -65,7 +65,7 @@ export default function Loading() {
               {Array.from({ length: 4 }).map((_, index) => (
                 <div key={index} role="listitem">
                   <Skeleton
-                    className="aspect-[4/5] w-full rounded-card"
+                    className="aspect-square w-full rounded-xl"
                     label="Publicação"
                   />
                 </div>
@@ -82,7 +82,7 @@ export default function Loading() {
           {Array.from({ length: 3 }).map((_, index) => (
             <Skeleton
               key={index}
-              className="h-44 rounded-card"
+              className="h-44 rounded-2xl"
               label="Cartão lateral"
             />
           ))}

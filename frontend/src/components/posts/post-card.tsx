@@ -311,12 +311,12 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
         </span>
       )}
       {hasMultiple ? (
-        <span className="absolute right-2 bottom-2 inline-flex items-center gap-1 rounded-pill bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+        <span className="absolute right-2 bottom-2 inline-flex items-center gap-1 rounded-pill bg-background/60 px-2 py-0.5 text-xs font-medium text-foreground">
           <span aria-hidden="true">+{media.length - 1}</span>
         </span>
       ) : null}
       {isVideo ? (
-        <span className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-pill bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+        <span className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-pill bg-background/60 px-2 py-0.5 text-xs font-medium text-foreground">
           Vídeo
         </span>
       ) : null}
@@ -375,7 +375,7 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
             label="Mais opções da publicação"
             items={menuItems}
             align="end"
-            trigger={<MoreHorizontal className="size-5 text-white drop-shadow-md" />}
+            trigger={<MoreHorizontal className="size-5 text-foreground drop-shadow-md" />}
           />
           {actionMessage ? (
             <p className="mt-2 text-xs leading-5 text-muted" role="status">

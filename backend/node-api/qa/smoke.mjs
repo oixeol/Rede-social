@@ -69,7 +69,7 @@ ok('paleta arbitrária é rejeitada', invalidPalette.status === 400, `status ${i
 
 const freePaletteAttempt = await api('/api/me/theme-palette', {
   method: 'PATCH',
-  body: JSON.stringify({ palette: 'blue' }),
+  body: JSON.stringify({ palette: 'black' }),
 });
 ok('usuário free não altera a paleta', freePaletteAttempt.status === 403, `status ${freePaletteAttempt.status}`);
 
@@ -114,17 +114,17 @@ if (canMutateIsolatedUser) {
 
     const subscriberPalette = await api('/api/me/theme-palette', {
       method: 'PATCH',
-      body: JSON.stringify({ palette: 'blue' }),
+      body: JSON.stringify({ palette: 'black' }),
     });
     ok(
       'assinatura ativa persiste paleta allow-listed',
       subscriberPalette.status === 200 &&
-        subscriberPalette.data.user.themePalette === 'blue' &&
-        subscriberPalette.data.themePalette === 'blue'
+        subscriberPalette.data.user.themePalette === 'black' &&
+        subscriberPalette.data.themePalette === 'black'
     );
 
     testDb
-      .prepare("UPDATE users SET subscription_status = 'active', subscription_ends_at = ?, theme_palette = 'blue' WHERE id = ?")
+      .prepare("UPDATE users SET subscription_status = 'active', subscription_ends_at = ?, theme_palette = 'black' WHERE id = ?")
       .run(Date.now() - 1000, userId);
 
     const expiredMe = await api('/api/me');
@@ -138,7 +138,7 @@ if (canMutateIsolatedUser) {
 
     const expiredPalette = await api('/api/me/theme-palette', {
       method: 'PATCH',
-      body: JSON.stringify({ palette: 'green' }),
+      body: JSON.stringify({ palette: 'white' }),
     });
     ok('assinatura expirada não altera a paleta', expiredPalette.status === 403, `status ${expiredPalette.status}`);
 

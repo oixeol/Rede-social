@@ -163,7 +163,7 @@ try {
       username: 'prod.qa',
       name: 'Produção QA',
       birthDate: '1994-01-02',
-      password: 'senha-segura',
+      password: 'SenhaSegura1!',
     }),
   });
   const session = registration.headers.get('set-cookie') || '';
