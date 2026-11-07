@@ -1586,11 +1586,12 @@ const POST_SELECT = `
 
 function mapPost(row) {
   const mediaType = row.media_type || 'image';
+  const isTextOnly = mediaType === 'text' || !row.image;
   return {
     id: row.id,
-    image: row.image,
-    mediaType,
-    media: [{ url: row.image, mediaType }],
+    image: isTextOnly ? '' : row.image,
+    mediaType: isTextOnly ? 'text' : mediaType,
+    media: isTextOnly ? [] : [{ url: row.image, mediaType }],
     topic: row.topic || 'cotidiano',
     caption: row.caption,
     createdAt: row.created_at,
@@ -1729,11 +1730,9 @@ async function handleApi(req, res, pathname, url) {
     rateLimit(req, 'register', 10, 60 * 60 * 1000);
     const body = await readBody(req);
 
-    // Validação de username (gerado automaticamente ou fornecido)
-    const username = body.username
-      ? cleanText(body.username, 'Usuário', { min: 3, max: 24, required: true }).toLowerCase()
-      : null;
-    if (username && !/^[a-z0-9._]+$/.test(username)) {
+    // Username escolhido pela pessoa. Obrigatório e único.
+    const username = cleanText(body.username, 'Usuário', { min: 3, max: 24, required: true }).toLowerCase();
+    if (!/^[a-z0-9._]+$/.test(username)) {
       throw new HttpError(400, 'Usuário deve ter apenas letras, números, ponto e underline.');
     }
 
@@ -1777,19 +1776,8 @@ async function handleApi(req, res, pathname, url) {
     const country = body.country ? cleanText(body.country, 'País', { min: 2, max: 3, required: false }).toUpperCase() : null;
     const state = body.state ? cleanText(body.state, 'Estado', { min: 1, max: 10, required: false }).toUpperCase() : null;
 
-    // Gerar username se não fornecido
-    let finalUsername = username;
-    if (!finalUsername) {
-      const base = name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 20) || 'user';
-      const random = Math.random().toString(36).substring(2, 6);
-      finalUsername = base + random;
-      if (finalUsername.length < 3) {
-        finalUsername = 'user' + finalUsername;
-      }
-    }
-
     // Verificar se username já existe
-    if (db.prepare('SELECT 1 AS ok FROM users WHERE username = ?').get(finalUsername)) {
+    if (db.prepare('SELECT 1 AS ok FROM users WHERE username = ?').get(username)) {
       throw new HttpError(409, 'Esse usuário já está em uso. Tente outro.');
     }
 
@@ -1797,7 +1785,7 @@ async function handleApi(req, res, pathname, url) {
       .prepare(
         'INSERT INTO users (username, name, bio, avatar, password_hash, created_at, birth_date, email, gender, country, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       )
-      .run(finalUsername, name, '', null, hashPassword(password), now(), birthDate, email, gender, country, state);
+      .run(username, name, '', null, hashPassword(password), now(), birthDate, email, gender, country, state);
 
     const id = Number(result.lastInsertRowid);
     const token = createSession(id, req.headers['user-agent']);
@@ -1823,6 +1811,17 @@ async function handleApi(req, res, pathname, url) {
     const token = cookieValue(req, SESSION_COOKIE);
     if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
     return json(res, 200, { ok: true }, { 'Set-Cookie': `${SESSION_COOKIE}=; ${cookieAttributes()}; Max-Age=0` });
+  }
+
+  // Verificação de disponibilidade de username (pública, sem autenticação)
+  if (method === 'GET' && pathname === '/api/username-available') {
+    rateLimit(req, 'username-available', 60, 60 * 1000);
+    const u = (url.searchParams.get('username') || '').toLowerCase();
+    if (!/^[a-z0-9._]{3,24}$/.test(u)) {
+      return json(res, 400, { available: false, error: 'Formato de usuário inválido.' });
+    }
+    const exists = db.prepare('SELECT 1 AS ok FROM users WHERE username = ?').get(u);
+    return json(res, 200, { username: u, available: !exists });
   }
 
   const me = requireUser(req);
@@ -2588,21 +2587,29 @@ async function handleApi(req, res, pathname, url) {
     const rawImages = Array.isArray(body.images)
       ? body.images.filter((value) => typeof value === 'string' && value.trim())
       : [];
-    if (isVideo && rawImages.length) throw new HttpError(400, 'Escolha um vídeo ou fotos, não os dois.');
+    const singleImage =
+      typeof body.image === 'string' && body.image.trim() ? body.image : null;
+    if (isVideo && (rawImages.length || singleImage)) {
+      throw new HttpError(400, 'Escolha um vídeo ou fotos, não os dois.');
+    }
     if (rawImages.length > 10) throw new HttpError(400, 'Envie no máximo 10 fotos por publicação.');
-    const totalImageSize = rawImages.reduce((sum, value) => sum + value.length, 0);
+    const imageSources = rawImages.length ? rawImages : singleImage ? [singleImage] : [];
+    const totalImageSize = imageSources.reduce((sum, value) => sum + value.length, 0);
     if (totalImageSize > 34 * 1024 * 1024) {
       throw new HttpError(413, 'As fotos somam mais de 34 MB. Escolha arquivos menores.');
     }
     const caption = cleanText(body.caption, 'Legenda', { max: 2200 });
+    const hasMedia = isVideo || imageSources.length > 0;
+    if (!hasMedia && !caption) {
+      throw new HttpError(400, 'Escreva uma legenda ou adicione uma mídia antes de publicar.');
+    }
     const topic = POST_TOPICS.includes(body.topic) ? body.topic : 'cotidiano';
     const media = [];
     try {
       if (isVideo) {
         media.push({ url: videoUrl || saveVideo(body.video, 'post'), mediaType: 'video' });
       } else {
-        const sources = rawImages.length ? rawImages : [body.image];
-        for (const source of sources) {
+        for (const source of imageSources) {
           media.push({ url: saveImage(source, 'post'), mediaType: 'image' });
         }
       }
@@ -2615,7 +2622,7 @@ async function handleApi(req, res, pathname, url) {
     try {
       const result = db
         .prepare('INSERT INTO posts (user_id, image, caption, media_type, topic, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(me.id, cover.url, caption, cover.mediaType, topic, now());
+        .run(me.id, cover ? cover.url : '', caption, cover ? cover.mediaType : 'text', topic, now());
       postId = Number(result.lastInsertRowid);
       const insertMedia = db.prepare(
         'INSERT INTO post_media (post_id, url, media_type, position) VALUES (?, ?, ?, ?)'
