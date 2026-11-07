@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import type { KeyboardEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,6 +21,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Pill } from '@/components/ui/pill';
 import { apiRequest, ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { isSafeMediaSource } from '@/lib/media';
 import type { Post } from '@/lib/types';
 
 interface PostCardProps {
@@ -28,10 +30,6 @@ interface PostCardProps {
   compact?: boolean;
   /** Optional callback when post is opened. */
   onOpen?: (postId: number) => void;
-}
-
-function isSafeMediaSource(src: string | null | undefined): src is string {
-  return Boolean(src && src.startsWith('/uploads/') && !src.includes('..') && !src.includes('\\'));
 }
 
 async function copyToClipboard(value: string): Promise<boolean> {
@@ -62,9 +60,12 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
 
+  const isTextOnly = post.mediaType === 'text' && !post.image;
   const media = post.media?.length
     ? post.media
-    : [{ url: post.image, mediaType: post.mediaType }];
+    : post.image
+      ? [{ url: post.image, mediaType: post.mediaType }]
+      : [];
   const firstMedia = media[0];
   const safeMediaUrl = isSafeMediaSource(firstMedia?.url) ? firstMedia.url : null;
   const isVideo = firstMedia?.mediaType === 'video';
@@ -279,7 +280,7 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
     compact ? 'relative grid-item overflow-visible' : 'overflow-hidden',
   );
 
-  const mediaContent = (
+  const mediaContent = isTextOnly ? null : (
     <button
       type="button"
       className={cn(
@@ -299,11 +300,12 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
           aria-label={post.caption || 'Vídeo da publicação'}
         />
       ) : safeMediaUrl ? (
-        <img
+        <Image
           src={safeMediaUrl}
           alt={post.caption || `Foto de ${post.user.username}`}
-          loading="lazy"
-          className="size-full object-cover"
+          fill
+          sizes="(min-width: 1280px) 428px, (min-width: 640px) 50vw, 100vw"
+          className="object-cover"
         />
       ) : (
         <span className="flex size-full items-center justify-center text-sm text-muted" aria-hidden="true">
@@ -325,60 +327,81 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
 
   if (compact) {
     return (
-      <article className={postClasses}>
-        <div className="overflow-hidden rounded-t-[inherit]">
-          {mediaContent}
-        </div>
-        <div className="gallery-foot p-3">
-          <div className="flex items-center gap-1">
-            <IconButton
-              label={liked ? 'Descurtir' : 'Curtir'}
-              icon={<Heart className={cn('size-5', liked && 'text-danger')} />}
-              tone={liked ? 'danger' : 'default'}
-              pressed={liked}
+      <article className={cn(postClasses, 'group overflow-hidden')}>
+        <div className="relative overflow-hidden rounded-t-[inherit]">
+          {mediaContent ?? (
+            <button
+              type="button"
+              className="flex aspect-square w-full items-center justify-center bg-surface-subtle p-5 text-center"
+              onClick={openPost}
+              aria-label={`Abrir publicação de ${post.user.username}`}
+            >
+              <span className="line-clamp-6 text-sm leading-6 text-foreground">
+                {post.caption || 'Publicação somente com texto'}
+              </span>
+            </button>
+          )}
+
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/80 via-black/25 to-transparent"
+            aria-hidden="true"
+          />
+
+          <div className="absolute right-2 top-2 z-20">
+            <DropdownMenu
+              label="Mais opções da publicação"
+              items={menuItems}
+              align="end"
+              trigger={<MoreHorizontal className="size-5 text-foreground drop-shadow-md" />}
+            />
+          </div>
+
+          <div className="absolute right-2 bottom-2 left-2 z-10 flex items-center justify-end gap-1">
+            <button
+              type="button"
               onClick={() => void handleLike()}
               disabled={pendingLike}
-            />
-            <IconButton
-              label="Comentar"
-              icon={<MessageSquare className="size-5" />}
+              aria-label={liked ? 'Descurtir publicação' : 'Curtir publicação'}
+              aria-pressed={liked}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-pill bg-black/55 px-3 text-xs font-semibold text-white backdrop-blur-sm transition-colors hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Heart
+                aria-hidden="true"
+                className={cn('size-4', liked && 'fill-danger text-danger')}
+              />
+              <strong data-like-count={post.id} aria-live="polite" aria-atomic="true">
+                {likes}
+              </strong>
+            </button>
+
+            <button
+              type="button"
               onClick={openPost}
-            />
-            <IconButton
-              label="Repostar — em breve"
-              icon={<Repeat className="size-5" />}
-              disabled
-            />
-            <IconButton
-              label="Compartilhar"
-              icon={<Share2 className="size-5" />}
+              aria-label={`Comentar publicação, ${commentsCount} comentários`}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-pill bg-black/55 px-3 text-xs font-semibold text-white backdrop-blur-sm transition-colors hover:bg-black/75"
+            >
+              <MessageSquare aria-hidden="true" className="size-4" />
+              <strong data-comment-count={post.id}>{commentsCount}</strong>
+            </button>
+
+            <button
+              type="button"
               onClick={() => void handleShare()}
               disabled={pendingShare}
-            />
-          </div>
-          <div className="mt-1.5 flex items-center gap-3 text-xs text-muted">
-            <span className="flex items-center gap-1">
-              <Heart className="size-3.5" aria-hidden="true" />
-              <strong data-like-count={post.id}>{likes}</strong>
-            </span>
-            <span className="flex items-center gap-1">
-              <MessageSquare className="size-3.5" aria-hidden="true" />
-              <strong data-comment-count={post.id}>{commentsCount}</strong>
-            </span>
-            <span className="flex items-center gap-1">
-              <Share2 className="size-3.5" aria-hidden="true" />
+              aria-label={`Compartilhar publicação, ${shares} compartilhamentos`}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-pill bg-black/55 px-3 text-xs font-semibold text-white backdrop-blur-sm transition-colors hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Share2 aria-hidden="true" className="size-4" />
               <strong data-share-count={post.id}>{shares}</strong>
-            </span>
+            </button>
           </div>
-          <DropdownMenu
-            className="absolute right-2 top-2 z-20"
-            label="Mais opções da publicação"
-            items={menuItems}
-            align="end"
-            trigger={<MoreHorizontal className="size-5 text-foreground drop-shadow-md" />}
-          />
+
           {actionMessage ? (
-            <p className="mt-2 text-xs leading-5 text-muted" role="status">
+            <p
+              className="absolute inset-x-3 bottom-14 z-10 rounded-lg bg-black/70 px-3 py-2 text-center text-xs leading-5 text-white backdrop-blur-sm"
+              role="status"
+              aria-live="polite"
+            >
               {actionMessage}
             </p>
           ) : null}

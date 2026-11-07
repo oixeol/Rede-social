@@ -27,7 +27,9 @@ export interface ProfilePost {
   id: string;
   /** ID numérico da API. Ausente nos posts mockados. */
   apiId?: number;
-  image: string;
+  /** Imagem da publicação. Ausente em publicações somente com texto. */
+  image?: string;
+  /** Texto alternativo e conteúdo visível de publicações sem imagem. */
   alt: string;
   /** Contagem de curtidas já formatada (ex.: "1.2k"). */
   likes: string;
@@ -92,19 +94,19 @@ export const PROFILE_TABS: ProfileTab[] = [
 ];
 
 export const MOCK_PROFILE: MockProfile = {
-  name: 'Vibra',
-  username: 'vibra',
-  verified: true,
-  online: true,
+  name: 'Tauan Gonzaga',
+  username: 'tauangonzagaph7',
+  verified: false,
+  online: false,
   isMe: true,
   banner: '/images/banner.jpg',
-  bannerAlt: 'Capa do perfil Vibra: personagem de capuz olhando uma cidade iluminada à noite',
+  bannerAlt: 'Capa do perfil Tauan Gonzaga: personagem de capuz olhando uma cidade iluminada à noite',
   avatar: '/images/avatar.jpg',
-  avatarAlt: 'Foto de perfil de Vibra',
+  avatarAlt: 'Foto de perfil de Tauan Gonzaga',
   stats: {
-    posts: 128,
-    followers: 24,
-    following: 3,
+    posts: 0,
+    followers: 0,
+    following: 0,
   },
   tabs: PROFILE_TABS,
   posts: [

@@ -7,7 +7,7 @@ export type ThemePalette = 'orange' | 'black' | 'white';
 
 export type MessagePolicy = 'everyone' | 'connections' | 'nobody';
 
-export type MediaType = 'image' | 'video';
+export type MediaType = 'image' | 'video' | 'text';
 
 export interface UserStats {
   posts: number;

@@ -159,13 +159,9 @@ export function InicioRail({ suggestions: initialSuggestions }: InicioRailProps)
           O Vibra é uma rede social brasileira focada em comunidades, conversas autênticas e descoberta de interesses.
           Sem algoritmos invasivos, sem anúncios, só pessoas.
         </p>
-        <div className="flex flex-wrap gap-2">
-          <a href="/privacidade" className="text-xs text-brand hover:underline">Política de privacidade</a>
-          <span className="text-muted">·</span>
-          <a href="/termos" className="text-xs text-brand hover:underline">Termos de uso</a>
-          <span className="text-muted">·</span>
-          <a href="/diretrizes" className="text-xs text-brand hover:underline">Diretrizes da comunidade</a>
-        </div>
+        <p className="text-xs leading-5 text-muted">
+          Políticas, termos e diretrizes da comunidade ainda não estão publicados.
+        </p>
       </Card>
     </aside>
   );

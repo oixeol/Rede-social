@@ -44,8 +44,9 @@ function resolveNotificationHref(link: string | null | undefined): string | null
     return null;
   }
 
-  // Link direto para /publicacoes/[id] já no formato novo
+  // Links diretos já no formato novo
   if (link.startsWith('/publicacoes/')) return link;
+  if (link.startsWith('/perfil/')) return link;
 
   return null;
 }

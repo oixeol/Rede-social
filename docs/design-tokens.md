@@ -148,8 +148,23 @@ Variáveis CSS: `--font-inter`, `--font-lora`. `@theme inline` mapeia `--font-sa
 - API usa `fetch` com `credentials: 'same-origin'`, `cache: 'no-store'` e validação de caminho `/api/*`.
 - RLS e `users_public` ficam versionados em `supabase/migrations/`.
 
+## Layout do perfil
+
+Tokens e medidas do shell responsivo:
+
+| Medida | Token / valor | Uso |
+| --- | --- | --- |
+| Sidebar desktop | `248px` | Fixa à esquerda em telas largas |
+| Coluna central | `872px` | Conteúdo principal do perfil |
+| Coluna direita | `354px` | Sobre, destaques e sugestões |
+| Gap entre colunas | `22px` | Grade do perfil |
+| Banner | `207px` desktop | Raio `22px` |
+| Avatar | `166px` desktop | Anel laranja `3px`, glow e ponto verde |
+| Abas | Pill natural | Ativa com fundo elevado e sublinhado laranja |
+| Grade | 2 colunas, proporção `2:1` | Gap `16px`; uma coluna no mobile |
+
+Regras: coluna direita some abaixo de `1280px`; sidebar vira icon rail no tablet; mobile usa bottom nav e busca por ícone. Nenhuma área cria rolagem horizontal.
+
 ## Referência visual
 
-Perfil principal: `/perfil/vibra`.
-
-A comparação pixel a pixel depende das imagens de referência materializadas em `docs/reference/`. Sem bytes disponíveis, validação usa medidas de layout, captura em 1536 × 1024 e descrição visual.
+Perfil principal usa dados reais de `/api/users/:username`. A comparação visual usa imagens materializadas em `docs/reference/`, captura em 1536 × 1024 e medidas acima. Dados e arte da referência não entram no produto.

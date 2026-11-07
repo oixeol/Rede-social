@@ -17,6 +17,10 @@ export type Database = {
           password_hash: string;
           created_at: number;
           birth_date: string | null;
+          email: string | null;
+          gender: string | null;
+          country: string | null;
+          state: string | null;
           interests: string;
           message_policy: string;
           is_private: number;
@@ -36,6 +40,10 @@ export type Database = {
           password_hash: string;
           created_at: number;
           birth_date?: string | null;
+          email?: string | null;
+          gender?: string | null;
+          country?: string | null;
+          state?: string | null;
           interests?: string;
           message_policy?: string;
           is_private?: number;
@@ -55,6 +63,10 @@ export type Database = {
           password_hash: string;
           created_at: number;
           birth_date: string | null;
+          email: string | null;
+          gender: string | null;
+          country: string | null;
+          state: string | null;
           interests: string;
           message_policy: string;
           is_private: number;
@@ -782,6 +794,9 @@ export type Database = {
           subscription_status: string;
           subscription_ends_at: number | null;
           created_at: number;
+          gender: string | null;
+          country: string | null;
+          state: string | null;
         };
         Insert: never;
         Update: never;

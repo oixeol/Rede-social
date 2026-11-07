@@ -3,11 +3,15 @@
 import type { Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Heart, Home, MessageSquare, Settings, User, Users } from 'lucide-react';
+import { cn } from '@/lib/cn';
 
 import { AppSidebar } from '@/components/shell/app-sidebar';
 import { AppTopbar } from '@/components/shell/app-topbar';
-import { cn } from '@/lib/cn';
+import {
+  getPrimaryNavigation,
+  getSecondaryNavigation,
+  getMobileNavigation,
+} from '@/components/shell/navigation';
 import type { ThemePalette } from '@/lib/types';
 
 interface ShellUser {
@@ -31,43 +35,60 @@ interface AppShellProps {
 export default function AppShell({ children, me, dataPalette }: AppShellProps) {
   const pathname = usePathname();
 
-  const profileHref = `/perfil/${encodeURIComponent(me.user.username)}` as Route;
-
-  const mobileNavigation = [
-    { id: 'inicio', label: 'Início', href: '/inicio' as Route, icon: <Home className="size-5" /> },
-    { id: 'explorar', label: 'Explorar', href: '/explorar' as Route, icon: <Compass className="size-5" /> },
-    { id: 'mensagens', label: 'Mensagens', href: '/mensagens' as Route, icon: <MessageSquare className="size-5" /> },
-    { id: 'comunidades', label: 'Comunidades', href: '/comunidades' as Route, icon: <Users className="size-5" /> },
-    { id: 'favoritos', label: 'Favoritos', href: '/favoritos' as Route, icon: <Heart className="size-5" /> },
-    { id: 'perfil', label: 'Perfil', href: profileHref, icon: <User className="size-5" /> },
-    { id: 'configuracoes', label: 'Configurações', href: '/configuracoes' as Route, icon: <Settings className="size-5" /> },
-  ];
+  const primaryNav = getPrimaryNavigation(
+    { username: me.user.username, avatar: me.user.avatar, name: me.user.name },
+    me.unreadMessages,
+    me.unreadNotifications,
+  );
+  const secondaryNav = getSecondaryNavigation({ username: me.user.username });
+  const mobileNav = getMobileNavigation({
+    username: me.user.username,
+    avatar: me.user.avatar,
+    name: me.user.name,
+  });
 
   return (
     <div className="min-h-screen bg-background" data-palette={dataPalette}>
+      {/* Sidebar fixo desktop; icon rail tablet */}
       <AppSidebar
-        username={me.user.username}
-        unreadMessages={me.unreadMessages}
-        unreadNotifications={me.unreadNotifications}
+        primaryNavigation={primaryNav}
+        secondaryNavigation={secondaryNav}
+        user={me.user}
+        currentPath={pathname}
       />
 
-      <div className="min-w-0 xl:pl-[245px]">
-        <AppTopbar me={me} />
+      {/* Topbar responsiva */}
+      <AppTopbar me={me.user} currentPath={pathname} unreadNotifications={me.unreadNotifications} />
 
+      {/* Área de conteúdo */}
+      <div
+        className={cn(
+          'min-w-0 transition-all duration-200',
+          'md:pl-[72px] xl:pl-[248px]',
+        )}
+      >
         <main
           id="conteudo"
-          className="mx-auto w-full max-w-[1291px] px-4 pt-5 pb-24 sm:px-6 md:pb-10 xl:px-6"
+          className={cn(
+            'mx-auto w-full pb-24 md:pb-10',
+            pathname.startsWith('/perfil/')
+              ? 'max-w-[1288px] px-5 pt-4'
+              : 'max-w-[1291px] px-4 pt-5 sm:px-6 xl:px-6',
+          )}
         >
           {children}
         </main>
       </div>
 
+      {/* Bottom nav mobile */}
       <nav
-        className="fixed right-0 bottom-0 left-0 z-40 flex h-16 items-center justify-around border-t border-border bg-surface/95 px-1 backdrop-blur-md md:hidden"
+        className={cn(
+          'fixed right-0 bottom-0 left-0 z-40 flex h-16 items-center justify-around border-t border-border bg-surface/95 px-1 backdrop-blur-md md:hidden',
+        )}
         aria-label="Navegação inferior"
       >
-        {mobileNavigation.slice(0, 5).map((item) => {
-          const isActive = pathname.startsWith(item.href.split('/').slice(0, 2).join('/'));
+        {mobileNav.slice(0, 5).map((item) => {
+          const isActive = isNavigationItemActive(item, pathname);
           return (
             <Link
               key={item.id}
@@ -86,4 +107,13 @@ export default function AppShell({ children, me, dataPalette }: AppShellProps) {
       </nav>
     </div>
   );
+}
+
+/** Verifica se item de navegação corresponde à rota atual. */
+function isNavigationItemActive(item: { id: string; href: Route }, pathname: string): boolean {
+  if (item.id === 'perfil') {
+    // Perfil só ativo quando é o próprio perfil
+    return pathname === item.href;
+  }
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }

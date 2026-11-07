@@ -118,14 +118,14 @@
   --vibra-border: #E4E4E7;
   --vibra-border-strong: #D4D4D8;
 
-  --vibra-brand: #FF6A00;
-  --vibra-brand-hover: #FF4500;
+  --vibra-brand: #B45309;
+  --vibra-brand-hover: #92400E;
   --vibra-brand-fill: #FF6A00;
   --vibra-brand-fill-hover: #FF4500;
   --vibra-brand-soft: #FFEDD5;
   --vibra-on-brand: #0A0A0A;
 
-  --vibra-accent: #FF4500;
+  --vibra-accent: #92400E;
   --vibra-accent-soft: #FFEDD5;
 
   --vibra-success: #16A34A;
@@ -164,13 +164,13 @@
 }
 
 [data-theme="light"] [data-palette="orange"] {
-  --vibra-brand: #FF6A00;
-  --vibra-brand-hover: #FF4500;
+  --vibra-brand: #B45309;
+  --vibra-brand-hover: #92400E;
   --vibra-brand-fill: #FF6A00;
   --vibra-brand-fill-hover: #FF4500;
   --vibra-brand-soft: #FFEDD5;
   --vibra-on-brand: #0A0A0A;
-  --vibra-accent: #FF4500;
+  --vibra-accent: #92400E;
   --vibra-accent-soft: #FFEDD5;
 }
 
@@ -246,6 +246,17 @@ select {
   font: inherit;
 }
 
+select option {
+  background: #050505;
+  color: #ffffff;
+}
+
+/* Selects nativos: fundo preto e texto branco (não depende do tema). */
+.vibra-select-dark {
+  background-color: #050505;
+  color: #ffffff;
+}
+
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]) {
   cursor: pointer;
@@ -257,7 +268,7 @@ button:not(:disabled),
 }
 
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--vibra-brand-fill) 68%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--vibra-brand-fill) 68%, var(--vibra-foreground));
   outline-offset: 3px;
 }
 

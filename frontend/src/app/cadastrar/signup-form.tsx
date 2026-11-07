@@ -4,7 +4,7 @@ import { AlertCircle, LoaderCircle, Eye, EyeOff, ChevronDown } from 'lucide-reac
 import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
 import type { FormEvent, ChangeEvent } from 'react';
-import { useId, useRef, useState, useMemo } from 'react';
+import { useEffect, useId, useRef, useState, useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -20,6 +20,7 @@ interface SignupResponse {
 type FieldName =
   | 'firstName'
   | 'lastName'
+  | 'username'
   | 'email'
   | 'birthDate'
   | 'gender'
@@ -74,10 +75,8 @@ function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function generateUsername(firstName: string, lastName: string): string {
-  const base = (firstName + lastName).toLowerCase().replace(/[^a-z0-9]/g, '');
-  const random = Math.random().toString(36).substring(2, 6);
-  return base.substring(0, 20) + random;
+function validateUsername(username: string): boolean {
+  return /^[a-z0-9._]{3,24}$/.test(username);
 }
 
 export function SignupForm() {
@@ -87,6 +86,7 @@ export function SignupForm() {
   // Refs para foco
   const firstNameRef = useRef<HTMLInputElement>(null);
   const lastNameRef = useRef<HTMLInputElement>(null);
+  const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const birthDateRef = useRef<HTMLInputElement>(null);
   const genderRef = useRef<HTMLSelectElement>(null);
@@ -98,6 +98,7 @@ export function SignupForm() {
   // Estados do formulário
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState<GenderValue | ''>('');
@@ -111,6 +112,7 @@ export function SignupForm() {
   const [invalidField, setInvalidField] = useState<FieldName | null>(null);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const [submittingRef, setSubmittingRef] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<'idle'|'checking'|'available'|'unavailable'>('idle');
 
   // Estados/regiões derivados do país selecionado (sem efeito colateral)
   const states = useMemo<State[]>(
@@ -118,8 +120,34 @@ export function SignupForm() {
     [country]
   );
 
-  // Gerar username automático baseado no nome
-  const username = generateUsername(firstName, lastName);
+  useEffect(() => {
+    const normalized = username.trim().toLowerCase();
+    if (!validateUsername(normalized)) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setUsernameStatus('checking');
+      apiRequest<{ available: boolean }>(
+        `/api/username-available?username=${encodeURIComponent(normalized)}`,
+      )
+        .then((response) => {
+          if (cancelled) return;
+          setUsernameStatus(response.available ? 'available' : 'unavailable');
+          if (!response.available) {
+            setInvalidField('username');
+            setError('Esse nome de usuário já está em uso. Escolha outro.');
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setUsernameStatus('idle');
+        });
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [username]);
 
   function messageFromError(caught: unknown): string {
     if (caught instanceof ApiError) {
@@ -137,6 +165,8 @@ export function SignupForm() {
         return value.trim().length >= 1;
       case 'lastName':
         return value.trim().length >= 1;
+      case 'username':
+        return validateUsername(value.trim().toLowerCase());
       case 'email':
         return validateEmail(value);
       case 'birthDate': {
@@ -164,6 +194,8 @@ export function SignupForm() {
         return 'Informe seu primeiro nome.';
       case 'lastName':
         return 'Informe seu sobrenome.';
+      case 'username':
+        return 'Use de 3 a 24 caracteres: letras minúsculas, números, ponto ou underline.';
       case 'email':
         return 'Informe um e-mail válido.';
       case 'birthDate': {
@@ -236,6 +268,7 @@ export function SignupForm() {
     }[] = [
       { field: 'firstName', value: firstName, ref: firstNameRef },
       { field: 'lastName', value: lastName, ref: lastNameRef },
+      { field: 'username', value: username, ref: usernameRef },
       { field: 'email', value: email, ref: emailRef },
       { field: 'birthDate', value: birthDate, ref: birthDateRef },
       { field: 'gender', value: gender, ref: genderRef },
@@ -252,6 +285,13 @@ export function SignupForm() {
         ref.current?.focus();
         return;
       }
+    }
+
+    if (usernameStatus === 'unavailable') {
+      setInvalidField('username');
+      setError('Esse nome de usuário já está em uso. Escolha outro.');
+      usernameRef.current?.focus();
+      return;
     }
 
     // Verificar senhas conferem
@@ -271,7 +311,7 @@ export function SignupForm() {
       await apiRequest<SignupResponse>('/api/register', {
         method: 'POST',
         body: {
-          username,
+          username: username.trim().toLowerCase(),
           name: `${firstName.trim()} ${lastName.trim()}`,
           email: email.trim().toLowerCase(),
           birthDate,
@@ -297,7 +337,7 @@ export function SignupForm() {
   );
 
   const selectClass = cn(
-    'w-full h-11 rounded-xl border border-border bg-surface-raised px-4 text-sm outline-none transition-colors appearance-none',
+    'vibra-select-dark w-full h-11 rounded-xl border border-border px-4 text-sm outline-none transition-colors appearance-none [color-scheme:dark]',
     'focus:border-brand focus:ring-2 focus:ring-brand/20',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'bg-no-repeat bg-right pr-10',
@@ -357,6 +397,76 @@ export function SignupForm() {
                 className={invalidField === 'lastName' ? fieldErrorClass : inputClass}
               />
             </div>
+          </div>
+
+          {/* Nome de usuário */}
+          <div className="space-y-1.5">
+            <label htmlFor="username" className={labelClass}>
+              Nome de usuário <span className="text-danger" aria-hidden="true">*</span>
+            </label>
+            <div className="relative">
+              <span
+                className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-sm text-subtle"
+                aria-hidden="true"
+              >
+                @
+              </span>
+              <input
+                id="username"
+                ref={usernameRef}
+                type="text"
+                name="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={username}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  const next = e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, '');
+                  setUsername(next);
+                  setUsernameStatus('idle');
+                }}
+                onBlur={(e) => handleBlur('username', e.target.value)}
+                placeholder="joao.silva"
+                required
+                disabled={pending}
+                aria-invalid={invalidField === 'username' || usernameStatus === 'unavailable'}
+                aria-describedby={cn(
+                  (usernameStatus === 'checking' || usernameStatus === 'available' || usernameStatus === 'unavailable') ? 'username-status' : undefined,
+                  error && (invalidField === 'username' || usernameStatus === 'unavailable') ? 'form-error' : undefined
+                )}
+                className={cn(
+                  'pl-9',
+                  invalidField === 'username' || usernameStatus === 'unavailable'
+                    ? fieldErrorClass
+                    : inputClass
+                )}
+              />
+              {usernameStatus === 'checking' ? (
+                <span
+                  className="absolute inset-y-0 right-4 flex items-center text-xs text-muted"
+                  id="username-status"
+                >
+                  verificando…
+                </span>
+              ) : usernameStatus === 'available' ? (
+                <span
+                  className="absolute inset-y-0 right-4 flex items-center text-xs text-success"
+                  id="username-status"
+                >
+                  disponível ✓
+                </span>
+              ) : usernameStatus === 'unavailable' ? (
+                <span
+                  className="absolute inset-y-0 right-4 flex items-center text-xs text-danger"
+                  id="username-status"
+                >
+                  já está em uso
+                </span>
+              ) : null}
+            </div>
+            <p className="text-xs text-muted">
+              3–24 caracteres. Apenas letras minúsculas, números, ponto e underline.
+            </p>
           </div>
 
           {/* E-mail */}
@@ -423,9 +533,9 @@ export function SignupForm() {
               aria-describedby={error && invalidField === 'gender' ? 'form-error' : undefined}
               className={cn(selectClass, invalidField === 'gender' && 'border-danger focus:border-danger focus:ring-danger/20')}
             >
-              <option value="">Selecione</option>
+              <option value="" className="bg-[#050505] text-white">Selecione</option>
               {GENDER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
+                <option key={option.value} value={option.value} className="bg-[#050505] text-white">
                   {option.label}
                 </option>
               ))}
@@ -454,9 +564,9 @@ export function SignupForm() {
                 aria-describedby={error && invalidField === 'country' ? 'form-error' : undefined}
                 className={cn(selectClass, invalidField === 'country' && 'border-danger focus:border-danger focus:ring-danger/20')}
               >
-                <option value="">Selecione seu país</option>
+                <option value="" className="bg-[#050505] text-white">Selecione seu país</option>
                 {countriesList.map((c) => (
-                  <option key={c.code} value={c.code}>
+                  <option key={c.code} value={c.code} className="bg-[#050505] text-white">
                     {c.name}
                   </option>
                 ))}
@@ -484,9 +594,9 @@ export function SignupForm() {
                   states.length === 0 && 'opacity-50 cursor-not-allowed'
                 )}
               >
-                <option value="">Selecione o país primeiro</option>
+                <option value="" className="bg-[#050505] text-white">Selecione o país primeiro</option>
                 {states.map((s) => (
-                  <option key={s.code} value={s.code}>
+                  <option key={s.code} value={s.code} className="bg-[#050505] text-white">
                     {s.name}
                   </option>
                 ))}

@@ -117,7 +117,7 @@ export function DropdownMenu({
             setOpen(true);
           }
         }}
-        className="inline-flex size-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
+        className="inline-flex size-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
       >
         {trigger ?? <MoreHorizontal aria-hidden="true" className="size-5" />}
       </button>
