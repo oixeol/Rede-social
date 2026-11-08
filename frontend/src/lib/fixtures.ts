@@ -29,6 +29,8 @@ export function createFixtureProfile(): ProfileResponse {
       banner: null,
       interests: [],
       isPrivate: false,
+      country: null,
+      state: null,
       messagePolicy: 'everyone',
       createdAt: Date.UTC(2026, 0, 1),
     },

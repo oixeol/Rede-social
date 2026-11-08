@@ -64,18 +64,18 @@ export function getPrimaryNavigation(
   return items;
 }
 
-/** Navegação secundária (perfil, configurações, etc.). */
+/** Navegação secundária (configurações, perfil, etc.). */
 export function getSecondaryNavigation(
   me: { username: string },
 ): NavigationItem[] {
   return [
+    { id: 'configuracoes', label: 'Configurações', href: '/configuracoes', icon: <Settings className="size-5" /> },
     {
       id: 'perfil',
       label: 'Perfil',
       href: `/perfil/${encodeURIComponent(me.username)}` as Route,
       icon: <User className="size-5" />,
     },
-    { id: 'configuracoes', label: 'Configurações', href: '/configuracoes', icon: <Settings className="size-5" /> },
   ];
 }
 

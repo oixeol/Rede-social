@@ -71,24 +71,24 @@ export function ProfileBanner({ profile }: ProfileHeaderProps) {
 
 export function ProfileIdentity({ profile }: ProfileHeaderProps) {
   return (
-    <div className="relative shrink-0">
-      <span className="block size-[166px] rounded-full border-[3px] border-brand bg-surface-raised shadow-[0_0_0_3px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.15)]">
+    <div className="relative w-fit shrink-0">
+      <span className="block size-[112px] rounded-full border-[3px] border-brand bg-surface-raised shadow-[0_0_0_4px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.18),0_0_28px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.35)] sm:size-[150px]">
         {isSafeMediaSource(profile.avatar) ? (
           <Image
             src={profile.avatar}
             alt={profile.avatarAlt}
-            width={160}
-            height={160}
+            width={144}
+            height={144}
             loading="eager"
             fetchPriority="high"
             unoptimized
-            className="size-[160px] rounded-full object-cover"
+            className="size-[106px] rounded-full object-cover sm:size-[144px]"
           />
         ) : (
           <span
             role="img"
             aria-label={profile.avatarAlt}
-            className="flex size-[160px] items-center justify-center rounded-full bg-gradient-to-br from-brand-fill to-accent text-3xl font-bold text-on-brand"
+            className="flex size-[106px] items-center justify-center rounded-full bg-gradient-to-br from-brand-fill to-accent text-3xl font-bold text-on-brand sm:size-[144px]"
           >
             {profile.name
               .trim()
@@ -100,6 +100,11 @@ export function ProfileIdentity({ profile }: ProfileHeaderProps) {
           </span>
         )}
       </span>
+
+      <span
+        aria-hidden="true"
+        className="absolute right-0 bottom-1 size-[17px] rounded-full border-2 border-[var(--vibra-background)] bg-[#18D73C]"
+      />
     </div>
   );
 }
@@ -207,18 +212,18 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
           type="button"
           onClick={handleFollow}
           disabled={followState.followRequested}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-xs font-semibold text-white transition-colors hover:bg-[var(--vibra-brand-fill-hover)] disabled:cursor-not-allowed disabled:opacity-50"
           data-following={followState.isFollowing}
           data-requested={followState.followRequested}
         >
           {followState.followRequested ? (
             <>
-              <Heart aria-hidden="true" className="size-4 fill-brand text-brand" />
+              <Heart aria-hidden="true" className="size-4 fill-white text-white" />
               Solicitado
             </>
           ) : followState.isFollowing ? (
             <>
-              <Heart aria-hidden="true" className="size-4 fill-muted text-muted" />
+              <Heart aria-hidden="true" className="size-4 fill-white text-white" />
               Seguindo
             </>
           ) : (
@@ -231,7 +236,7 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
       ) : (
         <Link
           href={'/configuracoes' as Route}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-foreground transition-colors hover:bg-surface-subtle"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 text-xs font-semibold text-foreground transition-colors hover:bg-surface-subtle"
         >
           <Pencil aria-hidden="true" className="size-4" />
           Editar perfil
@@ -241,10 +246,10 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
       <button
         type="button"
         onClick={handleShareProfile}
-        className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-foreground transition-colors hover:bg-surface-subtle"
+        aria-label="Compartilhar perfil"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-foreground transition-colors hover:bg-surface-subtle"
       >
         <Share2 aria-hidden="true" className="size-4" />
-        Compartilhar
       </button>
 
       <DropdownMenu
@@ -258,26 +263,6 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
         {statusMessage}
       </p>
     </div>
-  );
-}
-
-export function ProfileStats({ profile, followersOverride }: { profile: ProfileViewModel; followersOverride?: number }) {
-  const followers = followersOverride ?? profile.stats.followers;
-  const items = [
-    { value: profile.stats.posts, label: 'publicações' },
-    { value: followers, label: 'seguidores' },
-    { value: profile.stats.following, label: 'seguindo' },
-  ];
-
-  return (
-    <dl className="flex flex-wrap items-start gap-x-8 gap-y-1" aria-label="Estatísticas do perfil">
-      {items.map((item) => (
-        <div key={item.label} className="flex min-w-0 flex-col items-start">
-          <dd className="text-[20px] leading-[26px] font-bold text-foreground">{item.value}</dd>
-          <dt className="text-[13px] leading-[18px] text-muted">{item.label}</dt>
-        </div>
-      ))}
-    </dl>
   );
 }
 
@@ -297,7 +282,7 @@ interface ProfileTabsProps {
 
 const PROFILE_TABS = [
   { id: 'posts', label: 'Publicações', icon: TAB_ICONS.posts },
-  { id: 'reels', label: 'Reels', icon: TAB_ICONS.reels },
+  { id: 'reels', label: 'Instantes', icon: TAB_ICONS.reels },
   { id: 'photos', label: 'Fotos', icon: TAB_ICONS.photos },
   { id: 'likes', label: 'Curtidas', icon: TAB_ICONS.likes },
 ] as const;
@@ -351,7 +336,7 @@ export function ProfileTabs({ active, onChange, profile, reelsEnabled }: Profile
       role="tablist"
       aria-label="Conteúdo do perfil"
       aria-orientation="horizontal"
-      className="inline-flex items-center gap-1 rounded-pill border border-border bg-surface p-1"
+      className="flex w-full items-center gap-1 rounded-2xl border border-border bg-surface p-1 lg:gap-[72px]"
       ref={listRef}
     >
       {filteredTabs.map((tab, index) => {
@@ -370,18 +355,21 @@ export function ProfileTabs({ active, onChange, profile, reelsEnabled }: Profile
             onClick={() => onChange(tab.id)}
             onKeyDown={(e) => handleKeyDown(e, index)}
             className={cn(
-              'relative flex min-h-11 items-center justify-center gap-2 rounded-pill px-3 text-[12px] font-semibold transition-colors',
+              'relative flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 text-[13px] font-semibold transition-colors lg:flex-none',
               isActive
-                ? 'bg-surface-raised text-foreground shadow-sm'
+                ? 'bg-surface-raised text-foreground'
                 : 'text-muted hover:bg-surface-subtle hover:text-foreground',
             )}
           >
-            <span aria-hidden="true" className={isActive ? 'text-brand' : undefined}>
+            <span aria-hidden="true" className="shrink-0">
               {tab.icon}
             </span>
-            <span className="truncate">{tab.label}</span>
+            <span className="hidden truncate sm:inline">{tab.label}</span>
             {isActive && (
-              <span aria-hidden="true" className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-brand" />
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full bg-brand"
+              />
             )}
           </button>
         );
@@ -542,7 +530,7 @@ export function VerifiedBadge({ className }: { className?: string }) {
   return (
     <BadgeCheck
       aria-label="Verificado"
-      className={cn('fill-brand text-surface', className)}
+      className={cn('fill-[#4A92E6] text-white', className)}
       strokeWidth={2.2}
     />
   );

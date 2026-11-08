@@ -18,7 +18,6 @@ minha-rede-social/
 │   ├── .dockerignore
 │   ├── package.json
 │   ├── next.config.ts
-│   ├── scripts/             # Gerador de placeholders de imagem
 │   ├── src/
 │   │   ├── app/             # Rotas (App Router) + globals.css (tokens)
 │   │   ├── components/
@@ -26,10 +25,10 @@ minha-rede-social/
 │   │   │   ├── profile/     # Tela de PERFIL (coluna central + lateral)
 │   │   │   ├── shell/       # Sidebar, topbar, logo
 │   │   │   └── ui/          # Componentes base
-│   │   ├── lib/             # API, Supabase (browser/server), mocks tipados
+│   │   ├── lib/             # API, Supabase (browser/server), view models, flags
 │   │   └── types/           # Tipos do schema Supabase
+│   ├── tests/               # Testes unitários do frontend (node:test)
 │   └── public/
-│       ├── images/          # Placeholders do perfil (banner, avatar, posts)
 │       └── theme-init.js
 │
 ├── backend/                 # Gateway FastAPI
@@ -72,7 +71,7 @@ minha-rede-social/
 | Componente | Estado | Observações |
 | --- | --- | --- |
 | Frontend Next.js (porta 3000) | **Funcional** | App Router + React 19 + TypeScript + Tailwind v4, rewrites `/api/*` → backend |
-| Tela de PERFIL | **Funcional** | Shell novo (sidebar + topbar) + 3 colunas; `/perfil/vibra` usa mock tipado, demais usernames usam a API |
+| Tela de PERFIL | **Funcional** | Layout responsivo de 3 colunas (sidebar + centro + direita) alimentado por dados reais de `/api/users/:username`; `getSuggestions()` real; 404 próprio; abas com ARIA e navegação por teclado |
 | Backend FastAPI (porta 8000) | **Funcional** | Gateway que repassa `/api/*` e `/uploads/*` para a API Node |
 | API Node.js (porta 4173) | **Funcional** | Servidor HTTP + SQLite + seed opcional (fonte de verdade da API) |
 | PostgreSQL 18.6 (porta 5432) | **Pronto** | Container com healthcheck e volume `vibra_postgres_data` |
@@ -114,7 +113,7 @@ Para limpar completamente (apaga dados persistidos):
 docker compose down -v
 ```
 
-> **Importante:** o frontend usa variáveis de ambiente `NEXT_PUBLIC_*` e `VIBRA_API_ORIGIN` (lidas em tempo de execução pelo `next dev`). O backend FastAPI lê `NODE_API_URL=http://node-api:4173` e as credenciais Supabase do `.env`.
+> **Importante:** o frontend usa variáveis de ambiente `NEXT_PUBLIC_*`, `VIBRA_API_ORIGIN` e `VIBRA_PUBLIC_ORIGIN` (lidas em tempo de execução pelo `next dev`). O backend FastAPI lê `NODE_API_URL=http://node-api:4173` e as credenciais Supabase do `.env`.
 
 ---
 
@@ -174,6 +173,14 @@ O gateway FastAPI (`main.py`) serve a API encaminhando para a API Node. Não há
 | `SUPABASE_SECRET_KEY` | — | Service role key — **somente backend**, nunca no navegador |
 | `DATABASE_URL` | — | Conexão Postgres direta (migração) |
 | `VIBRA_API_ORIGIN` | `http://backend:8000` | Origem da API para rewrites Next.js |
+| `VIBRA_PUBLIC_ORIGIN` | (vazio) | Origem pública canônica do frontend; usada pelo QR de login. Em produção configure a URL real (sem caminho) |
+| `NEXT_PUBLIC_VIBRA_FEATURE_PREMIUM` | ativo | `0` desliga o item Premium na interface |
+| `NEXT_PUBLIC_VIBRA_FEATURE_COMMUNITIES` | ativo | `0` desliga Comunidades na interface |
+| `NEXT_PUBLIC_VIBRA_FEATURE_REELS` | ativo | `0` desliga a aba Reels |
+| `NEXT_PUBLIC_VIBRA_FEATURE_HIGHLIGHTS` | ativo | `0` desliga Destaques |
+| `NEXT_PUBLIC_VIBRA_FEATURE_SUGGESTIONS` | ativo | `0` desliga Sugestões |
+| `NEXT_PUBLIC_VIBRA_FEATURE_NOTIFICATIONS` | ativo | `0` desliga Notificações |
+| `VIBRA_FIXTURES` | (vazio) | `1` libera fixtures sintéticas **somente** com `NODE_ENV=development`; em produção o valor é ignorado |
 | `NODE_API_URL` | `http://node-api:4173` | Upstream da API Node (backend gateway) |
 | `VIBRA_DATA_DIR` | `./data` | Diretório do SQLite + uploads (Node) |
 | `VIBRA_SEED_DEMO` | `0` | `1` habilita seed de demonstração (proibido em produção) |
@@ -230,6 +237,18 @@ As capturas de tela em `backend/node-api/qa/` são geradas com Chromium headless
 cd C:\Rede-social\backend\node-api
 powershell -NoProfile -ExecutionPolicy Bypass -File qa/shot.ps1 -Out qa/tela.png -Width 1400 -Height 1000
 ```
+
+### Testes do frontend
+
+```powershell
+cd C:\Rede-social\frontend
+npm run lint       # ESLint
+npm run typecheck  # tsc --noEmit
+npm test           # node:test (fixtures, origem pública, QR)
+npm run build      # build de produção
+```
+
+Cobertura atual: regras de fixture (ausentes em produção), resolução segura de `VIBRA_PUBLIC_ORIGIN` e geração do QR em SVG inline sem `dangerouslySetInnerHTML`.
 
 ---
 

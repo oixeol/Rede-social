@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Diamond, LogOut } from 'lucide-react';
 
-import { Avatar } from '@/components/ui/avatar';
 import { VibraLogo } from '@/components/shell/vibra-logo';
 import { Waves } from '@/components/ui/waves';
 import type { NavigationItem } from '@/components/shell/navigation';
 import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { isFeatureEnabled } from '@/lib/feature-flags';
+import { Avatar } from '@/components/ui/avatar';
+import { isSafeMediaSource } from '@/lib/media';
 
 interface SidebarUser {
   id: number;
@@ -23,15 +24,24 @@ interface SidebarUser {
 interface AppSidebarProps {
   primaryNavigation: NavigationItem[];
   secondaryNavigation: NavigationItem[];
-  user: SidebarUser;
   currentPath: string;
+  /** Sidebar expandida: empurra o conteúdo em vez de sobrepor. */
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+  user: SidebarUser;
 }
 
+/**
+ * Barra lateral em formato rail: ícones centralizados em 72px que expandem
+ * para 248px ao passar o mouse ou ganhar foco por teclado.
+ */
 export function AppSidebar({
   primaryNavigation,
   secondaryNavigation,
-  user,
   currentPath,
+  expanded,
+  onExpandedChange,
+  user,
 }: AppSidebarProps) {
   const router = useRouter();
 
@@ -44,36 +54,71 @@ export function AppSidebar({
     router.push('/entrar' as Route);
   }
 
+  function handleFocusCapture(event: React.FocusEvent<HTMLElement>) {
+    onExpandedChange(true);
+    void event;
+  }
+
+  function handleBlurCapture(event: React.FocusEvent<HTMLElement>) {
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+    onExpandedChange(false);
+  }
+
   return (
     <aside
-      className="fixed inset-y-0 left-0 z-40 hidden w-[72px] border-r border-border bg-surface md:block xl:w-[248px]"
+      className={cn(
+        'group fixed inset-y-0 left-0 z-40 hidden overflow-hidden bg-background shadow-float transition-[width] duration-200 motion-reduce:transition-none md:block',
+        expanded ? 'w-[248px]' : 'w-[72px]',
+      )}
       aria-label="Navegação principal"
+      onPointerEnter={() => onExpandedChange(true)}
+      onPointerLeave={() => onExpandedChange(false)}
+      onFocusCapture={handleFocusCapture}
+      onBlurCapture={handleBlurCapture}
     >
-      <div className="flex h-full flex-col overflow-y-auto">
-        <div className="flex h-[72px] shrink-0 items-center px-3 xl:px-4">
+      <div className="flex h-full w-[248px] flex-col overflow-y-auto overflow-x-hidden">
+        <div
+          className={cn(
+            'flex h-[72px] shrink-0 items-center',
+            expanded ? 'px-3' : 'w-[72px] justify-center',
+          )}
+        >
           <Link
             href="/inicio"
             aria-label="Vibra — página inicial"
-            className="flex min-h-11 items-center xl:px-1"
+            className="flex min-h-11 items-center"
           >
-            <VibraLogo compact className="xl:hidden" />
-            <VibraLogo className="hidden xl:inline-flex" />
+            <VibraLogo compact />
           </Link>
+          <span
+            className={cn(
+              'ml-1 max-w-0 overflow-hidden whitespace-nowrap text-[22px] font-bold tracking-[-0.02em] text-foreground opacity-0 transition-all duration-200',
+              expanded && 'ml-2 max-w-[140px] opacity-100',
+            )}
+          >
+            Vibra.
+          </span>
         </div>
 
-        <nav className="flex-1 px-2 pb-5 xl:px-4" aria-label="Menu principal">
+        <nav
+          className={cn(
+            'flex flex-1 flex-col justify-center',
+            expanded ? 'px-2 pb-5' : 'px-0 pb-[68px]',
+          )}
+          aria-label="Menu principal"
+        >
           <ul className="space-y-1" role="list">
             {primaryNavigation.map((item) => (
               <li key={item.id}>
                 <SidebarLinkItem
                   item={item}
                   active={isNavigationItemActive(item, currentPath)}
+                  expanded={expanded}
                 />
               </li>
             ))}
           </ul>
-
-          <div aria-hidden="true" className="my-4 h-px w-full bg-border" />
 
           <ul className="space-y-1" role="list">
             {secondaryNavigation.map((item) => (
@@ -81,6 +126,7 @@ export function AppSidebar({
                 <SidebarLinkItem
                   item={item}
                   active={isNavigationItemActive(item, currentPath)}
+                  expanded={expanded}
                   user={user}
                 />
               </li>
@@ -89,23 +135,36 @@ export function AppSidebar({
               <button
                 type="button"
                 onClick={() => void handleLogout()}
+                aria-label="Sair"
                 className={cn(
-                  'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-muted transition-colors hover:bg-surface-subtle hover:text-foreground',
-                  'justify-center xl:justify-start',
+                  'flex min-h-11 items-center gap-3 rounded-xl text-left text-sm font-medium text-muted transition-colors hover:bg-surface-subtle hover:text-foreground',
+                  expanded ? 'w-full px-3' : 'w-[72px] justify-center px-0',
                 )}
               >
                 <span aria-hidden="true" className="shrink-0">
                   <LogOut className="size-5" />
                 </span>
-                <span className="hidden min-w-0 flex-1 truncate xl:inline">Sair</span>
-                <span className="sr-only xl:hidden">Sair</span>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'whitespace-nowrap transition-all duration-200',
+                    expanded ? 'max-w-[160px] opacity-100' : 'hidden',
+                  )}
+                >
+                  Sair
+                </span>
               </button>
             </li>
           </ul>
         </nav>
 
         {isFeatureEnabled('premium') ? (
-          <div className="hidden shrink-0 px-3 pb-5 xl:block">
+          <div
+            className={cn(
+              'max-h-0 shrink-0 overflow-hidden px-3 opacity-0 transition-all duration-200',
+              expanded && 'max-h-[220px] pb-5 opacity-100',
+            )}
+          >
             <div className="relative overflow-hidden rounded-2xl border border-border bg-surface-raised p-4">
               <Waves className="-right-6 -bottom-4 h-[110px] w-[230px]" opacity={0.5} />
 
@@ -128,6 +187,7 @@ export function AppSidebar({
             </div>
           </div>
         ) : null}
+
       </div>
     </aside>
   );
@@ -136,13 +196,16 @@ export function AppSidebar({
 function SidebarLinkItem({
   item,
   active,
+  expanded,
   user,
 }: {
   item: NavigationItem;
   active: boolean;
+  expanded: boolean;
   user?: SidebarUser;
 }) {
-  const isProfile = item.id === 'perfil';
+  const isPerfil = item.id === 'perfil';
+  const showAvatar = isPerfil && user?.avatar && isSafeMediaSource(user.avatar);
 
   return (
     <Link
@@ -150,37 +213,51 @@ function SidebarLinkItem({
       aria-current={active ? 'page' : undefined}
       title={item.label}
       className={cn(
-        'group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-left text-sm transition-colors',
-        'justify-center xl:justify-start',
+        'group/item relative flex min-h-11 items-center rounded-xl text-left text-sm transition-colors',
+        expanded ? 'w-full gap-3 px-3' : 'w-[72px] justify-center gap-0 px-0',
         active
-          ? 'border border-[var(--vibra-nav-active-border)] bg-[var(--vibra-nav-active-bg)] font-semibold text-[var(--vibra-nav-active-text)]'
+          ? 'font-semibold text-foreground'
           : 'font-medium text-muted hover:bg-surface-subtle hover:text-foreground',
       )}
     >
-      {isProfile && user ? (
-        <Avatar
-          src={user.avatar}
-          alt={`Foto de perfil de ${user.name}`}
-          name={user.name}
-          size="sm"
-          className="shrink-0"
-          eager
-        />
-      ) : (
-        <span aria-hidden="true" className="relative shrink-0">
-          {item.icon}
-          {item.badge ? (
-            <span className="absolute -top-1 -right-1 size-2 rounded-full bg-danger xl:hidden" />
-          ) : null}
-        </span>
-      )}
+      <span aria-hidden="true" className="relative shrink-0">
+        {showAvatar ? (
+          <Avatar
+            src={user!.avatar}
+            alt={user!.name}
+            name={user!.name}
+            size="sm"
+            className="rounded-full"
+          />
+        ) : (
+          item.icon
+        )}
+        {item.badge ? (
+          <span
+            className={cn(
+              'absolute -top-1 -right-1 size-2 rounded-full bg-danger',
+              expanded && 'hidden',
+            )}
+          />
+        ) : null}
+      </span>
 
-      <span className="hidden min-w-0 flex-1 truncate xl:inline">{item.label}</span>
+      <span
+        className={cn(
+          'max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200',
+          expanded && 'max-w-[160px] opacity-100',
+        )}
+      >
+        {item.label}
+      </span>
 
       {item.badge ? (
         <span
           aria-hidden="true"
-          className="hidden min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold leading-4 text-on-brand xl:inline-flex"
+          className={cn(
+            'hidden min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold leading-4 text-on-brand',
+            expanded && 'inline-flex',
+          )}
         >
           {item.badge > 9 ? '9+' : item.badge}
         </span>

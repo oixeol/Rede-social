@@ -17,7 +17,7 @@ export default function Loading() {
           {/* Avatar + identidade */}
           <div className="relative -mt-[43px] flex items-start gap-5">
             <Skeleton
-              className="size-[166px] shrink-0 rounded-full border-[3px] border-brand"
+              className="size-[150px] shrink-0 rounded-full border-[3px] border-brand"
               label="Foto de perfil"
             />
 
@@ -54,7 +54,7 @@ export default function Loading() {
           {/* Abas */}
           <div className="mt-4" aria-label="Carregando abas do perfil">
             <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1">
-              {['Publicações', 'Reels', 'Fotos', 'Curtidas'].map((label) => (
+              {['Publicações', 'Instantes', 'Fotos', 'Curtidas'].map((label) => (
                 <Skeleton
                   key={label}
                   className="h-11 flex-1 rounded-lg"

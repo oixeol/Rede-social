@@ -3,6 +3,7 @@
 import type { Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import { cn } from '@/lib/cn';
 
 import { AppSidebar } from '@/components/shell/app-sidebar';
@@ -34,6 +35,7 @@ interface AppShellProps {
 
 export default function AppShell({ children, me, dataPalette }: AppShellProps) {
   const pathname = usePathname();
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   const primaryNav = getPrimaryNavigation(
     { username: me.user.username, avatar: me.user.avatar, name: me.user.name },
@@ -53,18 +55,20 @@ export default function AppShell({ children, me, dataPalette }: AppShellProps) {
       <AppSidebar
         primaryNavigation={primaryNav}
         secondaryNavigation={secondaryNav}
-        user={me.user}
         currentPath={pathname}
+        expanded={sidebarExpanded}
+        onExpandedChange={setSidebarExpanded}
+        user={me.user}
       />
 
       {/* Topbar responsiva */}
-      <AppTopbar me={me.user} currentPath={pathname} unreadNotifications={me.unreadNotifications} />
+      <AppTopbar currentPath={pathname} sidebarExpanded={sidebarExpanded} />
 
       {/* Área de conteúdo */}
       <div
         className={cn(
-          'min-w-0 transition-all duration-200',
-          'md:pl-[72px] xl:pl-[248px]',
+          'min-w-0 transition-[padding] duration-200 motion-reduce:transition-none',
+          sidebarExpanded ? 'md:pl-[248px]' : 'md:pl-[72px]',
         )}
       >
         <main

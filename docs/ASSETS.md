@@ -14,6 +14,6 @@ Perfil nunca reutiliza arte, nomes ou números da Imagem B. Dados de usuário v�
 
 Placeholders são código do próprio projeto. Não usam imagens de terceiros nem assets extraídos da referência.
 
-## Assets públicos legados
+## Assets públicos legados (removidos)
 
-`frontend/public/images/` contém arquivos históricos usados apenas por fluxos legados fora do perfil real. Novos componentes de perfil não importam esses arquivos. Remoção pode acontecer em tarefa separada, após confirmar consumidores.
+Os placeholders históricos em `frontend/public/images/` e o gerador `frontend/scripts/generate-placeholders.mjs` foram removidos. O perfil real usa placeholders próprios implementados em código (`components/ui/avatar.tsx` para avatar ausente, `ProfileBanner` para banner ausente, cartão textual para miniatura sem mídia). Nenhum componente importa os assets legados.

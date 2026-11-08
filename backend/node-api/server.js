@@ -2453,6 +2453,30 @@ async function handleApi(req, res, pathname, url) {
     });
   }
 
+  const removeFollowerMatch = matchRoute(pathname, '/api/users/:username/followers/:follower');
+  if (method === 'DELETE' && removeFollowerMatch) {
+    rateLimit(req, 'follow', 120, 60 * 1000);
+    const target = db.prepare('SELECT * FROM users WHERE username = ?').get(removeFollowerMatch.username);
+    if (!target) throw new HttpError(404, 'Perfil não encontrado.');
+    /* Remover seguidor é uma ação do dono do perfil: nobody else can edit it. */
+    if (target.id !== me.id) throw new HttpError(403, 'Só é possível remover seguidores do próprio perfil.');
+    const follower = db.prepare('SELECT * FROM users WHERE username = ?').get(removeFollowerMatch.follower);
+    if (!follower) throw new HttpError(404, 'Usuário não encontrado.');
+    const removed = db
+      .prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?')
+      .run(follower.id, target.id);
+    if (removed.changes > 0) {
+      db.prepare('DELETE FROM follow_requests WHERE requester_id = ? AND target_id = ?').run(
+        follower.id,
+        target.id
+      );
+    }
+    return json(res, 200, {
+      removed: removed.changes > 0,
+      stats: statsFor(target.id),
+    });
+  }
+
   const followingMatch = matchRoute(pathname, '/api/users/:username/following');
   if (method === 'GET' && followingMatch) {
     const target = db.prepare('SELECT * FROM users WHERE username = ?').get(followingMatch.username);
@@ -2483,6 +2507,24 @@ async function handleApi(req, res, pathname, url) {
         isCloseFriend: isCloseFriend(me.id, row.id),
         isMe: row.id === me.id,
       })),
+    });
+  }
+
+  const removeFollowingMatch = matchRoute(pathname, '/api/users/:username/following/:following');
+  if (method === 'DELETE' && removeFollowingMatch) {
+    rateLimit(req, 'follow', 120, 60 * 1000);
+    const target = db.prepare('SELECT * FROM users WHERE username = ?').get(removeFollowingMatch.username);
+    if (!target) throw new HttpError(404, 'Perfil não encontrado.');
+    /* Unfollow só vale para a própria conta: é quem está na lista "Seguindo". */
+    if (target.id !== me.id) throw new HttpError(403, 'Só é possível remover pessoas da sua lista de seguindo.');
+    const followed = db.prepare('SELECT * FROM users WHERE username = ?').get(removeFollowingMatch.following);
+    if (!followed) throw new HttpError(404, 'Usuário não encontrado.');
+    const removed = db
+      .prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?')
+      .run(target.id, followed.id);
+    return json(res, 200, {
+      removed: removed.changes > 0,
+      stats: statsFor(target.id),
     });
   }
 

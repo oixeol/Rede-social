@@ -3,39 +3,32 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
-import Link from 'next/link';
-import { Bell, Search } from 'lucide-react';
 
 import { Avatar } from '@/components/ui/avatar';
 import { SearchField } from '@/components/ui/search-field';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { isFeatureEnabled } from '@/lib/feature-flags';
 import type { SearchResponse } from '@/lib/types';
 
-interface TopbarUser {
-  id: number;
-  username: string;
-  name: string;
-  avatar: string | null;
-}
-
 interface AppTopbarProps {
-  me: TopbarUser;
   currentPath: string;
-  unreadNotifications: number;
+  /** Sidebar expandida: o topbar acompanha o mesmo deslocamento do conteúdo. */
+  sidebarExpanded?: boolean;
 }
 
-export function AppTopbar({ me, currentPath, unreadNotifications }: AppTopbarProps) {
+/** Topbar enxuto: apenas o campo de busca. */
+export function AppTopbar({ currentPath, sidebarExpanded = false }: AppTopbarProps) {
   const router = useRouter();
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const isProfilePage = currentPath.startsWith('/perfil/');
-  const profileHref = `/perfil/${encodeURIComponent(me.username)}` as Route;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur-md">
-      <div className="md:pl-[72px] xl:pl-[248px]">
+    <header className="relative z-30 bg-transparent">
+      <div
+        className={cn(
+          'transition-[padding] duration-200 motion-reduce:transition-none',
+          sidebarExpanded ? 'md:pl-[248px]' : 'md:pl-[72px]',
+        )}
+      >
         <div
           className={cn(
             'mx-auto grid h-16 w-full max-w-[1288px] items-center gap-3 px-4 sm:px-5',
@@ -44,78 +37,15 @@ export function AppTopbar({ me, currentPath, unreadNotifications }: AppTopbarPro
               : 'grid-cols-[minmax(0,1fr)_auto]',
           )}
         >
-          <div className="hidden min-w-0 md:block">
+          <div className="min-w-0">
             <TopbarSearch
               onNavigate={(username) => {
                 router.push(`/perfil/${encodeURIComponent(username)}` as Route);
               }}
             />
           </div>
-
-          <div className="flex items-center justify-end gap-1 sm:gap-2">
-            <button
-              type="button"
-              aria-label="Abrir busca"
-              aria-expanded={mobileSearchOpen}
-              aria-controls={mobileSearchOpen ? 'busca-mobile' : undefined}
-              onClick={() => setMobileSearchOpen((value) => !value)}
-              className="inline-flex size-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-subtle hover:text-foreground md:hidden"
-            >
-              <Search aria-hidden="true" className="size-5" />
-            </button>
-
-            <ThemeToggle />
-
-            {isFeatureEnabled('notifications') ? (
-              <Link
-                href="/notificacoes"
-                aria-label={
-                  unreadNotifications > 0
-                    ? `Notificações, ${unreadNotifications} não lidas`
-                    : 'Notificações'
-                }
-                className="relative inline-flex size-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
-              >
-                <Bell aria-hidden="true" className="size-5" />
-                {unreadNotifications > 0 ? (
-                  <>
-                    <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-danger" />
-                    <span className="sr-only">{unreadNotifications} não lidas</span>
-                  </>
-                ) : null}
-              </Link>
-            ) : null}
-
-            <Link
-              href={profileHref}
-              aria-label={`Abrir perfil de ${me.name}`}
-              className="ml-1 inline-flex size-11 items-center justify-center rounded-full"
-            >
-              <Avatar
-                src={me.avatar}
-                alt={`Foto de perfil de ${me.name}`}
-                name={me.name}
-                size="sm"
-                eager
-              />
-            </Link>
-          </div>
         </div>
       </div>
-
-      {mobileSearchOpen ? (
-        <div
-          id="busca-mobile"
-          className="absolute inset-x-0 top-full border-b border-border bg-surface p-3 shadow-float md:hidden"
-        >
-          <TopbarSearch
-            onNavigate={(username) => {
-              setMobileSearchOpen(false);
-              router.push(`/perfil/${encodeURIComponent(username)}` as Route);
-            }}
-          />
-        </div>
-      ) : null}
     </header>
   );
 }
@@ -249,7 +179,7 @@ function TopbarSearch({ onNavigate }: TopbarSearchProps) {
         onKeyDown={handleKeyDown}
         placeholder="Buscar no Vibra..."
         label="Buscar no Vibra"
-        className="h-11"
+        className="h-11 border-border-strong"
         rounded="pill"
         role="combobox"
         aria-expanded={open && query.trim().length >= 2}

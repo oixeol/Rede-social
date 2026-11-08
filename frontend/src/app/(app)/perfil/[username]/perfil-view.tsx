@@ -6,11 +6,12 @@ import {
   ProfileBanner,
   ProfileContent,
   ProfileIdentity,
-  ProfileStats,
   VerifiedBadge,
 } from '@/components/profile/profile-center';
+import { ProfileStats } from '@/components/profile/profile-stats';
 import {
   AboutCard,
+  BadgesCard,
   HighlightsCard,
   SuggestionsCard,
 } from '@/components/profile/profile-side';
@@ -29,9 +30,14 @@ export interface ProfileScreenProps {
 
 export function ProfileScreen({ profile }: ProfileScreenProps) {
   const [followers, setFollowers] = useState(profile.stats.followers);
+  const [following, setFollowing] = useState(profile.stats.following);
 
   const handleFollowerChange = (delta: number) => {
     setFollowers((prev) => prev + delta);
+  };
+
+  const handleFollowingChange = (delta: number) => {
+    setFollowing((prev) => prev + delta);
   };
 
   return (
@@ -42,31 +48,39 @@ export function ProfileScreen({ profile }: ProfileScreenProps) {
       <section className="min-w-0" aria-label="Conteúdo do perfil">
         <ProfileBanner profile={profile} />
 
-        <div className="relative -mt-[55px] grid grid-cols-[166px_minmax(0,1fr)] items-start gap-x-4 gap-y-3 sm:gap-x-5 lg:-mt-[70px] lg:grid-cols-[196px_minmax(0,1fr)_auto]">
-          <div className="col-start-1 row-start-1 lg:ml-[30px] lg:row-span-3">
+        <div className="relative -mt-[48px] grid grid-cols-1 items-start gap-y-3 sm:-mt-[65px] sm:grid-cols-[196px_minmax(0,1fr)] sm:gap-x-[30px] sm:gap-y-0">
+          <div className="col-start-1 row-start-1 sm:row-span-4 lg:ml-[21px]">
             <ProfileIdentity profile={profile} />
           </div>
 
-          <div className="col-start-2 row-start-1 min-w-0 pt-[75px] lg:col-start-2 lg:pt-[100px]">
-            <h1 className="flex min-w-0 items-center gap-1.5 text-[24px] leading-tight font-bold tracking-[-0.01em] text-foreground">
-              <span className="min-w-0 truncate">{profile.name}</span>
-              {profile.verified ? <VerifiedBadge className="size-[18px] shrink-0" /> : null}
-            </h1>
-            <p className="mt-1 truncate text-[13px] text-muted">@{profile.username}</p>
-          </div>
+          <div className="col-start-1 row-start-2 flex min-w-0 flex-col items-start gap-3 sm:col-start-2 sm:row-start-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:pt-[91px]">
+            <div className="min-w-0">
+              <h1 className="flex min-w-0 items-center gap-1.5 text-[24px] leading-tight font-bold tracking-[-0.01em] text-foreground">
+                <span className="min-w-0 truncate">{profile.name}</span>
+                {profile.verified ? <VerifiedBadge className="size-[18px] shrink-0" /> : null}
+              </h1>
+              <p className="mt-0.5 truncate text-[13px] text-muted">@{profile.username}</p>
+            </div>
 
-          <div className="col-span-2 col-start-1 row-start-2 flex min-w-0 flex-wrap justify-end gap-2 lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:flex-nowrap lg:pt-[100px]">
             <ProfileActions profile={profile} onFollowerChange={handleFollowerChange} />
           </div>
 
-          <div className="col-span-2 col-start-1 row-start-3 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-2">
+          <div className="col-start-1 row-start-3 min-w-0 sm:col-start-2 sm:row-start-2 sm:mt-3">
             {profile.bio ? (
               <p className="text-[13px] leading-5 text-foreground">{profile.bio}</p>
             ) : null}
           </div>
 
-          <div className="col-span-2 col-start-1 row-start-4 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-3">
-            <ProfileStats profile={profile} followersOverride={followers} />
+          <div className="col-start-1 row-start-4 min-w-0 sm:col-start-2 sm:row-start-3 sm:mt-3">
+            <ProfileStats
+              posts={profile.stats.posts}
+              followers={followers}
+              following={following}
+              username={profile.username}
+              isMe={profile.isMe}
+              onFollowersChange={handleFollowerChange}
+              onFollowingChange={handleFollowingChange}
+            />
           </div>
         </div>
 
@@ -80,6 +94,8 @@ export function ProfileScreen({ profile }: ProfileScreenProps) {
         aria-label="Informações do perfil"
       >
         <AboutCard profile={profile} />
+
+        <BadgesCard badges={profile.badges} />
 
         {isFeatureEnabled('highlights') ? <HighlightsCard profile={profile} /> : null}
 

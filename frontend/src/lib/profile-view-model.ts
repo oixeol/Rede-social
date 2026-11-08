@@ -1,5 +1,6 @@
 import { getInterestLabel } from './interests';
-import type { Badge, Post, ProfileResponse, SuggestionUser } from './types';
+import { getCountryByCode } from './countries';
+import type { Badge, Post, ProfileResponse, SuggestionUser, UserStats } from './types';
 
 export type ProfileTabId = 'posts' | 'reels' | 'photos' | 'likes';
 
@@ -32,10 +33,23 @@ export interface ProfileViewModel {
   about: ProfileAbout;
 }
 
+export type ProfileHighlightIcon =
+  | 'crown'
+  | 'gamepad'
+  | 'music'
+  | 'plane'
+  | 'trophy'
+  | 'dumbbell'
+  | 'camera'
+  | 'palette'
+  | 'coffee'
+  | 'sparkles';
+
 export interface ProfileHighlight {
+  /** Id do interesse que originou o destaque (usado para persistir edição). */
   id: string;
   label: string;
-  icon: 'crown' | 'gamepad' | 'music' | 'plane';
+  icon: ProfileHighlightIcon;
 }
 
 export interface ProfileSuggestion {
@@ -53,9 +67,43 @@ export interface ProfileSuggestion {
 export interface ProfileAbout {
   bio: string;
   joined: string;
+  country: string | null;
+  points: number;
 }
 
-const HIGHLIGHT_ICONS: ProfileHighlight['icon'][] = ['crown', 'gamepad', 'music', 'plane'];
+/**
+ * Ícone estável por interesse: a ordem da lista não pode trocar o ícone
+ * quando um destaque é adicionado ou removido.
+ */
+const HIGHLIGHT_ICON_BY_INTEREST: Record<string, ProfileHighlightIcon> = {
+  games: 'gamepad',
+  boardgames: 'gamepad',
+  musica: 'music',
+  'musica-ao-vivo': 'music',
+  podcasts: 'music',
+  viagens: 'plane',
+  trilhas: 'plane',
+  praia: 'plane',
+  futebol: 'trophy',
+  academia: 'dumbbell',
+  corrida: 'dumbbell',
+  fotografia: 'camera',
+  arte: 'palette',
+  design: 'palette',
+  cafe: 'coffee',
+  culinaria: 'coffee',
+  cozinhar: 'coffee',
+};
+
+const HIGHLIGHT_ICONS_FALLBACK: ProfileHighlightIcon[] = ['crown', 'sparkles'];
+
+export function highlightIconFor(interest: string): ProfileHighlightIcon {
+  const mapped = HIGHLIGHT_ICON_BY_INTEREST[interest];
+  if (mapped) return mapped;
+
+  const index = [...interest].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return HIGHLIGHT_ICONS_FALLBACK[index % HIGHLIGHT_ICONS_FALLBACK.length];
+}
 
 function formatJoinedDate(timestamp: number): string {
   if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
@@ -64,6 +112,14 @@ function formatJoinedDate(timestamp: number): string {
     month: 'long',
     year: 'numeric',
   }).format(new Date(timestamp))}`;
+}
+
+/**
+ * Pontos exibidos no card "Sobre mim".
+ * Soma de engagement real do backend. Finalidade de exibição ainda indefinida.
+ */
+function computePoints(stats: UserStats): number {
+  return stats.posts + stats.followers + stats.following + stats.likesReceived + stats.comments;
 }
 
 function mapSuggestion(user: SuggestionUser): ProfileSuggestion {
@@ -95,10 +151,10 @@ export function createProfileViewModel(
 ): ProfileViewModel {
   const { user, stats, badges, posts } = profile;
 
-  const highlights: ProfileHighlight[] = user.interests.slice(0, 4).map((interest, index) => ({
-    id: `highlight-${interest}`,
+  const highlights: ProfileHighlight[] = user.interests.map((interest) => ({
+    id: interest,
     label: getInterestLabel(interest),
-    icon: HIGHLIGHT_ICONS[index % HIGHLIGHT_ICONS.length],
+    icon: highlightIconFor(interest),
   }));
 
   return {
@@ -130,6 +186,8 @@ export function createProfileViewModel(
     about: {
       bio: user.bio,
       joined: formatJoinedDate(user.createdAt),
+      country: user.country ? getCountryByCode(user.country)?.name ?? user.country : null,
+      points: computePoints(stats),
     },
   };
 }

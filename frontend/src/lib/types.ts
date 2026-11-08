@@ -49,6 +49,8 @@ export interface PublicUser {
   banner: string | null;
   interests: string[];
   isPrivate: boolean;
+  country: string | null;
+  state: string | null;
 }
 
 /** Authenticated user's own profile (selfDTO from Node API). */
@@ -138,6 +140,19 @@ export interface ExploreResponse {
   people: ExplorePerson[];
   topics: ExploreTopic[];
   nextCursor: number | null;
+}
+
+/** Usuário em listas de seguidores/seguindo do perfil. */
+export interface FollowListUser extends PublicUser {
+  isFollowing: boolean;
+  followRequested: boolean;
+  isCloseFriend: boolean;
+  isMe: boolean;
+}
+
+/** GET /api/users/:username/followers | /following */
+export interface FollowListResponse {
+  users: FollowListUser[];
 }
 
 /** GET /api/users/:username */
