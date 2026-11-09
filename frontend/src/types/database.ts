@@ -22,6 +22,7 @@ export type Database = {
           country: string | null;
           state: string | null;
           interests: string;
+          highlights: string;
           message_policy: string;
           is_private: number;
           last_active_at: number | null;
@@ -29,6 +30,7 @@ export type Database = {
           subscription_status: string;
           subscription_ends_at: number | null;
           theme_palette: string;
+          points: number;
         };
         Insert: {
           id?: number;
@@ -45,6 +47,7 @@ export type Database = {
           country?: string | null;
           state?: string | null;
           interests?: string;
+          highlights?: string;
           message_policy?: string;
           is_private?: number;
           last_active_at?: number | null;
@@ -52,6 +55,7 @@ export type Database = {
           subscription_status?: string;
           subscription_ends_at?: number | null;
           theme_palette?: string;
+          points?: number;
         };
         Update: Partial<{
           id: number;
@@ -68,6 +72,7 @@ export type Database = {
           country: string | null;
           state: string | null;
           interests: string;
+          highlights: string;
           message_policy: string;
           is_private: number;
           last_active_at: number | null;
@@ -75,6 +80,7 @@ export type Database = {
           subscription_status: string;
           subscription_ends_at: number | null;
           theme_palette: string;
+          points: number;
         }>;
       };
       sessions: {
@@ -770,6 +776,57 @@ export type Database = {
         }>;
         Delete: {};
       };
+      communities: {
+        Row: {
+          id: number;
+          name: string;
+          slug: string;
+          description: string;
+          avatar: string | null;
+          created_by: number;
+          created_at: number;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          slug: string;
+          description?: string;
+          avatar?: string | null;
+          created_by: number;
+          created_at: number;
+        };
+        Update: Partial<{
+          id: number;
+          name: string;
+          slug: string;
+          description: string;
+          avatar: string | null;
+          created_by: number;
+          created_at: number;
+        }>;
+        Delete: {};
+      };
+      community_members: {
+        Row: {
+          community_id: number;
+          user_id: number;
+          role: 'owner' | 'member';
+          created_at: number;
+        };
+        Insert: {
+          community_id: number;
+          user_id: number;
+          role?: 'owner' | 'member';
+          created_at: number;
+        };
+        Update: Partial<{
+          community_id: number;
+          user_id: number;
+          role: 'owner' | 'member';
+          created_at: number;
+        }>;
+        Delete: {};
+      };
     };
     Views: {
       /**
@@ -787,6 +844,7 @@ export type Database = {
           banner: string | null;
           birth_date: string | null;
           interests: string;
+          highlights: string;
           message_policy: string;
           is_private: number;
           last_active_at: number | null;
@@ -797,6 +855,7 @@ export type Database = {
           gender: string | null;
           country: string | null;
           state: string | null;
+          points: number;
         };
         Insert: never;
         Update: never;

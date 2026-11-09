@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function EntrarPage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050505]">
+    <main className="relative min-h-screen overflow-hidden bg-[#121214]">
       <LoginBackground />
 
       <div className="relative z-10 flex min-h-screen flex-col">
@@ -28,13 +28,13 @@ export default function EntrarPage() {
         </header>
 
         <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8">
-          <div className="w-full max-w-[880px] overflow-hidden rounded-[24px] border border-[#FF6A00]/35 bg-[#0B0B0B]/85 shadow-[0_0_70px_-12px_rgba(255,106,0,0.55),0_28px_70px_rgba(0,0,0,0.65)] backdrop-blur-md">
+          <div className="w-full max-w-[880px] overflow-hidden rounded-[24px] border border-[#FF6A00]/35 bg-[#0D0D0D]/85 shadow-[0_0_70px_-12px_rgba(255,106,0,0.55),0_28px_70px_rgba(0,0,0,0.65)] backdrop-blur-md">
             <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
               <div className="px-6 py-8 sm:px-10 sm:py-10">
                 <LoginForm />
               </div>
 
-              <div className="flex flex-col justify-center border-t border-[#242424] px-6 py-8 sm:px-10 sm:py-10 lg:border-t-0 lg:border-l">
+              <div className="flex flex-col justify-center border-t border-[#1A1A1C] px-6 py-8 sm:px-10 sm:py-10 lg:border-t-0 lg:border-l">
                 <LoginQrPanel />
                 <LoginQrActions />
               </div>

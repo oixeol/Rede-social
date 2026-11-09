@@ -54,7 +54,7 @@ export default function Loading() {
           {/* Abas */}
           <div className="mt-4" aria-label="Carregando abas do perfil">
             <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1">
-              {['Publicações', 'Instantes', 'Fotos', 'Curtidas'].map((label) => (
+              {['Publicações', 'Instantes', 'Comunidade', 'Curtidas'].map((label) => (
                 <Skeleton
                   key={label}
                   className="h-11 flex-1 rounded-lg"

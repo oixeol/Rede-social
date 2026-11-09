@@ -84,7 +84,7 @@ export function LoginForm() {
   }
 
   const inputClass =
-    'h-12 w-full rounded-xl border border-[#242424] bg-[#101010] pl-11 pr-4 text-[14px] text-white placeholder:text-[#5F5F67] outline-none transition-colors focus:border-[#FF6A00] focus:ring-2 focus:ring-[#FF6A00]/20 disabled:cursor-not-allowed disabled:opacity-50';
+    'h-12 w-full rounded-xl border border-[#1A1A1C] bg-[#0D0D0D] pl-11 pr-4 text-[14px] text-white placeholder:text-[#5F5F67] outline-none transition-colors focus:border-[#FF6A00] focus:ring-2 focus:ring-[#FF6A00]/20 disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <div className="flex w-full flex-col">
@@ -199,9 +199,9 @@ export function LoginForm() {
         </button>
 
         <div className="my-1 flex items-center gap-3" aria-hidden="true">
-          <span className="h-px flex-1 bg-[#242424]" />
+          <span className="h-px flex-1 bg-[#1A1A1C]" />
           <span className="text-[10px] font-semibold tracking-[0.2em] text-[#71717A] uppercase">ou</span>
-          <span className="h-px flex-1 bg-[#242424]" />
+          <span className="h-px flex-1 bg-[#1A1A1C]" />
         </div>
 
         <div className="grid gap-2.5">

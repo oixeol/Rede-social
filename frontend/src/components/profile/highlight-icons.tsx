@@ -11,9 +11,23 @@ import {
   Trophy,
 } from 'lucide-react';
 
-import type { ProfileHighlightIcon } from '@/lib/profile-view-model';
+import type { ProfileHighlightIcon } from '@/lib/types';
 
-/** Ícone de cada destaque, derivado do interesse de origem. */
+/** Rótulo acessível de cada ícone disponível para destaques. */
+export const HIGHLIGHT_ICON_LABELS: Record<ProfileHighlightIcon, string> = {
+  crown: 'Coroa',
+  gamepad: 'Controle',
+  music: 'Música',
+  plane: 'Avião',
+  trophy: 'Troféu',
+  dumbbell: 'Haltere',
+  camera: 'Câmera',
+  palette: 'Paleta',
+  coffee: 'X Café',
+  sparkles: 'Brilhos',
+};
+
+/** Ícone de cada destaque, escolhido pelo usuário. */
 export const HIGHLIGHT_ICONS: Record<ProfileHighlightIcon, React.ReactNode> = {
   crown: <Crown className="size-[18px]" />,
   gamepad: <Gamepad2 className="size-[18px]" />,
@@ -27,6 +41,9 @@ export const HIGHLIGHT_ICONS: Record<ProfileHighlightIcon, React.ReactNode> = {
   sparkles: <Sparkles className="size-[18px]" />,
 };
 
+/** Ordem estável do seletor de ícones. */
+export const HIGHLIGHT_ICON_OPTIONS = Object.keys(HIGHLIGHT_ICONS) as ProfileHighlightIcon[];
+
 export function HighlightIcon({ icon }: { icon: ProfileHighlightIcon }) {
-  return HIGHLIGHT_ICONS[icon];
+  return HIGHLIGHT_ICONS[icon] ?? HIGHLIGHT_ICONS.sparkles;
 }

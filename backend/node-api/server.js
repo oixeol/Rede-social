@@ -39,6 +39,31 @@ const APP = require('./app.config');
 const APP_VERSION = require('./package.json').version;
 const dating = require('./lib/dating');
 
+/* Carrega .env da raiz do repositório (sem dependência externa). */
+function loadRepoEnv() {
+  const envPath = path.resolve(__dirname, '../../.env');
+  try {
+    const text = fs.readFileSync(envPath, 'utf8');
+    for (const line of text.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (!m) continue;
+      let value = m[2].trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (!(m[1] in process.env)) {
+        process.env[m[1]] = value;
+      }
+    }
+  } catch {
+    /* arquivo opcional — segue sem .env local */
+  }
+}
+loadRepoEnv();
+
 /* ------------------------------------------------------------------ */
 /* Configuração e inicialização                                        */
 /* ------------------------------------------------------------------ */
@@ -169,7 +194,9 @@ const SQLITE_SCHEMA = `
     bio TEXT NOT NULL DEFAULT '',
     avatar TEXT,
     password_hash TEXT NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    points INTEGER NOT NULL DEFAULT 0,
+    highlights TEXT NOT NULL DEFAULT '[]'
   );
 
   CREATE TABLE IF NOT EXISTS sessions (
@@ -268,6 +295,24 @@ const SQLITE_SCHEMA = `
     PRIMARY KEY (user_id, post_id)
   );
   CREATE INDEX IF NOT EXISTS idx_shares_post ON shares(post_id);
+
+  /* Repost: publicação replicada no feed de quem repostou. */
+  CREATE TABLE IF NOT EXISTS reposts (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, post_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_reposts_post ON reposts(post_id);
+
+  /* Salvo (bookmark): publicação guardada pelo próprio usuário. */
+  CREATE TABLE IF NOT EXISTS saved_posts (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, post_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_saved_posts_post ON saved_posts(post_id);
 
   CREATE TABLE IF NOT EXISTS blocks (
     blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -436,6 +481,25 @@ const SQLITE_SCHEMA = `
     distance_m INTEGER NOT NULL,
     PRIMARY KEY (match_id, user_id)
   );
+
+  CREATE TABLE IF NOT EXISTS communities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    avatar TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS community_members (
+    community_id INTEGER NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member')),
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (community_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_community_members_user ON community_members(user_id, created_at DESC);
 `;
 
 if (!USING_POSTGRES) db.exec(SQLITE_SCHEMA);
@@ -463,6 +527,11 @@ if (!USING_POSTGRES) {
   ensureColumn('users', 'gender', 'TEXT');
   ensureColumn('users', 'country', 'TEXT');
   ensureColumn('users', 'state', 'TEXT');
+  ensureColumn('users', 'points', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('users', 'highlights', "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn('users', 'external_link', 'TEXT');
+  ensureColumn('users', 'preferences', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn('users', 'presence', "TEXT NOT NULL DEFAULT 'available'");
   ensureColumn('sessions', 'user_agent', 'TEXT');
   ensureColumn('posts', 'media_type', "TEXT NOT NULL DEFAULT 'image'");
   ensureColumn('posts', 'topic', "TEXT NOT NULL DEFAULT 'cotidiano'");
@@ -543,10 +612,12 @@ const POST_TOPIC_LABELS = {
  * token recebido para seus próprios estilos; assim a API não aceita estilo
  * arbitrário nem precisa armazenar cores.
  */
-const DEFAULT_THEME_PALETTE = 'orange';
-const THEME_PALETTE_PRESETS = new Set(['orange', 'black', 'white']);
+const DEFAULT_THEME_PALETTE = 'orange';const THEME_PALETTE_PRESETS = new Set(['orange', 'black', 'white']);
 /* Statuses internos que representam uma assinatura utilizável. */
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'subscribed']);
+/* Estados de presença (bolinha de status do perfil). */
+const PRESENCE_VALUES = new Set(['available', 'away', 'dnd', 'invisible']);
+const DEFAULT_PRESENCE = 'available';
 /* Idade máxima aceita. Acima disso a data de nascimento é tratada como inválida. */
 const MAX_AGE_PLATFORM = 120;
 
@@ -561,6 +632,140 @@ function parseJsonArray(value, allowed = null) {
   if (!Array.isArray(parsed)) return [];
   const list = [...new Set(parsed.filter((item) => typeof item === 'string'))];
   return allowed ? list.filter((item) => allowed.has(item)) : list;
+}
+
+/* Destaques são livres: nome escolhido pelo usuário + um ícone do conjunto
+   fechado da plataforma. Não dependem do catálogo de interesses. */
+const HIGHLIGHT_ICONS = new Set([
+  'crown',
+  'gamepad',
+  'music',
+  'plane',
+  'trophy',
+  'dumbbell',
+  'camera',
+  'palette',
+  'coffee',
+  'sparkles',
+]);
+const MAX_HIGHLIGHTS = 12;
+const MAX_HIGHLIGHT_LABEL = 24;
+const HIGHLIGHT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
+
+/**
+ * Normaliza a lista de destaques persistida.
+ * Entradas inválidas são descartadas: a API nunca devolve dados quebrados.
+ */
+function parseHighlights(value) {
+  let parsed;
+  try {
+    parsed = JSON.parse(value || '[]');
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const seen = new Set();
+  const list = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== 'object') continue;
+    const label = typeof item.label === 'string' ? item.label.trim() : '';
+    const icon = typeof item.icon === 'string' ? item.icon : '';
+    if (!label || label.length > MAX_HIGHLIGHT_LABEL) continue;
+    if (!HIGHLIGHT_ICONS.has(icon)) continue;
+    const id = typeof item.id === 'string' && HIGHLIGHT_ID_PATTERN.test(item.id) ? item.id : crypto.randomUUID();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    list.push({ id, label, icon });
+    if (list.length >= MAX_HIGHLIGHTS) break;
+  }
+  return list;
+}
+
+/**
+ * Valida os destaques enviados pelo cliente no PATCH /api/me.
+ * Lança 400 quando a lista não é um array válido.
+ */
+function sanitizeHighlightsInput(value) {
+  if (!Array.isArray(value)) {
+    throw new HttpError(400, 'Destaques inválidos.');
+  }
+  if (value.length > MAX_HIGHLIGHTS) {
+    throw new HttpError(400, `Máximo de ${MAX_HIGHLIGHTS} destaques.`);
+  }
+  const seen = new Set();
+  const list = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      throw new HttpError(400, 'Destaque inválido.');
+    }
+    const label = cleanText(item.label, 'Nome do destaque', {
+      min: 1,
+      max: MAX_HIGHLIGHT_LABEL,
+      required: true,
+      strict: true,
+    });
+    const icon = typeof item.icon === 'string' ? item.icon : '';
+    if (!HIGHLIGHT_ICONS.has(icon)) {
+      throw new HttpError(400, 'Ícone de destaque inválido.');
+    }
+    const id =
+      typeof item.id === 'string' && HIGHLIGHT_ID_PATTERN.test(item.id)
+        ? item.id
+        : crypto.randomUUID();
+    if (seen.has(id)) {
+      throw new HttpError(400, 'Destaques duplicados.');
+    }
+    seen.add(id);
+    list.push({ id, label, icon });
+  }
+  return list;
+}
+
+/** Grupos permitidos no objeto preferences (client-controlled). */
+const PREFERENCES_ALLOWED_KEYS = new Set([
+  'notifications',
+  'privacy',
+  'appearance',
+  'content',
+]);
+
+/** Parse seguro de string JSON para objeto. */
+function parseJsonObject(value) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sanitiza preferências recebidas do cliente.
+ * Só mantém grupos permitidos e, dentro deles, apenas chaves booleanas.
+ */
+function sanitizePreferences(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const out = {};
+  for (const [group, values] of Object.entries(input)) {
+    if (!PREFERENCES_ALLOWED_KEYS.has(group)) continue;
+    if (!values || typeof values !== 'object' || Array.isArray(values)) continue;
+    const groupOut = {};
+    for (const [key, value] of Object.entries(values)) {
+      if (typeof value === 'boolean') groupOut[key] = value;
+    }
+    out[group] = groupOut;
+  }
+  return out;
+}
+
+/** Mescla preferências existentes com as novas do PATCH. */
+function mergePreferences(currentValue, patchValue) {
+  const current = parseJsonObject(currentValue) || {};
+  const incoming = sanitizePreferences(patchValue);
+  if (!incoming) return current;
+  return { ...current, ...incoming };
 }
 
 // Calcula a idade válida pela data de nascimento, rejeitando datas ou faixas implausíveis.
@@ -1250,10 +1455,12 @@ function userDTO(row) {
     banner: row.banner || null,
     interests: parseJsonArray(row.interests, INTEREST_IDS),
     isPrivate: !!row.is_private,
-    email: row.email || null,
     gender: row.gender || null,
     country: row.country || null,
     state: row.state || null,
+    points: row.points || 0,
+    highlights: parseHighlights(row.highlights),
+    presence: PRESENCE_VALUES.has(row.presence) ? row.presence : DEFAULT_PRESENCE,
   };
 }
 
@@ -1269,6 +1476,9 @@ function selfDTO(row) {
     gender: row.gender || null,
     country: row.country || null,
     state: row.state || null,
+    points: row.points || 0,
+    externalLink: row.external_link || null,
+    preferences: parseJsonObject(row.preferences) || {},
   };
 }
 
@@ -1578,6 +1788,12 @@ const POST_SELECT = `
          (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count,
          (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count,
          (SELECT COUNT(*) FROM shares sh WHERE sh.post_id = p.id) AS share_count,
+         (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id) AS repost_count,
+         (SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id) AS save_count,
+         CASE WHEN EXISTS (
+           SELECT 1 FROM identity_verifications iv
+           WHERE iv.user_id = u.id AND iv.status = 'approved'
+         ) THEN 1 ELSE 0 END AS author_verified,
          CASE WHEN EXISTS (
            SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ?
          ) THEN 1 ELSE 0 END AS liked
@@ -1601,12 +1817,52 @@ function mapPost(row) {
       name: row.name,
       avatar: row.avatar || null,
       isPrivate: !!row.is_private,
+      verified: !!row.author_verified,
     },
     likes: row.like_count,
     comments: row.comment_count,
     shares: row.share_count || 0,
+    reposts: row.repost_count || 0,
+    saves: row.save_count || 0,
     liked: !!row.liked,
+    reposted: false,
+    saved: false,
+    authorFollowing: false,
   };
+}
+
+/**
+ * Preenche os campos que dependem de quem está olhando: repost e save próprios
+ * e a relação de follow com o autor. Uma consulta por tipo, em lote.
+ */
+function withViewerState(posts, viewerId) {
+  if (!posts.length) return posts;
+  const ids = posts.map((post) => post.id);
+  const placeholders = ids.map(() => '?').join(',');
+
+  const repostRows = db
+    .prepare(`SELECT post_id FROM reposts WHERE user_id = ? AND post_id IN (${placeholders})`)
+    .all(viewerId, ...ids);
+  const repostedIds = new Set(repostRows.map((row) => row.post_id));
+
+  const savedRows = db
+    .prepare(`SELECT post_id FROM saved_posts WHERE user_id = ? AND post_id IN (${placeholders})`)
+    .all(viewerId, ...ids);
+  const savedIds = new Set(savedRows.map((row) => row.post_id));
+
+  const authorIds = [...new Set(posts.map((post) => post.user.id))];
+  const authorPlaceholders = authorIds.map(() => '?').join(',');
+  const followRows = db
+    .prepare(`SELECT following_id FROM follows WHERE follower_id = ? AND following_id IN (${authorPlaceholders})`)
+    .all(viewerId, ...authorIds);
+  const followingIds = new Set(followRows.map((row) => row.following_id));
+
+  for (const post of posts) {
+    post.reposted = repostedIds.has(post.id);
+    post.saved = savedIds.has(post.id);
+    post.authorFollowing = followingIds.has(post.user.id);
+  }
+  return posts;
 }
 
 function withMedia(posts) {
@@ -1673,6 +1929,30 @@ function commentDTO(row) {
     user: { id: row.user_id, username: row.username, name: row.name, avatar: row.avatar || null },
   };
 }
+
+/**
+ * Converte uma linha de `communities` no DTO público.
+ * `member_count` chega como número (COUNT) e `is_member` como booleano.
+ */
+function communityDTO(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description || '',
+    avatar: row.avatar || null,
+    memberCount: Number(row.member_count || 0),
+    isMember: !!row.is_member,
+    role: row.role || null,
+    createdAt: row.created_at,
+  };
+}
+
+/** SELECT padrão de comunidades com contagem de membros. */
+const COMMUNITY_SELECT = `
+  SELECT c.id, c.name, c.slug, c.description, c.avatar, c.created_at,
+         (SELECT COUNT(*) FROM community_members cm2 WHERE cm2.community_id = c.id) AS member_count
+  FROM communities c`;
 
 function commentsFor(postId) {
   return db
@@ -1932,6 +2212,12 @@ async function handleApi(req, res, pathname, url) {
     if (Array.isArray(body.interests)) {
       interests = [...new Set(body.interests.filter((item) => typeof item === 'string' && INTEREST_IDS.has(item)))].slice(0, 12);
     }
+    /* Destaques são livres: nome escolhido pelo usuário + ícone do conjunto
+       fechado da plataforma. A lista inteira é substituída pelo cliente. */
+    let highlights = parseHighlights(me.highlights);
+    if (body.highlights !== undefined) {
+      highlights = sanitizeHighlightsInput(body.highlights);
+    }
     let messagePolicy = me.message_policy || 'connections';
     if (body.messagePolicy !== undefined) {
       if (!['everyone', 'connections', 'nobody'].includes(body.messagePolicy)) {
@@ -1953,19 +2239,77 @@ async function handleApi(req, res, pathname, url) {
       if (age === null) throw new HttpError(400, 'Data de nascimento inválida.');
       if (age < 13) throw new HttpError(403, 'É necessário ter pelo menos 13 anos.');
     }
+    let gender = me.gender || null;
+    if (body.gender !== undefined) {
+      if (body.gender === null || body.gender === '') {
+        gender = null;
+      } else if (typeof body.gender === 'string') {
+        gender = cleanText(body.gender, 'Gênero', { min: 1, max: 40, required: true, strict: true });
+      } else {
+        throw new HttpError(400, 'Gênero inválido.');
+      }
+    }
+    let email = me.email || null;
+    if (body.email !== undefined) {
+      if (body.email === null || body.email === '') {
+        email = null;
+      } else if (typeof body.email === 'string') {
+        const candidate = body.email.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(candidate)) {
+          throw new HttpError(400, 'E-mail inválido.');
+        }
+        const taken = db
+          .prepare('SELECT id FROM users WHERE lower(email) = ? AND id != ?')
+          .get(candidate, me.id);
+        if (taken) throw new HttpError(409, 'Este e-mail já está em uso.');
+        email = candidate;
+      } else {
+        throw new HttpError(400, 'E-mail inválido.');
+      }
+    }
+    let externalLink = me.external_link || null;
+    if (body.externalLink !== undefined) {
+      if (body.externalLink === null || body.externalLink === '') {
+        externalLink = null;
+      } else if (typeof body.externalLink === 'string') {
+        const link = body.externalLink.trim();
+        if (link && !/^https?:\/\//i.test(link)) {
+          throw new HttpError(400, 'Link externo deve começar com http:// ou https://');
+        }
+        if (link && link.length > 200) {
+          throw new HttpError(400, 'Link externo muito longo (máx. 200 caracteres).');
+        }
+        externalLink = link || null;
+      }
+    }
+    const preferences = mergePreferences(me.preferences, body.preferences);
+    /* Presença (bolinha de status) só aceita os quatro estados do catálogo. */
+    let presence = PRESENCE_VALUES.has(me.presence) ? me.presence : DEFAULT_PRESENCE;
+    if (body.presence !== undefined) {
+      if (typeof body.presence !== 'string' || !PRESENCE_VALUES.has(body.presence)) {
+        throw new HttpError(400, 'Status de presença inválido.');
+      }
+      presence = body.presence;
+    }
     const oldAvatar = me.avatar;
     const oldBanner = me.banner || null;
     db.prepare(
-      'UPDATE users SET name = ?, bio = ?, avatar = ?, banner = ?, interests = ?, message_policy = ?, is_private = ?, birth_date = ? WHERE id = ?'
+      'UPDATE users SET name = ?, bio = ?, avatar = ?, banner = ?, interests = ?, highlights = ?, message_policy = ?, is_private = ?, birth_date = ?, gender = ?, email = ?, external_link = ?, preferences = ?, presence = ? WHERE id = ?'
     ).run(
       name,
       bio,
       avatar,
       banner,
       JSON.stringify(interests),
+      JSON.stringify(highlights),
       messagePolicy,
       isPrivate,
       birthDate,
+      gender,
+      email,
+      externalLink,
+      JSON.stringify(preferences),
+      presence,
       me.id
     );
     if (oldAvatar && oldAvatar !== avatar) removeUploadIfUnused(oldAvatar);
@@ -2050,6 +2394,7 @@ async function handleApi(req, res, pathname, url) {
       )
       .all(me.id, me.id, me.id, before, me.id, me.id, limit);
     const posts = withPreviews(rows.map(mapPost));
+    withViewerState(posts, me.id);
     return json(res, 200, {
       posts,
       nextCursor: posts.length === limit ? posts[posts.length - 1].createdAt : null,
@@ -2088,6 +2433,7 @@ async function handleApi(req, res, pathname, url) {
       .prepare(`${POST_SELECT} WHERE ${clauses.join(' AND ')} ORDER BY p.created_at DESC, p.id DESC LIMIT ?`)
       .all(...params);
     const posts = withPreviews(rows.map(mapPost));
+    withViewerState(posts, me.id);
 
     const peopleRows = db
       .prepare(
@@ -2232,6 +2578,48 @@ async function handleApi(req, res, pathname, url) {
     return json(res, 200, { users });
   }
 
+  // --- communities ----------------------------------------------------
+  if (method === 'GET' && pathname === '/api/communities') {
+    const rows = db
+      .prepare(
+        `SELECT c.id, c.name, c.slug, c.description, c.avatar, c.created_at,
+                (SELECT COUNT(*) FROM community_members cm2 WHERE cm2.community_id = c.id) AS member_count,
+                EXISTS (
+                  SELECT 1 FROM community_members cm3
+                  WHERE cm3.community_id = c.id AND cm3.user_id = ?
+                ) AS is_member
+         FROM communities c
+         ORDER BY member_count DESC, c.name ASC
+         LIMIT 100`
+      )
+      .all(me.id);
+    return json(res, 200, { communities: rows.map(communityDTO) });
+  }
+
+  const userCommunitiesMatch = matchRoute(pathname, '/api/users/:username/communities');
+  if (method === 'GET' && userCommunitiesMatch) {
+    const target = db.prepare('SELECT * FROM users WHERE username = ?').get(userCommunitiesMatch.username);
+    if (!target) throw new HttpError(404, 'Perfil não encontrado.');
+    if (target.id !== me.id && isBlocked(me.id, target.id)) {
+      throw new HttpError(404, 'Perfil indisponível.');
+    }
+    const rows = db
+      .prepare(
+        `SELECT c.id, c.name, c.slug, c.description, c.avatar, c.created_at, cm.role,
+                (SELECT COUNT(*) FROM community_members cm2 WHERE cm2.community_id = c.id) AS member_count,
+                EXISTS (
+                  SELECT 1 FROM community_members cm3
+                  WHERE cm3.community_id = c.id AND cm3.user_id = ?
+                ) AS is_member
+         FROM communities c
+         JOIN community_members cm ON cm.community_id = c.id
+         WHERE cm.user_id = ?
+         ORDER BY cm.created_at DESC, c.id DESC`
+      )
+      .all(me.id, target.id);
+    return json(res, 200, { communities: rows.map(communityDTO) });
+  }
+
   // --- users ----------------------------------------------------------
   const userMatch = matchRoute(pathname, '/api/users/:username');
   if (method === 'GET' && userMatch) {
@@ -2267,7 +2655,7 @@ async function handleApi(req, res, pathname, url) {
       pendingFollowRequests: isMe ? followRequestCount(me.id) : 0,
       canMessage: canMessageTarget(me, user),
       sharedInterests: parseJsonArray(user.interests, INTEREST_IDS).filter((id) => myInterests.includes(id)),
-      posts: withPreviews(posts),
+      posts: withViewerState(withPreviews(posts), me.id),
     });
   }
 
@@ -2560,7 +2948,7 @@ async function handleApi(req, res, pathname, url) {
          LIMIT 100`
       )
       .all(me.id, target.id, me.id, me.id, me.id, me.id);
-    return json(res, 200, { posts: withPreviews(rows.map(mapPost)) });
+    return json(res, 200, { posts: withViewerState(withPreviews(rows.map(mapPost)), me.id) });
   }
 
   if (method === 'GET' && pathname === '/api/blocks') {
@@ -2676,7 +3064,7 @@ async function handleApi(req, res, pathname, url) {
       throw error;
     }
     const row = db.prepare(`${POST_SELECT} WHERE p.id = ?`).get(me.id, postId);
-    return json(res, 201, { post: withPreviews([row].map(mapPost))[0] });
+    return json(res, 201, { post: withViewerState(withPreviews([row].map(mapPost)), me.id)[0] });
   }
 
   const postMatch = matchRoute(pathname, '/api/posts/:id');
@@ -2693,7 +3081,7 @@ async function handleApi(req, res, pathname, url) {
     }
 
     if (method === 'GET') {
-      const post = withMedia([mapPost(row)])[0];
+      const post = withViewerState(withMedia([mapPost(row)]), me.id)[0];
       return json(res, 200, {
         post,
         comments: commentsFor(postId).filter((comment) => comment.user.id === me.id || !isBlocked(me.id, comment.user.id)),
@@ -2728,7 +3116,10 @@ async function handleApi(req, res, pathname, url) {
     return json(res, 200, {
       shares: count,
       link: `/publicacoes/${postId}`,
-      post: mapPost(db.prepare(`${POST_SELECT} WHERE p.id = ?`).get(me.id, postId)),
+      post: withViewerState(
+        [mapPost(db.prepare(`${POST_SELECT} WHERE p.id = ?`).get(me.id, postId))],
+        me.id,
+      )[0],
     });
   }
 
@@ -2751,6 +3142,46 @@ async function handleApi(req, res, pathname, url) {
     }
     const count = db.prepare('SELECT COUNT(*) AS n FROM likes WHERE post_id = ?').get(postId).n;
     return json(res, 200, { liked: !liked, likes: count });
+  }
+
+  const repostMatch = matchRoute(pathname, '/api/posts/:id/repost');
+  if (method === 'POST' && repostMatch) {
+    rateLimit(req, 'reposts', 120, 60 * 1000);
+    const postId = Number(repostMatch.id);
+    const post = db.prepare('SELECT id, user_id FROM posts WHERE id = ?').get(postId);
+    if (!post) throw new HttpError(404, 'Publicação não encontrada.');
+    if (isBlocked(me.id, post.user_id)) throw new HttpError(404, 'Publicação não encontrada.');
+    assertCanViewOwner(me.id, post.user_id);
+    const reposted = !!db
+      .prepare('SELECT 1 AS ok FROM reposts WHERE user_id = ? AND post_id = ?')
+      .get(me.id, postId);
+    if (reposted) {
+      db.prepare('DELETE FROM reposts WHERE user_id = ? AND post_id = ?').run(me.id, postId);
+    } else {
+      db.prepare('INSERT OR IGNORE INTO reposts (user_id, post_id, created_at) VALUES (?, ?, ?)').run(me.id, postId, now());
+    }
+    const count = db.prepare('SELECT COUNT(*) AS n FROM reposts WHERE post_id = ?').get(postId).n;
+    return json(res, 200, { reposted: !reposted, reposts: count });
+  }
+
+  const saveMatch = matchRoute(pathname, '/api/posts/:id/save');
+  if (method === 'POST' && saveMatch) {
+    rateLimit(req, 'saved-posts', 120, 60 * 1000);
+    const postId = Number(saveMatch.id);
+    const post = db.prepare('SELECT id, user_id FROM posts WHERE id = ?').get(postId);
+    if (!post) throw new HttpError(404, 'Publicação não encontrada.');
+    if (isBlocked(me.id, post.user_id)) throw new HttpError(404, 'Publicação não encontrada.');
+    assertCanViewOwner(me.id, post.user_id);
+    const saved = !!db
+      .prepare('SELECT 1 AS ok FROM saved_posts WHERE user_id = ? AND post_id = ?')
+      .get(me.id, postId);
+    if (saved) {
+      db.prepare('DELETE FROM saved_posts WHERE user_id = ? AND post_id = ?').run(me.id, postId);
+    } else {
+      db.prepare('INSERT OR IGNORE INTO saved_posts (user_id, post_id, created_at) VALUES (?, ?, ?)').run(me.id, postId, now());
+    }
+    const count = db.prepare('SELECT COUNT(*) AS n FROM saved_posts WHERE post_id = ?').get(postId).n;
+    return json(res, 200, { saved: !saved, saves: count });
   }
 
   const commentsMatch = matchRoute(pathname, '/api/posts/:id/comments');
@@ -3673,16 +4104,16 @@ function seedIfEmpty() {
   const t = now();
 
   const seedUsers = [
-    { username: 'vibra', name: 'Vibra', bio: 'Seu cantinho visual. Compartilhe o que te inspira.', avatar: '/uploads/avatar-vibe.svg', birthDate: '1997-05-14', interests: ['fotografia', 'cafe', 'musica', 'viagens', 'tecnologia'] },
-    { username: 'ana.souza', name: 'Ana Souza', bio: 'Fotografia, café e fins de tarde.', avatar: '/uploads/avatar-ana.svg', birthDate: '1996-08-22', interests: ['fotografia', 'cafe', 'arte', 'natureza', 'viagens', 'musica'] },
-    { username: 'bruno.dev', name: 'Bruno Lima', bio: 'Código, trilhas e céu aberto.', avatar: '/uploads/avatar-bruno.svg', birthDate: '1994-03-09', interests: ['tecnologia', 'trilhas', 'games', 'musica', 'natureza', 'corrida'] },
-    { username: 'carla.arte', name: 'Carla Nunes', bio: 'Ilustração, cor e experimentação.', avatar: '/uploads/avatar-carla.svg', birthDate: '1998-11-02', interests: ['arte', 'design', 'filmes', 'musica', 'livros', 'fotografia'] },
-    { username: 'diego.foto', name: 'Diego Alves', bio: 'Luz natural, sempre.', avatar: '/uploads/avatar-diego.svg', birthDate: '1992-01-17', interests: ['fotografia', 'praia', 'viagens', 'cinema', 'musica', 'culinaria'] },
+    { username: 'vibra', name: 'Vibra', bio: 'Seu cantinho visual. Compartilhe o que te inspira.', avatar: '/uploads/avatar-vibe.svg', birthDate: '1997-05-14', interests: ['fotografia', 'cafe', 'musica', 'viagens', 'tecnologia'], highlights: [{ id: 'vibra-fotos', label: 'Fotos', icon: 'camera' }, { id: 'vibra-cafe', label: 'Café', icon: 'coffee' }, { id: 'vibra-viagens', label: 'Viagens', icon: 'plane' }, { id: 'vibra-musica', label: 'Música', icon: 'music' }] },
+    { username: 'ana.souza', name: 'Ana Souza', bio: 'Fotografia, café e fins de tarde.', avatar: '/uploads/avatar-ana.svg', birthDate: '1996-08-22', interests: ['fotografia', 'cafe', 'arte', 'natureza', 'viagens', 'musica'], highlights: [{ id: 'ana-fotos', label: 'Fotos', icon: 'camera' }, { id: 'ana-arte', label: 'Arte', icon: 'palette' }, { id: 'ana-cafe', label: 'Café', icon: 'coffee' }] },
+    { username: 'bruno.dev', name: 'Bruno Lima', bio: 'Código, trilhas e céu aberto.', avatar: '/uploads/avatar-bruno.svg', birthDate: '1994-03-09', interests: ['tecnologia', 'trilhas', 'games', 'musica', 'natureza', 'corrida'], highlights: [{ id: 'bruno-trilhas', label: 'Trilhas', icon: 'plane' }, { id: 'bruno-games', label: 'Games', icon: 'gamepad' }, { id: 'bruno-corrida', label: 'Corrida', icon: 'dumbbell' }] },
+    { username: 'carla.arte', name: 'Carla Nunes', bio: 'Ilustração, cor e experimentação.', avatar: '/uploads/avatar-carla.svg', birthDate: '1998-11-02', interests: ['arte', 'design', 'filmes', 'musica', 'livros', 'fotografia'], highlights: [{ id: 'carla-arte', label: 'Arte', icon: 'palette' }, { id: 'carla-filmes', label: 'Filmes', icon: 'crown' }] },
+    { username: 'diego.foto', name: 'Diego Alves', bio: 'Luz natural, sempre.', avatar: '/uploads/avatar-diego.svg', birthDate: '1992-01-17', interests: ['fotografia', 'praia', 'viagens', 'cinema', 'musica', 'culinaria'], highlights: [{ id: 'diego-fotos', label: 'Fotos', icon: 'camera' }, { id: 'diego-praia', label: 'Praia', icon: 'plane' }] },
   ];
 
   const insertUser = db.prepare(
-    `INSERT INTO users (username, name, bio, avatar, password_hash, created_at, birth_date, interests)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO users (username, name, bio, avatar, password_hash, created_at, birth_date, interests, points, highlights)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const userIds = [];
   for (const user of seedUsers) {
@@ -3694,7 +4125,9 @@ function seedIfEmpty() {
       password,
       t - 30 * 24 * 60 * 60 * 1000,
       user.birthDate,
-      JSON.stringify(user.interests)
+      JSON.stringify(user.interests),
+      0,
+      JSON.stringify(user.highlights)
     );
     userIds.push(Number(result.lastInsertRowid));
   }

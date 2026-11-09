@@ -21,11 +21,17 @@ interface PostDetailResponse {
       name: string;
       avatar: string | null;
       isPrivate: boolean;
+      verified: boolean;
     };
     likes: number;
     comments: number;
     shares: number;
+    reposts: number;
+    saves: number;
     liked: boolean;
+    reposted: boolean;
+    saved: boolean;
+    authorFollowing: boolean;
   };
   comments: Array<{
     id: number;

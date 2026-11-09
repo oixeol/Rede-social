@@ -15,6 +15,8 @@ const env = {
   PORT: String(port),
   HOST: '127.0.0.1',
   VIBRA_DATA_DIR: dataDir,
+  /* Banco temporário isolado: ignora o DATABASE_URL do .env da raiz. */
+  DATABASE_URL: '',
   VIBRA_SEED_DEMO: '1',
   VIBRA_SEED_ONLY: '0',
   VIBRA_DEMO_PASSWORD: demoPassword,

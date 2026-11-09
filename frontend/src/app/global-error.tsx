@@ -33,7 +33,7 @@ export default function GlobalError({ error, retry }: GlobalErrorProps) {
           html { color-scheme: light dark; }
           body {
             min-height: 100vh;
-            background: #050505;
+            background: #121214;
             color: #FFFFFF;
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             -webkit-font-smoothing: antialiased;

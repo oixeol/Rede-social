@@ -26,7 +26,7 @@ DATABASE_URL=postgresql://postgres:<SENHA>@db.cpobpnmrisgkceerbkxr.supabase.co:5
 PGSSL=1
 ```
 
-A senha do banco foi definida via Management API: `vibra-botola-2026`.
+A senha do banco fica somente no `.env` local (não versionado). Nunca a registre neste arquivo.
 
 ## Como obter as chaves
 
@@ -44,6 +44,21 @@ O schema está versionado em `supabase/migrations/`:
 - `20261103000001_rls_policies.sql` — Row Level Security com `private.current_vibra_user_id()`
 - `20261103000002_data_api_grants.sql` — privilégios Data API (anon mínimo, users coluna a coluna)
 - `20261103000003_users_public_view.sql` — view `users_public` com `security_invoker=true`
+- `20261108000005_users_points.sql` — coluna `points` na tabela de usuários
+- `20261108000006_users_highlights.sql` — coluna `highlights` (destaques do perfil)
+- `20261108000007_communities.sql` — tabelas `communities` e `community_members`
+- `20261108000008_users_settings.sql` — colunas `external_link` e `preferences`
+- `20261108000009_users_presence.sql` — coluna `presence` (status da bolinha do perfil)
+- `20261108000010_post_interactions.sql` — tabelas `reposts` e `saved_posts`
+
+Aplicar as migrations novas no Postgres do Supabase:
+
+```bash
+cd backend/node-api
+node scripts/apply-presence-and-interactions.mjs
+```
+
+Os scripts leem `DATABASE_URL` do `.env` da raiz do repositório.
 
 Aplicar local (Docker stack):
 ```bash

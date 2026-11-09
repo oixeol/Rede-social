@@ -16,7 +16,6 @@ import {
   MapPin,
   MessageCircle,
   Plus,
-  Search,
   Shield,
   Sparkles,
   Trash2,
@@ -24,15 +23,18 @@ import {
 } from 'lucide-react';
 
 import { VerifiedBadge } from '@/components/profile/profile-center';
-import { Avatar } from '@/components/ui/avatar';
+import { Avatar, initials } from '@/components/ui/avatar';
 import { Waves } from '@/components/ui/waves';
 import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import type { ProfileHighlight, ProfileViewModel } from '@/lib/profile-view-model';
-import type { Badge } from '@/lib/types';
-import { INTERESTS } from '@/lib/interests';
-import { HIGHLIGHT_ICONS, HighlightIcon } from '@/components/profile/highlight-icons';
-import { highlightIconFor } from '@/lib/profile-view-model';
+import type { ProfileViewModel } from '@/lib/profile-view-model';
+import type { Badge, ProfileHighlight, ProfileHighlightIcon } from '@/lib/types';
+import {
+  HIGHLIGHT_ICON_LABELS,
+  HIGHLIGHT_ICON_OPTIONS,
+  HIGHLIGHT_ICONS,
+  HighlightIcon,
+} from '@/components/profile/highlight-icons';
 
 const BADGE_ICONS: Record<string, React.ReactNode> = {
   camera: <Camera className="size-[18px]" />,
@@ -72,7 +74,7 @@ export function AboutCard({ profile }: { profile: ProfileViewModel }) {
         <li className="flex items-center gap-2.5 text-[13px] text-muted">
           <Sparkles aria-hidden="true" className="size-4 shrink-0 text-brand" />
           <span>{profile.about.points}</span>
-          <span className="text-muted/60">Pontos</span>
+          <span className="text-muted">Pontos</span>
         </li>
       </ul>
     </section>
@@ -107,6 +109,7 @@ export function BadgesCard({ badges }: { badges: Badge[] }) {
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') setOpenBadgeId(null);
                 }}
+                aria-label={badge.label}
                 aria-describedby={tooltipId}
                 aria-expanded={isOpen}
                 className="group relative flex size-[52px] items-center justify-center rounded-full border-2 border-brand bg-surface-raised text-brand transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
@@ -136,96 +139,103 @@ export function BadgesCard({ badges }: { badges: Badge[] }) {
   );
 }
 
+const MAX_HIGHLIGHTS = 12;
+const MAX_HIGHLIGHT_LABEL = 24;
+
+interface HighlightsResponse {
+  user: { highlights: ProfileHighlight[] };
+}
+
+/**
+ * Card de destaques do perfil.
+ *
+ * Destaques são livres: não vêm de um catálogo de interesses. O usuário escolhe
+ * o nome e o ícone de cada um. A lista inteira é persistida via PATCH /api/me.
+ */
 export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
   const isOwnProfile = profile.isMe;
-  const [editing, setEditing] = useState(false);
-  const [highlights, setHighlights] = useState(profile.highlights);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [highlights, setHighlights] = useState<ProfileHighlight[]>(profile.highlights);
+  const [formOpen, setFormOpen] = useState(false);
+  const [label, setLabel] = useState('');
+  const [icon, setIcon] = useState<ProfileHighlightIcon>('sparkles');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const availableInterests = INTERESTS.filter(
-    (i) => !highlights.some((h) => h.id === i.id),
-  );
-
-  const filteredInterests = availableInterests.filter((i) =>
-    i.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    i.group.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
-  async function saveHighlights() {
+  async function persist(next: ProfileHighlight[]): Promise<boolean> {
+    setSaving(true);
+    setMessage(null);
     try {
-      await apiRequest('/api/me', {
+      const response = await apiRequest<HighlightsResponse>('/api/me', {
         method: 'PATCH',
-        body: { interests: highlights.map((h) => h.id) },
+        body: {
+          highlights: next.map((highlight) => ({
+            id: highlight.id,
+            label: highlight.label,
+            icon: highlight.icon,
+          })),
+        },
       });
-      setEditing(false);
-    } catch {
-      // Error handling - could add toast
+      setHighlights(response.user.highlights);
+      return true;
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Não foi possível salvar os destaques.',
+      );
+      return false;
+    } finally {
+      setSaving(false);
     }
   }
 
-  function handleAddInterest(interestId: string) {
-    const interest = INTERESTS.find((i) => i.id === interestId);
-    if (!interest) return;
-    const icon = highlightIconFor(interest.id);
-    setHighlights((prev) => [
-      ...prev,
-      { id: interest.id, label: interest.label, icon },
-    ]);
-    setSelectedInterests((prev) => prev.filter((id) => id !== interestId));
+  function openForm() {
+    setLabel('');
+    setIcon('sparkles');
+    setMessage(null);
+    setFormOpen(true);
   }
 
-  function handleRemoveHighlight(highlightId: string) {
-    setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    if (highlights.length >= MAX_HIGHLIGHTS) {
+      setMessage(`Máximo de ${MAX_HIGHLIGHTS} destaques.`);
+      return;
+    }
+
+    const next: ProfileHighlight[] = [
+      ...highlights,
+      { id: `hl-${Date.now().toString(36)}`, label: trimmed, icon },
+    ];
+    const saved = await persist(next);
+    if (saved) {
+      setFormOpen(false);
+      setLabel('');
+    }
   }
 
-  function handleToggleSelect(interestId: string) {
-    setSelectedInterests((prev) =>
-      prev.includes(interestId)
-        ? prev.filter((id) => id !== interestId)
-        : [...prev, interestId],
-    );
+  async function handleRemove(highlightId: string) {
+    const next = highlights.filter((highlight) => highlight.id !== highlightId);
+    await persist(next);
   }
 
-  function handleAddSelected() {
-    selectedInterests.forEach((id) => handleAddInterest(id));
-  }
+  const canCreate = formOpen && label.trim().length > 0 && highlights.length < MAX_HIGHLIGHTS;
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-5">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-3">
         <h2 className="text-[15px] font-bold text-foreground">Destaques</h2>
         {isOwnProfile ? (
-          <div className="flex items-center gap-2">
-            {editing ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 text-[13px] font-semibold text-foreground transition-colors hover:bg-surface-subtle"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={saveHighlights}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--vibra-brand-fill-hover)]"
-                >
-                  Salvar
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--vibra-brand-fill-hover)]"
-              >
-                <Plus aria-hidden="true" className="size-4" />
-                Adicionar
-              </button>
-            )}
-          </div>
-        ) : profile.highlights.length > 0 ? (
+          <button
+            type="button"
+            onClick={openForm}
+            disabled={highlights.length >= MAX_HIGHLIGHTS}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-[13px] font-semibold text-on-brand transition-colors hover:bg-[var(--vibra-brand-fill-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Adicionar
+          </button>
+        ) : highlights.length > 0 ? (
           <Link
             href={'/explorar' as Route}
             className="inline-flex min-h-11 items-center gap-1 text-[13px] font-semibold text-brand hover:underline"
@@ -236,113 +246,77 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
         ) : null}
       </header>
 
-      {editing ? (
-        <div className="mt-4 space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="highlight-search" className="sr-only">
-              Buscar interesses
+      {formOpen ? (
+        <form onSubmit={handleCreate} className="mt-4 space-y-4 rounded-xl border border-border bg-surface-raised p-4">
+          <div className="space-y-1.5">
+            <label htmlFor="highlight-label" className="block text-[13px] font-semibold text-foreground">
+              Nome do destaque
             </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted" aria-hidden="true" />
-              <input
-                id="highlight-search"
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar interesses…"
-                className="w-full min-h-11 rounded-xl border border-border bg-background px-10 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2" role="list" aria-label="Destaques atuais">
-            {highlights.map((highlight) => (
-              <li key={highlight.id} className="relative group flex flex-col items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="flex size-[60px] items-center justify-center rounded-full border-2 border-brand bg-surface-raised text-brand"
-                >
-                  <HighlightIcon icon={highlight.icon} />
-                </span>
-                <span className="max-w-full truncate text-center text-[11px] leading-4 text-muted">
-                  {highlight.label}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveHighlight(highlight.id)}
-                  aria-label={`Remover destaque ${highlight.label}`}
-                  className="absolute -top-2 -right-2 inline-flex size-7 items-center justify-center rounded-full bg-danger/90 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                >
-                  <Trash2 aria-hidden="true" className="size-3.5" />
-                </button>
-              </li>
-            ))}
-            {highlights.length < 12 && (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                aria-label="Adicionar destaque"
-                className="flex flex-col items-center gap-2 rounded-full border-2 border-dashed border-border-strong bg-surface-raised p-4 text-brand transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-              >
-                <Plus aria-hidden="true" className="size-6" />
-                <span className="text-[11px] leading-4 text-center">Adicionar</span>
-              </button>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-border bg-surface-raised p-4 max-h-64 overflow-y-auto">
-            <p className="mb-3 text-xs font-semibold text-muted uppercase tracking-wide">
-              Interesses disponíveis
+            <input
+              id="highlight-label"
+              type="text"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              maxLength={MAX_HIGHLIGHT_LABEL}
+              required
+              autoFocus
+              placeholder="Ex.: Viagens, Música, Receitas…"
+              className="w-full min-h-11 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            />
+            <p className="text-xs text-muted">
+              {label.trim().length}/{MAX_HIGHLIGHT_LABEL} caracteres
             </p>
-            <div className="space-y-3">
-              {Object.entries(
-                filteredInterests.reduce((acc, interest) => {
-                  const group = interest.group || 'Outros';
-                  if (!acc[group]) acc[group] = [];
-                  acc[group].push(interest);
-                  return acc;
-                }, {} as Record<string, typeof INTERESTS[number][]>),
-              ).map(([group, interests]) => (
-                <div key={group} className="space-y-2">
-                  <p className="text-xs font-semibold text-muted uppercase tracking-wide px-1">
-                    {group}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {interests.map((interest) => (
-                      <label
-                        key={interest.id}
-                        className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-surface-subtle cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedInterests.includes(interest.id)}
-                          onChange={() => handleToggleSelect(interest.id)}
-                          className="size-4 rounded border-border text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                          aria-label={`Adicionar ${interest.label}`}
-                        />
-                        <span>{interest.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+          </div>
+
+          <fieldset>
+            <legend className="mb-2 text-[13px] font-semibold text-foreground">Ícone</legend>
+            <div className="grid grid-cols-5 gap-2">
+              {HIGHLIGHT_ICON_OPTIONS.map((option) => (
+                <label key={option} className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="highlight-icon"
+                    value={option}
+                    checked={icon === option}
+                    onChange={() => setIcon(option)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="flex size-11 items-center justify-center rounded-xl border border-border bg-surface text-muted transition-colors peer-checked:border-brand peer-checked:bg-brand/10 peer-checked:text-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand"
+                  >
+                    {HIGHLIGHT_ICONS[option]}
+                  </span>
+                  <span className="sr-only">{HIGHLIGHT_ICON_LABELS[option]}</span>
+                </label>
               ))}
             </div>
-          </div>
+          </fieldset>
 
-          {selectedInterests.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={!canCreate || saving}
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-[13px] font-semibold text-on-brand transition-colors hover:bg-[var(--vibra-brand-fill-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              {saving ? 'Salvando…' : 'Criar destaque'}
+            </button>
             <button
               type="button"
-              onClick={handleAddSelected}
-              className="w-full min-h-11 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--vibra-brand-fill-hover)]"
+              onClick={() => setFormOpen(false)}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface px-4 text-[13px] font-semibold text-foreground transition-colors hover:bg-surface-subtle"
             >
-              Adicionar {selectedInterests.length} selecionado{selectedInterests.length !== 1 ? 's' : ''}
+              Cancelar
             </button>
-          )}
-        </div>
-      ) : highlights.length > 0 ? (
+          </div>
+        </form>
+      ) : null}
+
+      {highlights.length > 0 ? (
         <ul className="mt-4 grid grid-cols-4 gap-2" role="list">
           {highlights.map((highlight) => (
-            <li key={highlight.id} className="flex flex-col items-center gap-2">
+            <li key={highlight.id} className="group relative flex flex-col items-center gap-2">
               <span
                 aria-hidden="true"
                 className="flex size-[60px] items-center justify-center rounded-full border-2 border-brand bg-surface-raised text-brand"
@@ -352,6 +326,17 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
               <span className="max-w-full truncate text-center text-[11px] leading-4 text-muted">
                 {highlight.label}
               </span>
+              {isOwnProfile ? (
+                <button
+                  type="button"
+                  onClick={() => void handleRemove(highlight.id)}
+                  disabled={saving}
+                  aria-label={`Remover destaque ${highlight.label}`}
+                  className="absolute -top-1 -right-1 inline-flex size-6 items-center justify-center rounded-full bg-danger/90 text-white opacity-100 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                >
+                  <Trash2 aria-hidden="true" className="size-2.5" />
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -360,6 +345,12 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
           Nenhum destaque publicado.
         </div>
       )}
+
+      {message ? (
+        <p className="mt-3 text-xs leading-5 text-danger" role="status">
+          {message}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -446,7 +437,7 @@ export function SuggestionsCard({ profile }: { profile: ProfileViewModel }) {
                 <Link
                   href={`/perfil/${encodeURIComponent(suggestion.username)}` as Route}
                   className="flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  aria-label={`Abrir perfil de ${suggestion.name}`}
+                  aria-label={`${initials(suggestion.name)} — ${suggestion.name}`}
                 >
                   <Avatar
                     src={suggestion.avatar}
@@ -473,7 +464,7 @@ export function SuggestionsCard({ profile }: { profile: ProfileViewModel }) {
                     'min-h-11 shrink-0 rounded-pill px-4 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                     isFollowing || isRequested
                       ? 'bg-surface-subtle text-muted'
-                      : 'bg-[var(--vibra-brand-fill)] text-white hover:bg-[var(--vibra-brand-fill-hover)]',
+                      : 'bg-[var(--vibra-brand-fill)] text-on-brand hover:bg-[var(--vibra-brand-fill-hover)]',
                   )}
                 >
                   {isRequested ? 'Solicitado' : isFollowing ? 'Seguindo' : 'Seguir'}

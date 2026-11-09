@@ -1,8 +1,16 @@
-import { getInterestLabel } from './interests';
 import { getCountryByCode } from './countries';
-import type { Badge, Post, ProfileResponse, SuggestionUser, UserStats } from './types';
+import type {
+  Badge,
+  Community,
+  Post,
+  Presence,
+  ProfileHighlight,
+  ProfileResponse,
+  SuggestionUser,
+  UserStats,
+} from './types';
 
-export type ProfileTabId = 'posts' | 'reels' | 'photos' | 'likes';
+export type ProfileTabId = 'posts' | 'reels' | 'communities' | 'likes';
 
 export interface ProfileViewModel {
   id: number;
@@ -15,6 +23,8 @@ export interface ProfileViewModel {
   bannerAlt: string;
   verified: boolean;
   isMe: boolean;
+  /** Estado da bolinha de status do perfil. */
+  presence: Presence;
   stats: {
     posts: number;
     followers: number;
@@ -33,24 +43,7 @@ export interface ProfileViewModel {
   about: ProfileAbout;
 }
 
-export type ProfileHighlightIcon =
-  | 'crown'
-  | 'gamepad'
-  | 'music'
-  | 'plane'
-  | 'trophy'
-  | 'dumbbell'
-  | 'camera'
-  | 'palette'
-  | 'coffee'
-  | 'sparkles';
-
-export interface ProfileHighlight {
-  /** Id do interesse que originou o destaque (usado para persistir edição). */
-  id: string;
-  label: string;
-  icon: ProfileHighlightIcon;
-}
+export type { ProfileHighlight, ProfileHighlightIcon } from './types';
 
 export interface ProfileSuggestion {
   id: string;
@@ -69,40 +62,6 @@ export interface ProfileAbout {
   joined: string;
   country: string | null;
   points: number;
-}
-
-/**
- * Ícone estável por interesse: a ordem da lista não pode trocar o ícone
- * quando um destaque é adicionado ou removido.
- */
-const HIGHLIGHT_ICON_BY_INTEREST: Record<string, ProfileHighlightIcon> = {
-  games: 'gamepad',
-  boardgames: 'gamepad',
-  musica: 'music',
-  'musica-ao-vivo': 'music',
-  podcasts: 'music',
-  viagens: 'plane',
-  trilhas: 'plane',
-  praia: 'plane',
-  futebol: 'trophy',
-  academia: 'dumbbell',
-  corrida: 'dumbbell',
-  fotografia: 'camera',
-  arte: 'palette',
-  design: 'palette',
-  cafe: 'coffee',
-  culinaria: 'coffee',
-  cozinhar: 'coffee',
-};
-
-const HIGHLIGHT_ICONS_FALLBACK: ProfileHighlightIcon[] = ['crown', 'sparkles'];
-
-export function highlightIconFor(interest: string): ProfileHighlightIcon {
-  const mapped = HIGHLIGHT_ICON_BY_INTEREST[interest];
-  if (mapped) return mapped;
-
-  const index = [...interest].reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return HIGHLIGHT_ICONS_FALLBACK[index % HIGHLIGHT_ICONS_FALLBACK.length];
 }
 
 function formatJoinedDate(timestamp: number): string {
@@ -151,11 +110,8 @@ export function createProfileViewModel(
 ): ProfileViewModel {
   const { user, stats, badges, posts } = profile;
 
-  const highlights: ProfileHighlight[] = user.interests.map((interest) => ({
-    id: interest,
-    label: getInterestLabel(interest),
-    icon: highlightIconFor(interest),
-  }));
+  /* Destaques são livres: vêm do backend já normalizados (id, label, icon). */
+  const highlights: ProfileHighlight[] = user.highlights ?? [];
 
   return {
     id: user.id,
@@ -168,6 +124,7 @@ export function createProfileViewModel(
     bannerAlt: `Capa de ${user.name}`,
     verified: stats.verified === 1,
     isMe: profile.isMe,
+    presence: user.presence ?? 'available',
     stats: {
       posts: stats.posts,
       followers: stats.followers,
@@ -187,7 +144,7 @@ export function createProfileViewModel(
       bio: user.bio,
       joined: formatJoinedDate(user.createdAt),
       country: user.country ? getCountryByCode(user.country)?.name ?? user.country : null,
-      points: computePoints(stats),
+      points: user.points ?? computePoints(stats),
     },
   };
 }

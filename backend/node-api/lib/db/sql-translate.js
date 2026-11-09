@@ -25,6 +25,8 @@ const TABLES_WITHOUT_ID = new Set([
   'story_views',
   'story_reactions',
   'shares',
+  'reposts',
+  'saved_posts',
   'blocks',
   'conversation_members',
   'location_consents',
@@ -33,6 +35,7 @@ const TABLES_WITHOUT_ID = new Set([
   'location_snapshots',
   'radar_prefs',
   'compatibility_answers',
+  'community_members',
 ]);
 
 /**

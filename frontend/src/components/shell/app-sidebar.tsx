@@ -141,7 +141,7 @@ export function AppSidebar({
                   expanded ? 'w-full px-3' : 'w-[72px] justify-center px-0',
                 )}
               >
-                <span aria-hidden="true" className="shrink-0">
+                <span aria-hidden="true" className="shrink-0 text-white">
                   <LogOut className="size-5" />
                 </span>
                 <span
@@ -220,7 +220,7 @@ function SidebarLinkItem({
           : 'font-medium text-muted hover:bg-surface-subtle hover:text-foreground',
       )}
     >
-      <span aria-hidden="true" className="relative shrink-0">
+      <span aria-hidden="true" className="relative shrink-0 text-white">
         {showAvatar ? (
           <Avatar
             src={user!.avatar}
@@ -255,7 +255,7 @@ function SidebarLinkItem({
         <span
           aria-hidden="true"
           className={cn(
-            'hidden min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold leading-4 text-on-brand',
+            'hidden min-w-[20px] items-center justify-center rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-bold leading-4 text-white',
             expanded && 'inline-flex',
           )}
         >

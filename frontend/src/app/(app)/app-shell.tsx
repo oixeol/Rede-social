@@ -36,6 +36,8 @@ interface AppShellProps {
 export default function AppShell({ children, me, dataPalette }: AppShellProps) {
   const pathname = usePathname();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  /* Configurações usa o layout de duas colunas e dispensa a navbar. */
+  const hideTopbar = pathname === '/configuracoes';
 
   const primaryNav = getPrimaryNavigation(
     { username: me.user.username, avatar: me.user.avatar, name: me.user.name },
@@ -62,7 +64,7 @@ export default function AppShell({ children, me, dataPalette }: AppShellProps) {
       />
 
       {/* Topbar responsiva */}
-      <AppTopbar currentPath={pathname} sidebarExpanded={sidebarExpanded} />
+      {hideTopbar ? null : <AppTopbar currentPath={pathname} sidebarExpanded={sidebarExpanded} />}
 
       {/* Área de conteúdo */}
       <div

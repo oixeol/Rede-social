@@ -17,14 +17,16 @@ import {
   Send,
   Share2,
   Trash2,
-  Image as ImageIcon,
+  Users,
 } from 'lucide-react';
 
 import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { PostCard } from '@/components/posts/post-card';
+import { StatusMenu } from '@/components/profile/status-menu';
 import { apiRequest } from '@/lib/api';
 import { isFeatureEnabled } from '@/lib/feature-flags';
 import type { ProfileTabId, ProfileViewModel } from '@/lib/profile-view-model';
+import type { Community, CommunitiesResponse, Presence } from '@/lib/types';
 import { cn } from '@/lib/cn';
 import { isSafeMediaSource } from '@/lib/media';
 
@@ -70,25 +72,34 @@ export function ProfileBanner({ profile }: ProfileHeaderProps) {
 }
 
 export function ProfileIdentity({ profile }: ProfileHeaderProps) {
+  const [presence, setPresence] = useState<Presence>(profile.presence ?? 'available');
+  const [presenceProp, setPresenceProp] = useState<Presence>(profile.presence ?? 'available');
+
+  /* Sincronização com props do servidor (ajustar state durante o render). */
+  if (profile.presence !== presenceProp) {
+    setPresenceProp(profile.presence ?? 'available');
+    setPresence(profile.presence ?? 'available');
+  }
+
   return (
     <div className="relative w-fit shrink-0">
-      <span className="block size-[112px] rounded-full border-[3px] border-brand bg-surface-raised shadow-[0_0_0_4px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.18),0_0_28px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.35)] sm:size-[150px]">
+      <span className="block size-[90px] rounded-full border-[3px] border-brand bg-surface-raised shadow-[0_0_0_4px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.18),0_0_28px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.35)] sm:size-[120px]">
         {isSafeMediaSource(profile.avatar) ? (
           <Image
             src={profile.avatar}
             alt={profile.avatarAlt}
-            width={144}
-            height={144}
+            width={115}
+            height={115}
             loading="eager"
             fetchPriority="high"
             unoptimized
-            className="size-[106px] rounded-full object-cover sm:size-[144px]"
+            className="size-[84px] rounded-full object-cover sm:size-[114px]"
           />
         ) : (
           <span
             role="img"
             aria-label={profile.avatarAlt}
-            className="flex size-[106px] items-center justify-center rounded-full bg-gradient-to-br from-brand-fill to-accent text-3xl font-bold text-on-brand sm:size-[144px]"
+            className="flex size-[84px] items-center justify-center rounded-full bg-gradient-to-br from-brand-fill to-accent text-3xl font-bold text-on-brand sm:size-[114px]"
           >
             {profile.name
               .trim()
@@ -101,10 +112,16 @@ export function ProfileIdentity({ profile }: ProfileHeaderProps) {
         )}
       </span>
 
-      <span
-        aria-hidden="true"
-        className="absolute right-0 bottom-1 size-[17px] rounded-full border-2 border-[var(--vibra-background)] bg-[#18D73C]"
-      />
+      {/* Ponto de status ancorado na borda do avatar (canto inferior direito).
+          No próprio perfil, abre o menu de presença.
+          `z-30` mantém o menu acima da grade de publicações (z-20). */}
+      <span className="absolute right-0 bottom-0 z-30 translate-x-1/3 translate-y-1/3">
+        <StatusMenu
+          presence={presence}
+          editable={profile.isMe}
+          onChange={setPresence}
+        />
+      </span>
     </div>
   );
 }
@@ -212,18 +229,18 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
           type="button"
           onClick={handleFollow}
           disabled={followState.followRequested}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-xs font-semibold text-white transition-colors hover:bg-[var(--vibra-brand-fill-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-xs font-semibold text-on-brand transition-colors hover:bg-[var(--vibra-brand-fill-hover)] disabled:cursor-not-allowed disabled:opacity-50"
           data-following={followState.isFollowing}
           data-requested={followState.followRequested}
         >
           {followState.followRequested ? (
             <>
-              <Heart aria-hidden="true" className="size-4 fill-white text-white" />
+              <Heart aria-hidden="true" className="size-4 fill-on-brand text-on-brand" />
               Solicitado
             </>
           ) : followState.isFollowing ? (
             <>
-              <Heart aria-hidden="true" className="size-4 fill-white text-white" />
+              <Heart aria-hidden="true" className="size-4 fill-on-brand text-on-brand" />
               Seguindo
             </>
           ) : (
@@ -269,7 +286,7 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
 const TAB_ICONS: Record<ProfileTabId, React.ReactNode> = {
   posts: <LayoutGrid className="size-4" />,
   reels: <Play className="size-4" />,
-  photos: <ImageIcon className="size-4" />,
+  communities: <Users className="size-4" />,
   likes: <Heart className="size-4" />,
 };
 
@@ -283,7 +300,7 @@ interface ProfileTabsProps {
 const PROFILE_TABS = [
   { id: 'posts', label: 'Publicações', icon: TAB_ICONS.posts },
   { id: 'reels', label: 'Instantes', icon: TAB_ICONS.reels },
-  { id: 'photos', label: 'Fotos', icon: TAB_ICONS.photos },
+  { id: 'communities', label: 'Comunidade', icon: TAB_ICONS.communities },
   { id: 'likes', label: 'Curtidas', icon: TAB_ICONS.likes },
 ] as const;
 
@@ -292,7 +309,7 @@ function getAvailableProfileTabs(profile: ProfileViewModel, reelsEnabled: boolea
   return PROFILE_TABS.filter((tab) => {
     if (tab.id === 'posts') return true;
     if (tab.id === 'reels') return reelsEnabled;
-    if (tab.id === 'photos') return profile.posts.some((p) => p.mediaType === 'image');
+    if (tab.id === 'communities') return isFeatureEnabled('communities');
     if (tab.id === 'likes') return profile.isMe;
     return false;
   });
@@ -472,6 +489,94 @@ function ProfileLikes({ username }: ProfileLikesProps) {
   );
 }
 
+interface ProfileCommunitiesProps {
+  username: string;
+}
+
+function ProfileCommunities({ username }: ProfileCommunitiesProps) {
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        setLoading(true);
+        const response = await apiRequest<CommunitiesResponse>(
+          `/api/users/${encodeURIComponent(username)}/communities`,
+        );
+        if (!cancelled) {
+          setCommunities(response.communities);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Não foi possível carregar as comunidades.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [username]);
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-border bg-surface p-10 text-center text-sm text-muted">
+        Carregando comunidades…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-border bg-surface p-10 text-center text-sm text-danger">
+        {error}
+      </div>
+    );
+  }
+
+  if (communities.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border-strong bg-surface/60 px-5 py-10 text-center text-sm text-muted">
+        Este perfil ainda não participa de nenhuma comunidade.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" role="list" aria-label="Comunidades">
+      {communities.map((community) => (
+        <div
+          key={community.id}
+          role="listitem"
+          className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-surface p-4"
+        >
+          <span
+            aria-hidden="true"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand"
+          >
+            <Users className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-foreground">{community.name}</p>
+            <p className="text-xs text-muted">
+              {community.memberCount} {community.memberCount === 1 ? 'membro' : 'membros'}
+            </p>
+          </div>
+          {community.role === 'owner' ? (
+            <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-bold tracking-wide text-brand uppercase">
+              Criador
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export interface ProfileContentProps {
   profile: ProfileViewModel;
 }
@@ -489,8 +594,8 @@ export function ProfileContent({ profile }: ProfileContentProps) {
     if (tabId === 'reels') {
       return <ProfilePostGrid posts={profile.posts.filter((p) => p.mediaType === 'video')} />;
     }
-    if (tabId === 'photos') {
-      return <ProfilePostGrid posts={profile.posts.filter((p) => p.mediaType === 'image')} />;
+    if (tabId === 'communities') {
+      return <ProfileCommunities username={profile.username} />;
     }
     if (tabId === 'likes' && profile.isMe) {
       return <ProfileLikes username={profile.username} />;

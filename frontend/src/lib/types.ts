@@ -7,6 +7,9 @@ export type ThemePalette = 'orange' | 'black' | 'white';
 
 export type MessagePolicy = 'everyone' | 'connections' | 'nobody';
 
+/** Estados da bolinha de status do perfil. */
+export type Presence = 'available' | 'away' | 'dnd' | 'invisible';
+
 export type MediaType = 'image' | 'video' | 'text';
 
 export interface UserStats {
@@ -37,6 +40,28 @@ export interface UserBrief {
 /** Author info in posts — includes privacy flag. */
 export interface PostAuthor extends UserBrief {
   isPrivate: boolean;
+  /** Perfil com verificação de identidade aprovada. */
+  verified: boolean;
+}
+
+/** Icones disponíveis para destaques — conjunto fechado da plataforma. */
+export type ProfileHighlightIcon =
+  | 'crown'
+  | 'gamepad'
+  | 'music'
+  | 'plane'
+  | 'trophy'
+  | 'dumbbell'
+  | 'camera'
+  | 'palette'
+  | 'coffee'
+  | 'sparkles';
+
+/** Destaque livre: nome escolhido pelo usuário + ícone. */
+export interface ProfileHighlight {
+  id: string;
+  label: string;
+  icon: ProfileHighlightIcon;
 }
 
 /** Public user profile (userDTO from Node API). */
@@ -48,9 +73,51 @@ export interface PublicUser {
   avatar: string | null;
   banner: string | null;
   interests: string[];
+  highlights: ProfileHighlight[];
   isPrivate: boolean;
+  gender: string | null;
   country: string | null;
   state: string | null;
+  points: number;
+  /** Estado da bolinha de status (default `available`). */
+  presence: Presence;
+}
+
+/** Preferências de notificação do usuário. */
+export interface NotificationPreferences {
+  likes?: boolean;
+  comments?: boolean;
+  follows?: boolean;
+  mentions?: boolean;
+  messages?: boolean;
+}
+
+/** Preferências de privacidade do usuário. */
+export interface PrivacyPreferences {
+  showActivityStatus?: boolean;
+  discoverableBySearch?: boolean;
+}
+
+/** Preferências de aparência do usuário. */
+export interface AppearancePreferences {
+  reduceMotion?: boolean;
+  compactFeed?: boolean;
+  autoplayMedia?: boolean;
+}
+
+/** Preferências de conteúdo do feed. */
+export interface ContentPreferences {
+  showReplies?: boolean;
+  autoplayReels?: boolean;
+  sensitiveMedia?: boolean;
+}
+
+/** Bloco de preferências salvo em `users.preferences`. */
+export interface UserPreferences {
+  notifications?: NotificationPreferences;
+  privacy?: PrivacyPreferences;
+  appearance?: AppearancePreferences;
+  content?: ContentPreferences;
 }
 
 /** Authenticated user's own profile (selfDTO from Node API). */
@@ -59,6 +126,10 @@ export interface SelfUser extends PublicUser {
   messagePolicy: MessagePolicy;
   canCustomizeTheme: boolean;
   themePalette: ThemePalette;
+  email: string | null;
+  gender: string | null;
+  externalLink: string | null;
+  preferences: UserPreferences;
 }
 
 /** Profile user as returned by /api/users/:username (userDTO + messagePolicy + createdAt). */
@@ -86,7 +157,17 @@ export interface Post {
   likes: number;
   comments: number;
   shares: number;
+  /** Total de reposts da publicação. */
+  reposts: number;
+  /** Total de salvamentos da publicação. */
+  saves: number;
   liked: boolean;
+  /** O usuário logado repostou esta publicação. */
+  reposted: boolean;
+  /** O usuário logado salvou esta publicação. */
+  saved: boolean;
+  /** O usuário logado segue o autor da publicação. */
+  authorFollowing: boolean;
   /** Present in feed/profile responses (withPreviews). Optional in post detail. */
   preview?: Comment[];
 }
@@ -100,6 +181,37 @@ export interface Comment {
 }
 
 /** --- Response types --- */
+
+/** Comunidade retornada pelas rotas de comunidades. */
+export interface Community {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  avatar: string | null;
+  memberCount: number;
+  isMember: boolean;
+  role: 'owner' | 'member' | null;
+  createdAt: number;
+}
+
+/** GET /api/communities | /api/users/:username/communities */
+export interface CommunitiesResponse {
+  communities: Community[];
+}
+
+/** Sessão ativa retornada por GET /api/sessions. */
+export interface SessionInfo {
+  id: string;
+  device: string;
+  createdAt: number;
+  current: boolean;
+}
+
+/** GET /api/sessions */
+export interface SessionsResponse {
+  sessions: SessionInfo[];
+}
 
 /** GET /api/me */
 export interface MeResponse {

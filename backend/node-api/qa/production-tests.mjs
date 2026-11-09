@@ -30,6 +30,8 @@ async function startServer(extraEnv, { expectExit = false } = {}) {
       PORT: String(port),
       HOST: '127.0.0.1',
       VIBRA_DATA_DIR: dataDir,
+      /* Banco temporário isolado: ignora o DATABASE_URL do .env da raiz. */
+      DATABASE_URL: '',
       COOKIE_SECURE: '0',
       CLEANUP_INTERVAL_MS: '0',
       /* Neutraliza o ambiente herdado do runner para cada cenário. */

@@ -23,6 +23,7 @@
   --color-accent: var(--vibra-accent);
   --color-accent-soft: var(--vibra-accent-soft);
   --color-success: var(--vibra-success);
+  --color-warning: var(--vibra-warning);
   --color-danger: var(--vibra-danger);
   --color-danger-soft: var(--vibra-danger-soft);
 
@@ -38,10 +39,10 @@
 /* =============================================================================
    TOKENS DE TEMA — Visual Vibra (Preto / Laranja / Branco)
    Paleta da referência:
-   - Fundo geral:        #050505
-   - Fundo secundário:   #0B0B0B
-   - Cards:              #101010
-   - Borda:              1px #242424
+   - Fundo geral:        #121214
+   - Fundo secundário:   #0D0D0D
+   - Cards:              #0D0D0D
+   - Borda:              1px #1A1A1C
    - Laranja principal:  #FF6A00
    - Laranja secundário: #FF8C00
    - Laranja intenso:    #FF4500
@@ -55,16 +56,17 @@
   color-scheme: dark;
 
   /* Superfícies */
-  --vibra-background: #050505;
-  --vibra-background-secondary: #0B0B0B;
-  --vibra-surface: #101010;
-  --vibra-surface-raised: #101010;
-  --vibra-surface-subtle: #181818;
+  --vibra-background: #121214;
+  --vibra-background-secondary: #0D0D0D;
+  --vibra-surface: #0D0D0D;
+  --vibra-surface-raised: #0D0D0D;
+  --vibra-surface-subtle: #151517;
   --vibra-foreground: #FFFFFF;
   --vibra-muted: #A1A1AA;
-  --vibra-subtle: #71717A;
-  --vibra-border: #242424;
-  --vibra-border-strong: #3F3F46;
+  /* Texto terciário: contraste >= 4.5:1 sobre as superfícies escuras. */
+  --vibra-subtle: #85858E;
+  --vibra-border: #1A1A1C;
+  --vibra-border-strong: #2A2A2C;
 
   /* Brand: laranja vibrante */
   --vibra-brand: #FF6A00;
@@ -79,6 +81,7 @@
   --vibra-accent-soft: #3A1600;
 
   --vibra-success: #22C55E;
+  --vibra-warning: #F5B942;
   --vibra-danger: #EF4444;
   --vibra-danger-soft: #3A1414;
 
@@ -114,7 +117,8 @@
   --vibra-surface-subtle: #F4F4F5;
   --vibra-foreground: #111111;
   --vibra-muted: #52525B;
-  --vibra-subtle: #71717A;
+  /* Texto terciário: contraste >= 4.5:1 sobre as superfícies claras. */
+  --vibra-subtle: #65656E;
   --vibra-border: #E4E4E7;
   --vibra-border-strong: #D4D4D8;
 
@@ -129,6 +133,7 @@
   --vibra-accent-soft: #FFEDD5;
 
   --vibra-success: #16A34A;
+  --vibra-warning: #B45309;
   --vibra-danger: #DC2626;
   --vibra-danger-soft: #FEE2E2;
 
@@ -177,12 +182,12 @@
 [data-palette="black"] {
   --vibra-brand: #F5F5F5;
   --vibra-brand-hover: #FFFFFF;
-  --vibra-brand-fill: #101010;
-  --vibra-brand-fill-hover: #242424;
-  --vibra-brand-soft: #242424;
+  --vibra-brand-fill: #0D0D0D;
+  --vibra-brand-fill-hover: #1A1A1C;
+  --vibra-brand-soft: #1A1A1C;
   --vibra-on-brand: #FFFFFF;
   --vibra-accent: #FFFFFF;
-  --vibra-accent-soft: #242424;
+  --vibra-accent-soft: #1A1A1C;
 }
 
 [data-theme="light"] [data-palette="black"] {
@@ -201,10 +206,10 @@
   --vibra-brand-hover: #E4E4E7;
   --vibra-brand-fill: #FFFFFF;
   --vibra-brand-fill-hover: #E4E4E7;
-  --vibra-brand-soft: #242424;
+  --vibra-brand-soft: #0D0D0D;
   --vibra-on-brand: #111111;
   --vibra-accent: #FFFFFF;
-  --vibra-accent-soft: #242424;
+  --vibra-accent-soft: #0D0D0D;
 }
 
 [data-theme="light"] [data-palette="white"] {
@@ -218,58 +223,60 @@
   --vibra-accent-soft: #E4E4E7;
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-html {
-  background: var(--vibra-background);
-  scroll-behavior: smooth;
-}
+  html {
+    background: var(--vibra-background);
+    scroll-behavior: smooth;
+  }
 
-body {
-  min-height: 100vh;
-  margin: 0;
-  background: var(--vibra-background);
-  color: var(--vibra-foreground);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
+  body {
+    min-height: 100vh;
+    margin: 0;
+    background: var(--vibra-background);
+    color: var(--vibra-foreground);
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
 
-button,
-input,
-textarea,
-select {
-  color: inherit;
-  font: inherit;
-}
+  button,
+  input,
+  textarea,
+  select {
+    color: inherit;
+    font: inherit;
+  }
 
-select option {
-  background: #050505;
-  color: #ffffff;
+  select option {
+    background: #0D0D0D;
+    color: #ffffff;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: var(--vibra-brand);
+    color: var(--vibra-on-brand);
+  }
+
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--vibra-brand-fill) 68%, var(--vibra-foreground));
+    outline-offset: 3px;
+  }
 }
 
 /* Selects nativos: fundo preto e texto branco (não depende do tema). */
 .vibra-select-dark {
-  background-color: #050505;
+  background-color: #0D0D0D;
   color: #ffffff;
-}
-
-button:not(:disabled),
-[role="button"]:not([aria-disabled="true"]) {
-  cursor: pointer;
-}
-
-::selection {
-  background: var(--vibra-brand);
-  color: var(--vibra-on-brand);
-}
-
-:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--vibra-brand-fill) 68%, var(--vibra-foreground));
-  outline-offset: 3px;
 }
 
 .sr-only {

@@ -5,7 +5,7 @@ import type { Route } from 'next';
 import { useState, useEffect } from 'react';
 import { Compass, Users, Sparkles, Info, ExternalLink } from 'lucide-react';
 
-import { Avatar } from '@/components/ui/avatar';
+import { Avatar, initials } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -69,7 +69,6 @@ export function InicioRail({ suggestions: initialSuggestions }: InicioRailProps)
           <a
             href="/explorar"
             className="text-xs font-medium text-brand hover:underline flex items-center gap-1"
-            aria-label="Ver todas as sugestões"
           >
             Ver tudo
             <ExternalLink className="size-3" aria-hidden="true" />
@@ -88,7 +87,7 @@ export function InicioRail({ suggestions: initialSuggestions }: InicioRailProps)
                 <Link
                   href={`/perfil/${encodeURIComponent(user.username)}` as Route}
                   className="flex items-center gap-2 shrink-0"
-                  aria-label={`Perfil de ${user.name}`}
+                  aria-label={`${initials(user.name)} — ${user.name}`}
                 >
                   <Avatar src={user.avatar} alt={user.name} name={user.name} size="sm" />
                 </Link>

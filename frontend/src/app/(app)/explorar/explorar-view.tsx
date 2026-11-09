@@ -172,6 +172,7 @@ export function ExplorarView({ explore: initialExplore }: ExplorarViewProps) {
               <PostCard
                 key={post.id}
                 post={post}
+                compact
                 onOpen={() =>
                   router.push(`/perfil/${encodeURIComponent(post.user.username)}` as Route)
                 }

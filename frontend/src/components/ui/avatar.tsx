@@ -43,7 +43,8 @@ const statusClasses: Record<AvatarSize, string> = {
   xl: 'size-5 border-[3px]',
 };
 
-function initials(name: string): string {
+/** Iniciais de um nome, usadas como fallback visual do avatar. */
+export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return '?';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();

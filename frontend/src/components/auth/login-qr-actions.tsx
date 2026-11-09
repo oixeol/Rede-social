@@ -14,9 +14,9 @@ export function LoginQrActions() {
   return (
     <div className="flex w-full flex-col items-center">
       <div className="my-6 flex w-full items-center gap-3" aria-hidden="true">
-        <span className="h-px flex-1 bg-[#242424]" />
+        <span className="h-px flex-1 bg-[#1A1A1C]" />
         <span className="text-[10px] font-semibold tracking-[0.2em] text-[#71717A] uppercase">ou</span>
-        <span className="h-px flex-1 bg-[#242424]" />
+        <span className="h-px flex-1 bg-[#1A1A1C]" />
       </div>
 
       <button

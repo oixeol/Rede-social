@@ -533,9 +533,9 @@ export function SignupForm() {
               aria-describedby={error && invalidField === 'gender' ? 'form-error' : undefined}
               className={cn(selectClass, invalidField === 'gender' && 'border-danger focus:border-danger focus:ring-danger/20')}
             >
-              <option value="" className="bg-[#050505] text-white">Selecione</option>
+              <option value="" className="bg-[#0D0D0D] text-white">Selecione</option>
               {GENDER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value} className="bg-[#050505] text-white">
+                <option key={option.value} value={option.value} className="bg-[#0D0D0D] text-white">
                   {option.label}
                 </option>
               ))}
@@ -564,9 +564,9 @@ export function SignupForm() {
                 aria-describedby={error && invalidField === 'country' ? 'form-error' : undefined}
                 className={cn(selectClass, invalidField === 'country' && 'border-danger focus:border-danger focus:ring-danger/20')}
               >
-                <option value="" className="bg-[#050505] text-white">Selecione seu país</option>
+                <option value="" className="bg-[#0D0D0D] text-white">Selecione seu país</option>
                 {countriesList.map((c) => (
-                  <option key={c.code} value={c.code} className="bg-[#050505] text-white">
+                  <option key={c.code} value={c.code} className="bg-[#0D0D0D] text-white">
                     {c.name}
                   </option>
                 ))}
@@ -594,9 +594,9 @@ export function SignupForm() {
                   states.length === 0 && 'opacity-50 cursor-not-allowed'
                 )}
               >
-                <option value="" className="bg-[#050505] text-white">Selecione o país primeiro</option>
+                <option value="" className="bg-[#0D0D0D] text-white">Selecione o país primeiro</option>
                 {states.map((s) => (
-                  <option key={s.code} value={s.code} className="bg-[#050505] text-white">
+                  <option key={s.code} value={s.code} className="bg-[#0D0D0D] text-white">
                     {s.name}
                   </option>
                 ))}
