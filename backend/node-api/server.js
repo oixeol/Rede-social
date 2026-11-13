@@ -3021,6 +3021,28 @@ async function handleApi(req, res, pathname, url) {
     }
   }
 
+  // TESTE: rota para listar rotas do Better Auth
+  if (pathname === '/api/auth/debug-routes') {
+    const { getAuth } = require('./lib/auth');
+    try {
+      const auth = await getAuth();
+      const routes = [];
+      // Better Auth stores routes in the handler
+      if (auth.handler && auth.handler.routes) {
+        for (const route of auth.handler.routes) {
+          routes.push({ method: route.method, path: route.path });
+        }
+      }
+      return json(res, 200, { routes });
+    } catch (err) {
+      return json(res, 500, { 
+        error: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+    }
+  }
+
   // Better Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
     console.log('[DEBUG] Better Auth route:', pathname);
