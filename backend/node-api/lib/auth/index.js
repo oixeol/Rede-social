@@ -109,6 +109,7 @@ function createAuth() {
       },
       database: {
         generateId: () => crypto.randomUUID(),
+        checkSchema: false,
       },
     },
 
