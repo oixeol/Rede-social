@@ -3029,7 +3029,10 @@ async function handleApi(req, res, pathname, url) {
       const routes = [];
       // Better Auth stores routes in the handler
       const handler = auth.handler;
-      console.log('[DEBUG] Handler keys:', Object.keys(handler));
+      const authOptions = auth.options;
+      console.log('[DEBUG] Auth options keys:', Object.keys(authOptions));
+      console.log('[DEBUG] Social providers:', authOptions?.socialProviders);
+      console.log('[DEBUG] Handler type:', typeof handler);
       if (handler && handler.routes) {
         for (const route of handler.routes) {
           routes.push({ method: route.method, path: route.path });
@@ -3041,7 +3044,12 @@ async function handleApi(req, res, pathname, url) {
       } else if (handler && handler.router) {
         console.log('[DEBUG] Router keys:', Object.keys(handler.router));
       }
-      return json(res, 200, { routes, handlerKeys: Object.keys(handler) });
+      return json(res, 200, { 
+        routes, 
+        handlerKeys: Object.keys(handler || {}),
+        socialProvidersConfig: authOptions?.socialProviders,
+        baseURL: authOptions?.baseURL,
+      });
     } catch (err) {
       return json(res, 500, { 
         error: err.message,
