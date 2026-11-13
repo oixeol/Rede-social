@@ -14,7 +14,11 @@ const db = new Kysely({
   }),
 });
 
+const isProduction = env.NODE_ENV === 'production';
+const apiOrigin = env.API_ORIGIN || (isProduction ? 'https://rede-social-attz.onrender.com' : 'http://localhost:4173');
+
 const auth = betterAuth({
+  baseURL: apiOrigin,
   database: db,
 
   emailAndPassword: {
@@ -31,9 +35,10 @@ const auth = betterAuth({
     cookieName: 'vibra_session',
     cookieOptions: {
       httpOnly: true,
-      secure: env.COOKIE_SECURE === '1',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
+      domain: isProduction ? '.onrender.com' : undefined,
     },
   },
 
@@ -60,12 +65,13 @@ const auth = betterAuth({
   },
 
   advanced: {
-    crossSubDomainCookies: { enabled: false },
+    crossSubDomainCookies: { enabled: isProduction },
     defaultCookieAttributes: {
       httpOnly: true,
-      secure: env.COOKIE_SECURE === '1',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
+      domain: isProduction ? '.onrender.com' : undefined,
     },
     database: {
       generateId: () => crypto.randomUUID(),
