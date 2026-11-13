@@ -46,12 +46,28 @@ export function LoginForm() {
 
   async function handleSubmitSocial(provider: 'google'): Promise<void> {
     try {
-      const result = await signIn.social({
-        provider,
-        callbackURL: '/inicio',
+      setPending(true);
+      setError(null);
+      const res = await fetch('/api/auth/sign-in/social', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider,
+          callbackURL: `${window.location.origin}/inicio`,
+        }),
       });
-      if (result?.url) {
-        window.location.href = result.url;
+
+      if (!res.ok) {
+        throw new Error('Falha ao conectar com serviço de autenticação.');
+      }
+
+      const data = await res.json();
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('Resposta inválida do servidor.');
       }
     } catch (caught) {
       setError(messageFromError(caught));
