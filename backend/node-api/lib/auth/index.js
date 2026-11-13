@@ -44,6 +44,8 @@ function createAuth() {
 
   const isProduction = env.NODE_ENV === 'production';
   const apiOrigin = env.API_ORIGIN || (isProduction ? 'https://rede-social-attz.onrender.com' : 'http://localhost:4173');
+  // baseURL should include the auth path prefix since handler is mounted at /api/auth/*
+  const baseURL = `${apiOrigin}/api/auth`;
   const authSecret = env.BETTER_AUTH_SECRET || (isProduction ? '' : 'dev-secret-change-in-production');
 
   if (isProduction && !env.BETTER_AUTH_SECRET) {
@@ -51,7 +53,7 @@ function createAuth() {
   }
 
   return betterAuth({
-    baseURL: apiOrigin,
+    baseURL: baseURL,
     database: kyselyAdapter(db),
     secret: authSecret,
 
