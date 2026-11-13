@@ -48,6 +48,7 @@ export function SignupForm() {
   const countriesList = getCountries();
 
   // Refs
+  const fullNameRef = useRef<HTMLInputElement>(null);
   const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -183,21 +184,22 @@ export function SignupForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submittingRef) return;
+    if (submittingRef.current) return;
 
-    const fields: { field: FieldName; value: string }[] = [
-      { field: 'fullName', value: fullName },
-      { field: 'username', value: username },
-      { field: 'email', value: email },
-      { field: 'country', value: country },
-      { field: 'password', value: password },
-      { field: 'confirmPassword', value: confirmPassword },
+    const fields: { field: FieldName; value: string; ref?: React.RefObject<HTMLInputElement | HTMLSelectElement | null> }[] = [
+      { field: 'fullName', value: fullName, ref: fullNameRef },
+      { field: 'username', value: username, ref: usernameRef },
+      { field: 'email', value: email, ref: emailRef },
+      { field: 'country', value: country, ref: undefined },
+      { field: 'password', value: password, ref: passwordRef },
+      { field: 'confirmPassword', value: confirmPassword, ref: confirmPasswordRef },
     ];
 
-    for (const { field, value } of fields) {
+    for (const { field, value, ref } of fields) {
       if (!validateField(field, value)) {
         setInvalidField(field);
         setError(getFieldErrorMessage(field, value));
+        ref?.current?.focus();
         return;
       }
     }
@@ -216,7 +218,7 @@ export function SignupForm() {
       return;
     }
 
-    setSubmittingRef(true);
+    submittingRef.current = true;
     setPending(true);
     setError(null);
     setInvalidField(null);
@@ -234,11 +236,13 @@ export function SignupForm() {
         country,
         callbackURL: '/inicio',
       } as any);
+      submittingRef.current = false;
       router.push('/inicio' as Route);
       router.refresh();
     } catch (caught) {
       setError(messageFromError(caught));
       setPending(false);
+      submittingRef.current = false;
     }
   }
 
