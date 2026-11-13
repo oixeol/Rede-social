@@ -2828,6 +2828,25 @@ async function handleApi(req, res, pathname, url) {
     });
   }
 
+  // TESTE: rota para testar inicialização do Better Auth
+  if (pathname === '/api/auth/test-init') {
+    try {
+      const { getAuth } = require('./lib/auth');
+      const auth = await getAuth();
+      return json(res, 200, { 
+        msg: 'Better Auth initialized successfully',
+        hasHandler: typeof auth.handler === 'function'
+      });
+    } catch (err) {
+      console.error('[TEST-INIT] Error:', err);
+      return json(res, 500, { 
+        error: 'Better Auth init failed',
+        message: err.message,
+        stack: err.stack
+      });
+    }
+  }
+
   // Better Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
     console.log('[DEBUG] Better Auth route:', pathname);
