@@ -19,8 +19,8 @@ export interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElem
 export function SearchField({
   value,
   onValueChange,
-  label = 'Buscar no Vibra',
-  placeholder = 'Buscar no Vibra...',
+  label = 'Buscar no Orbit',
+  placeholder = 'Buscar no Orbit...',
   className,
   onSubmit,
   id,

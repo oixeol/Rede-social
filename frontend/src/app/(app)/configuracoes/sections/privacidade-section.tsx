@@ -106,7 +106,7 @@ export function PrivacidadeSection({
               setValues((current) => ({ ...current, showActivityStatus: checked }))
             }
             label="Mostrar status de atividade"
-            description="Permite que outras pessoas vejam quando você acessou o Vibra."
+            description="Permite que outras pessoas vejam quando você acessou o Orbit."
             disabled={state.status === 'saving'}
           />
 

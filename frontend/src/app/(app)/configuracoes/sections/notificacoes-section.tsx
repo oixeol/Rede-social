@@ -75,7 +75,7 @@ export function NotificacoesSection({
     <div>
       <SettingsHeading
         title="Notificações"
-        description="Escolha quais eventos geram aviso dentro do Vibra."
+        description="Escolha quais eventos geram aviso dentro do Orbit."
       />
 
       <form onSubmit={handleSubmit}>

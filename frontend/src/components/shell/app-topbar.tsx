@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
+import { Bell, MessageSquare } from 'lucide-react';
 
 import { Avatar } from '@/components/ui/avatar';
 import { SearchField } from '@/components/ui/search-field';
@@ -10,51 +12,93 @@ import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import type { SearchResponse } from '@/lib/types';
 
-interface AppTopbarProps {
-  currentPath: string;
-  /** Sidebar expandida: o topbar acompanha o mesmo deslocamento do conteúdo. */
-  sidebarExpanded?: boolean;
-}
+import { OrbitLogo } from '@/components/shell/orbit-logo';
+import { UserMenu } from '@/components/shell/user-menu';
+import type { NavigationItem } from '@/components/shell/navigation';
 
-/** Topbar enxuto: apenas o campo de busca. */
-export function AppTopbar({ currentPath, sidebarExpanded = false }: AppTopbarProps) {
-  const router = useRouter();
-  const isProfilePage = currentPath.startsWith('/perfil/');
+/**
+ * Topbar fixa: logo + navegação primária à esquerda (desktop), busca no Explorar,
+ * e ações do usuário (mensagens, notificações, avatar) à direita.
+ */
+export function AppTopbar({
+  currentPath,
+  primaryNavigation,
+  unreadNotifications,
+  unreadMessages,
+  user,
+}: {
+  currentPath: string;
+  primaryNavigation: NavigationItem[];
+  unreadNotifications: number;
+  unreadMessages: number;
+  user: { name: string; username: string; avatar: string | null; presence: 'available' | 'away' | 'dnd' | 'invisible' };
+}) {
+  const isExplore = currentPath === '/explorar';
 
   return (
-    <header className="relative z-30 bg-transparent">
-      <div
-        className={cn(
-          'transition-[padding] duration-200 motion-reduce:transition-none',
-          sidebarExpanded ? 'md:pl-[248px]' : 'md:pl-[72px]',
-        )}
-      >
-        <div
-          className={cn(
-            'mx-auto grid h-16 w-full max-w-[1288px] items-center gap-3 px-4 sm:px-5',
-            isProfilePage
-              ? 'xl:grid-cols-[minmax(0,872px)_354px] xl:gap-[22px]'
-              : 'grid-cols-[minmax(0,1fr)_auto]',
-          )}
-        >
-          <div className="min-w-0">
-            <TopbarSearch
-              onNavigate={(username) => {
-                router.push(`/perfil/${encodeURIComponent(username)}` as Route);
-              }}
-            />
-          </div>
+    <header className="fixed top-0 right-0 left-0 z-30 h-16 border-b border-border bg-background/80 backdrop-blur-xl">
+      <div className="flex h-full items-center gap-4 px-4 sm:px-6">
+        {/* Logo + Navegação primária (desktop) */}
+        <div className="flex items-center gap-4 shrink-0">
+          <Link
+            href="/inicio"
+            aria-label="Orbit — página inicial"
+            className="shrink-0"
+          >
+            <OrbitLogo compact />
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-1" aria-label="Navegação principal">
+            {primaryNavigation.map((item) => (
+              <Link
+                key={item.id}
+                href={item.href}
+                aria-current={currentPath === item.href || currentPath.startsWith(`${item.href}/`) ? 'page' : undefined}
+                className={cn(
+                  'relative flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                  currentPath === item.href || currentPath.startsWith(`${item.href}/`)
+                    ? 'text-foreground'
+                    : 'text-muted hover:text-foreground hover:bg-surface-subtle',
+                )}
+              >
+                <span aria-hidden="true">{item.icon}</span>
+                <span className="hidden sm:inline">{item.label}</span>
+                {item.badge && item.badge > 0 ? (
+                  <span className="absolute -top-1 -right-1 flex min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[10px] font-bold text-white">
+                    {item.badge > 9 ? '9+' : item.badge}
+                  </span>
+                ) : null}
+              </Link>
+            ))}
+          </nav>
         </div>
+
+        {/* Busca (apenas Explorar) */}
+        {isExplore ? (
+          <div className="mr-auto w-full max-w-md">
+            <TopbarSearch />
+          </div>
+        ) : (
+          <div className="mr-auto" />
+        )}
+
+        {/* Ações do usuário à direita */}
+        <TopbarActions
+          unreadNotifications={unreadNotifications}
+          unreadMessages={unreadMessages}
+          user={user}
+        />
       </div>
     </header>
   );
 }
 
 interface TopbarSearchProps {
-  onNavigate: (username: string) => void;
+  onNavigate?: (username: string) => void;
 }
 
 function TopbarSearch({ onNavigate }: TopbarSearchProps) {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResponse['users']>([]);
   const [open, setOpen] = useState(false);
@@ -81,25 +125,25 @@ function TopbarSearch({ onNavigate }: TopbarSearchProps) {
     }
 
     const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
+    const timer = window.setTimeout(() => {
       setLoading(true);
-      try {
-        const response = await apiRequest<SearchResponse>(
-          `/api/search?q=${encodeURIComponent(trimmed)}`,
-          { signal: controller.signal },
-        );
-        setResults(response.users);
-        setActiveResultIndex(response.users.length > 0 ? 0 : -1);
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          setResults([]);
+      apiRequest<SearchResponse>(`/api/search?q=${encodeURIComponent(trimmed)}`, {
+        signal: controller.signal,
+      })
+        .then((response) => {
+          setResults(response.users);
           setActiveResultIndex(-1);
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
+        })
+        .catch((error) => {
+          if (!(error instanceof DOMException && error.name === 'AbortError')) {
+            setResults([]);
+            setActiveResultIndex(-1);
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
     }, 250);
-
     cleanupRef.current = () => {
       window.clearTimeout(timer);
       controller.abort();
@@ -108,17 +152,14 @@ function TopbarSearch({ onNavigate }: TopbarSearchProps) {
 
   useEffect(() => {
     function closeOnOutsidePointer(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         setOpen(false);
         setActiveResultIndex(-1);
       }
     }
 
     document.addEventListener('pointerdown', closeOnOutsidePointer);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      cleanupRef.current?.();
-    };
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
   }, []);
 
   function navigateToResult(username: string) {
@@ -126,7 +167,11 @@ function TopbarSearch({ onNavigate }: TopbarSearchProps) {
     setQuery('');
     setResults([]);
     setActiveResultIndex(-1);
-    onNavigate(username);
+    if (onNavigate) {
+      onNavigate(username);
+      return;
+    }
+    router.push(`/perfil/${encodeURIComponent(username)}` as Route);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -135,16 +180,19 @@ function TopbarSearch({ onNavigate }: TopbarSearchProps) {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       setOpen(true);
-      setActiveResultIndex((index) => (index + 1) % visibleResults.length);
+      setActiveResultIndex((current) => (current + 1) % visibleResults.length);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       setOpen(true);
-      setActiveResultIndex((index) =>
-        index <= 0 ? visibleResults.length - 1 : index - 1,
+      setActiveResultIndex((current) =>
+        current <= 0 ? visibleResults.length - 1 : current - 1,
       );
-    } else if (event.key === 'Enter' && activeResultIndex >= 0) {
+    } else if (event.key === 'Enter') {
       event.preventDefault();
-      const selected = visibleResults[activeResultIndex];
+      const selected =
+        activeResultIndex >= 0
+          ? visibleResults[activeResultIndex]
+          : visibleResults[0];
       if (selected) navigateToResult(selected.username);
     } else if (event.key === 'Escape') {
       event.preventDefault();
@@ -154,7 +202,7 @@ function TopbarSearch({ onNavigate }: TopbarSearchProps) {
   }
 
   const activeDescendant =
-    open && activeResultIndex >= 0
+    open && query.trim().length >= 2 && activeResultIndex >= 0
       ? `${resultsId}-opcao-${activeResultIndex}`
       : undefined;
 
@@ -177,8 +225,8 @@ function TopbarSearch({ onNavigate }: TopbarSearchProps) {
           if (selected) navigateToResult(selected.username);
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Buscar no Vibra..."
-        label="Buscar no Vibra"
+        placeholder="Buscar no Orbit..."
+        label="Buscar no Orbit"
         className="h-11 border-border-strong"
         rounded="pill"
         role="combobox"
@@ -229,5 +277,72 @@ function TopbarSearch({ onNavigate }: TopbarSearchProps) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+interface TopbarActionsProps {
+  unreadNotifications: number;
+  unreadMessages: number;
+  user: { name: string; username: string; avatar: string | null; presence: 'available' | 'away' | 'dnd' | 'invisible' };
+}
+
+/** Ações do topo: mensagens, notificações e menu do usuário no canto superior direito. */
+export function TopbarActions({ unreadNotifications, unreadMessages, user }: TopbarActionsProps) {
+  const router = useRouter();
+
+  return (
+    <div className="flex items-center gap-1">
+      <IconAction
+        href="/mensagens"
+        label="Mensagens"
+        badge={unreadMessages}
+        icon={<MessageSquare className="size-5" />}
+        onClick={() => router.push('/mensagens' as Route)}
+      />
+      <IconAction
+        href="/notificacoes"
+        label="Notificações"
+        badge={unreadNotifications}
+        icon={<Bell className="size-5" />}
+        onClick={() => router.push('/notificacoes' as Route)}
+      />
+      <UserMenu
+        name={user.name}
+        username={user.username}
+        avatar={user.avatar}
+        presence={user.presence}
+        onLogout={() => router.push('/entrar' as Route)}
+      />
+    </div>
+  );
+}
+
+function IconAction({
+  href,
+  label,
+  badge,
+  icon,
+  onClick,
+}: {
+  href: string;
+  label: string;
+  badge: number;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={badge > 0 ? `${label} (${badge})` : label}
+      className="relative flex size-11 shrink-0 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
+    >
+      <span aria-hidden="true">{icon}</span>
+      {badge > 0 ? (
+        <span className="absolute -top-0.5 -right-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-danger px-1 py-0.5 text-[10px] font-bold leading-4 text-white">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      ) : null}
+    </button>
   );
 }

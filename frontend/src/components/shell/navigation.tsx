@@ -1,16 +1,5 @@
 import type { Route } from 'next';
-import {
-  Home,
-  Compass,
-  MessageSquare,
-  Bell,
-  Users,
-  User,
-  Settings,
-  Search,
-  Sun,
-  MoonStar,
-} from 'lucide-react';
+import { Home, Compass, MessageSquare, Bell, Users, User } from 'lucide-react';
 import { isFeatureEnabled, type FeatureName } from '@/lib/feature-flags';
 
 export interface NavigationItem {
@@ -24,9 +13,11 @@ export interface NavigationItem {
   badge?: number;
 }
 
-/** Navegação primária (sempre visível no desktop / icon rail no tablet). */
+/**
+ * Navegação primária do rail lateral.
+ * Mensagens e notificações ficam aqui, com contador de não lidas.
+ */
 export function getPrimaryNavigation(
-  me: { username: string; avatar: string | null; name: string },
   unreadMessages: number,
   unreadNotifications: number,
 ): NavigationItem[] {
@@ -64,21 +55,6 @@ export function getPrimaryNavigation(
   return items;
 }
 
-/** Navegação secundária (configurações, perfil, etc.). */
-export function getSecondaryNavigation(
-  me: { username: string },
-): NavigationItem[] {
-  return [
-    { id: 'configuracoes', label: 'Configurações', href: '/configuracoes', icon: <Settings className="size-5" /> },
-    {
-      id: 'perfil',
-      label: 'Perfil',
-      href: `/perfil/${encodeURIComponent(me.username)}` as Route,
-      icon: <User className="size-5" />,
-    },
-  ];
-}
-
 /** Navegação mobile (bottom bar). Máximo 5 itens visíveis. */
 export function getMobileNavigation(
   me: { username: string; avatar: string | null; name: string },
@@ -87,7 +63,12 @@ export function getMobileNavigation(
     { id: 'inicio', label: 'Início', href: '/inicio', icon: <Home className="size-5" /> },
     { id: 'explorar', label: 'Explorar', href: '/explorar', icon: <Compass className="size-5" /> },
     { id: 'mensagens', label: 'Mensagens', href: '/mensagens', icon: <MessageSquare className="size-5" /> },
-    { id: 'perfil', label: 'Perfil', href: `/perfil/${encodeURIComponent(me.username)}` as Route, icon: <User className="size-5" /> },
+    {
+      id: 'perfil',
+      label: 'Perfil',
+      href: `/perfil/${encodeURIComponent(me.username)}` as Route,
+      icon: <User className="size-5" />,
+    },
   ];
 
   if (isFeatureEnabled('communities')) {
@@ -101,10 +82,3 @@ export function getMobileNavigation(
 
   return items;
 }
-
-/** Ícones de ações no topbar (busca, tema, notificações, avatar). */
-export const topbarActionIcons = {
-  search: <Search className="size-5" />,
-  sun: <Sun className="size-5" />,
-  moon: <MoonStar className="size-5" />,
-} as const;

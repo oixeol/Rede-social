@@ -89,7 +89,7 @@ export function LoginForm() {
   return (
     <div className="flex w-full flex-col">
       <h1 className="font-display text-[30px] leading-[1.15] font-semibold tracking-[-0.02em] text-white sm:text-[34px]">
-        Bem-vindo ao <span className="text-[#FF6A00]">Vibra!</span>
+        Bem-vindo ao <span className="text-brand">Orbit!</span>
       </h1>
       <p className="mt-2.5 text-[13.5px] text-[#A1A1AA]">
         Estamos muito animados em te ver novamente!
@@ -167,13 +167,12 @@ export function LoginForm() {
         </div>
 
         <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setNotice('Recuperação de senha chega em breve.')}
+          <Link
+            href="/esqueci-senha"
             className="text-[12.5px] font-medium text-[#FF8C00] transition-colors hover:text-[#FF6A00]"
           >
             Esqueceu sua senha?
-          </button>
+          </Link>
         </div>
 
         {error ? (

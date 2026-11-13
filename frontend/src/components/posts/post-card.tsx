@@ -197,23 +197,19 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
     setActionMessage(null);
     setShareUrl(null);
 
-    try {
-      const response = await apiRequest<{ shares: number; link: string }>(
-        `/api/posts/${post.id}/share`,
-        { method: 'POST' },
-      );
-      setShares(response.shares);
+    const canonicalUrl = new URL(`/publicacoes/${post.id}`, window.location.origin).toString();
 
-      const canonicalUrl = new URL(`/publicacoes/${post.id}`, window.location.origin).toString();
+    try {
+      let shared = false;
+
       if (navigator.share) {
         try {
           await navigator.share({
-            title: 'Publicação no Vibra',
-            text: post.caption || 'Veja esta publicação no Vibra.',
+            title: 'Publicação no Orbit',
+            text: post.caption || 'Veja esta publicação no Orbit.',
             url: canonicalUrl,
           });
-          setActionMessage('Compartilhamento concluído.');
-          return;
+          shared = true;
         } catch (error) {
           if (error instanceof DOMException && error.name === 'AbortError') {
             setActionMessage('Compartilhamento cancelado.');
@@ -222,11 +218,30 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
         }
       }
 
-      if (await copyToClipboard(canonicalUrl)) {
-        setActionMessage('Link da publicação copiado.');
-      } else {
-        setShareUrl(canonicalUrl);
-        setActionMessage('Copie o link abaixo para compartilhar a publicação.');
+      if (!shared) {
+        const copied = await copyToClipboard(canonicalUrl);
+        if (!copied) {
+          setShareUrl(canonicalUrl);
+          setActionMessage('Copie o link abaixo para compartilhar a publicação.');
+          return;
+        }
+      }
+
+      try {
+        const response = await apiRequest<{ shares: number; link: string }>(
+          `/api/posts/${post.id}/share`,
+          { method: 'POST' },
+        );
+        setShares(response.shares);
+        setActionMessage(
+          shared ? 'Compartilhamento concluído.' : 'Link da publicação copiado.',
+        );
+      } catch (error) {
+        setActionMessage(
+          error instanceof ApiError
+            ? `Compartilhamento concluído, mas ${error.message.toLowerCase()}`
+            : 'Compartilhamento concluído, mas o contador não foi atualizado.',
+        );
       }
     } catch (error) {
       setActionMessage(
@@ -391,7 +406,7 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
 
   const postClasses = cn(
     'post-card rounded-card border border-border bg-surface transition-shadow hover:shadow-card',
-    compact ? 'relative grid-item overflow-visible' : 'overflow-hidden',
+    compact ? 'relative grid-item overflow-visible' : 'mx-auto w-[470px] max-w-full overflow-hidden',
   );
 
   /* Compact mode — grid do perfil (preserva comportamento atual). */
@@ -512,62 +527,70 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
   /* Instagram-style feed card (non-compact) */
   return (
     <article className={postClasses}>
-      {/* Header: avatar com anel gradiente + info do autor + Seguir/… */}
-      <header className="flex items-start gap-3 p-4">
+      {/* Header compacto: avatar e informações têm dimensões fixas. */}
+      <header className="relative mx-auto h-8 w-[446px] max-w-full">
         <button
           type="button"
-          className="flex shrink-0 items-center gap-2"
+          className="absolute left-0 top-0 flex size-8 shrink-0 items-center"
           onClick={() => router.push(`/perfil/${encodeURIComponent(post.user.username)}` as Route)}
           aria-label={`Ver perfil de ${post.user.name}`}
         >
-          {/* Avatar com anel estilo story (gradient border) */}
-          <span className="relative inline-flex shrink-0" aria-hidden="true">
-            <Avatar src={post.user.avatar} alt="" name={post.user.name} size="md" ring />
+          <span className="relative inline-flex size-8 shrink-0" aria-hidden="true">
+            <Avatar
+              src={post.user.avatar}
+              alt=""
+              name={post.user.name}
+              size="xs"
+              ring
+              className="[&>span:first-child]:size-8 [&>span:first-child]:text-xs"
+            />
           </span>
         </button>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
+        <div
+          className="absolute left-2 right-2 top-1/2 h-[18px] -translate-y-1/2 overflow-hidden sm:left-10 sm:right-auto sm:w-[370px]"
+          data-post-card-author-info
+        >
+          <div className="flex h-full min-w-0 items-center gap-1.5 overflow-hidden pr-[104px] leading-[18px]">
             <button
               type="button"
-              className="font-semibold text-foreground hover:underline truncate"
+              className="min-w-0 truncate text-xs font-semibold text-foreground hover:underline"
               onClick={() => router.push(`/perfil/${encodeURIComponent(post.user.username)}` as Route)}
             >
               {post.user.username}
             </button>
-            {post.user.verified && (
+            {post.user.verified ? (
               <BadgeCheck
-                className="size-4 shrink-0 text-[var(--vibra-brand-fill)]"
+                className="size-3 shrink-0 text-[var(--vibra-brand-fill)]"
                 aria-label="Perfil verificado"
               />
-            )}
-            <span className="text-xs text-muted shrink-0">
+            ) : null}
+            <span className="shrink-0 text-[10px] leading-[18px] text-muted">
               · {formatRelativeTime(post.createdAt)}
             </span>
+            <span className="min-w-0 truncate text-[10px] leading-[18px] text-muted">
+              · {authorFollowing ? 'Seguindo' : 'Sugestões para você'}
+            </span>
           </div>
-
-          {/* Subtítulo: "Sugestões para você" ou "Seguindo" */}
-          <span className="text-xs text-muted">
-            {authorFollowing ? 'Seguindo' : 'Sugestões para você'}
-          </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {!authorFollowing && (
+        <div className="absolute right-0 top-0 flex h-8 shrink-0 items-center gap-1">
+          {!authorFollowing ? (
             <Button
               size="sm"
               variant="secondary"
               onClick={handleFollowAuthor}
-              className="h-9 px-3 text-xs whitespace-nowrap"
+              className="h-8 w-[72px] px-0 text-[10px] whitespace-nowrap justify-center"
             >
               Seguir
             </Button>
-          )}
+          ) : null}
           <DropdownMenu
             label="Mais opções da publicação"
             items={menuItems}
             align="end"
-            trigger={<MoreHorizontal className="size-5 text-muted" />}
+            trigger={<MoreHorizontal className="size-4 text-muted" />}
+            triggerClassName="size-7"
           />
         </div>
       </header>
@@ -589,6 +612,7 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
           <button
             type="button"
             className="relative block w-full overflow-hidden bg-surface-subtle"
+            style={{ aspectRatio: '468 / 585' }}
             onClick={openPost}
             aria-label={`Abrir publicação de ${post.user.username}`}
           >
@@ -666,9 +690,9 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
       ) : null}
 
       {/* Ações + Legenda */}
-      <div className="space-y-3 p-4">
+      <div className="flex flex-col gap-2 py-2 px-3">
         {/* Linha de ações com contadores */}
-        <div className="flex items-center gap-1">
+        <div className="flex h-[40px] w-[446px] max-w-full items-center gap-0.5" data-post-card-actions>
           <span className="relative inline-flex">
             <IconButton
               label={liked ? 'Descurtir' : 'Curtir'}
@@ -677,6 +701,7 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
               pressed={liked}
               onClick={() => void handleLike()}
               disabled={pendingLike}
+              className="size-10"
             />
             {likes > 0 && (
               <span className="pointer-events-none absolute -top-0.5 -right-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold leading-none text-on-brand">
@@ -690,6 +715,7 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
               label="Comentar"
               icon={<MessageSquare className="size-5" />}
               onClick={() => setCommentOpen(true)}
+              className="size-10"
             />
             {commentsCount > 0 && (
               <span className="pointer-events-none absolute -top-0.5 -right-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold leading-none text-on-brand">
@@ -706,6 +732,7 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
               pressed={reposted}
               onClick={() => void handleRepost()}
               disabled={pendingRepost}
+              className="size-10"
             />
             {reposts > 0 && (
               <span className="pointer-events-none absolute -top-0.5 -right-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold leading-none text-on-brand">
@@ -723,12 +750,14 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
             pressed={saved}
             onClick={() => void handleSave()}
             disabled={pendingSave}
+            className="size-10"
           />
           <IconButton
             label="Compartilhar"
             icon={<Share2 className="size-5" />}
             onClick={() => void handleShare()}
             disabled={pendingShare}
+            className="size-10"
           />
         </div>
 
@@ -755,7 +784,10 @@ export function PostCard({ post, compact = false, onOpen }: PostCardProps) {
         {/* Legenda */}
         {post.caption ? (
           <div className="flex flex-col gap-1">
-            <p className="caption text-sm text-foreground">
+            <p
+              className="caption min-h-[37px] w-[436px] max-w-full text-sm text-foreground"
+              data-post-card-caption
+            >
               <button
                 type="button"
                 className="inline-user font-semibold text-foreground hover:underline"

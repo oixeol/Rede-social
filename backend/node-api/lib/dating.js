@@ -1104,9 +1104,9 @@ async function handle({ req, res, pathname, url, me, ctx }) {
             targetUser.id,
             'match',
             `Você e ${me.name} deram match. A conversa está aberta.`,
-            `/?conversation=${conversation.id}`
+            `/mensagens?conversa=${conversation.id}`
           );
-          ctx.notify(me.id, 'match', `Você e ${targetUser.name} deram match.`, `/?conversation=${conversation.id}`);
+          ctx.notify(me.id, 'match', `Você e ${targetUser.name} deram match.`, `/mensagens?conversa=${conversation.id}`);
         }
       }
       ctx.db.exec('COMMIT');
@@ -1340,7 +1340,7 @@ async function handle({ req, res, pathname, url, me, ctx }) {
         me.id,
         'radar',
         `${other.name} está ${formatDistance(meters)} de você.`,
-        `/?conversation=${ctx.conversationForMatch(match.id).id}`
+        `/mensagens?conversa=${ctx.conversationForMatch(match.id).id}`
       );
       triggered += 1;
       results.push({ matchId: match.id, distanceLabel: formatDistance(meters) });

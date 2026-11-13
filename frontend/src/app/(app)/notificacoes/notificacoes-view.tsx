@@ -37,7 +37,8 @@ function resolveNotificationHref(link: string | null | undefined): string | null
     const search = new URL(link, 'http://localhost').searchParams;
     const profile = search.get('profile');
     if (profile) return `/perfil/${encodeURIComponent(profile)}`;
-    if (search.has('conversation')) return '/mensagens';
+    const conversation = search.get('conversation');
+    if (conversation) return `/mensagens?conversa=${encodeURIComponent(conversation)}`;
     const postId = search.get('post');
     if (postId) return `/publicacoes/${postId}`;
   } catch {

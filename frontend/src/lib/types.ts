@@ -10,7 +10,7 @@ export type MessagePolicy = 'everyone' | 'connections' | 'nobody';
 /** Estados da bolinha de status do perfil. */
 export type Presence = 'available' | 'away' | 'dnd' | 'invisible';
 
-export type MediaType = 'image' | 'video' | 'text';
+export type MediaType = 'image' | 'video' | 'text' | 'file';
 
 export interface UserStats {
   posts: number;
@@ -81,6 +81,8 @@ export interface PublicUser {
   points: number;
   /** Estado da bolinha de status (default `available`). */
   presence: Presence;
+  /** Assinatura Orbit Premium ativa. */
+  isPremium: boolean;
 }
 
 /** Preferências de notificação do usuário. */
@@ -144,6 +146,15 @@ export interface PostMedia {
   mediaType: MediaType;
 }
 
+/** Anexo persisted em uma mensagem. */
+export interface MessageMedia {
+  url: string;
+  mediaType: MediaType;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  fileName?: string | null;
+}
+
 /** Post as returned by feed, profile, and search. */
 export interface Post {
   id: number;
@@ -168,6 +179,8 @@ export interface Post {
   saved: boolean;
   /** O usuário logado segue o autor da publicação. */
   authorFollowing: boolean;
+  /** O usuário logado solicitou seguir o autor privado. */
+  authorFollowRequested?: boolean;
   /** Present in feed/profile responses (withPreviews). Optional in post detail. */
   preview?: Comment[];
 }
@@ -193,6 +206,32 @@ export interface Community {
   isMember: boolean;
   role: 'owner' | 'member' | null;
   createdAt: number;
+}
+
+/** Post de comunidade (estilo Twitter/X). */
+export interface CommunityPost {
+  id: number;
+  communityId: number;
+  userId: number;
+  text: string;
+  replyToId: number | null;
+  sharedPostId: number | null;
+  media: { url: string; mediaType: 'image' | 'video' | 'file'; mimeType?: string; sizeBytes: number; fileName?: string }[];
+  createdAt: number;
+  updatedAt: number | null;
+  deletedAt: number | null;
+  user: { id: number; username: string; name: string; avatar: string | null; verified: number };
+  likesCount: number;
+  repostsCount: number;
+  repliesCount: number;
+  liked: boolean;
+  reposted: boolean;
+}
+
+/** GET /api/communities/:slug/posts */
+export interface CommunityPostsResponse {
+  posts: CommunityPost[];
+  nextCursor: number | null;
 }
 
 /** GET /api/communities | /api/users/:username/communities */
@@ -335,6 +374,15 @@ export interface StoriesResponse {
   groups: StoryGroup[];
 }
 
+/** Remetente real exposto pelo backend em cada mensagem. */
+export interface MessageSender {
+  id: number;
+  username: string;
+  name: string;
+  avatar: string | null;
+  verified: boolean;
+}
+
 /** Conversation summary returned by /api/conversations. */
 export interface ConversationSummary {
   id: number;
@@ -347,6 +395,7 @@ export interface ConversationSummary {
     sharedPostId: number | null;
     createdAt: number;
     mine: boolean;
+    sender: MessageSender;
   } | null;
   unread: number;
   updatedAt: number;
@@ -371,4 +420,273 @@ export interface AppNotification {
 export interface NotificationsResponse {
   notifications: AppNotification[];
   unread: number;
+}
+
+/** Message as returned by /api/conversations/:id */
+export interface Message {
+  id: number;
+  body: string;
+  /** Publicação completa em respostas de leitura. */
+  sharedPost?: Post | null;
+  /** ID da publicação em respostas de envio. */
+  sharedPostId?: number | null;
+  media?: MessageMedia[];
+  createdAt: number;
+  editedAt?: number | null;
+  deletedAt?: number | null;
+  mine: boolean;
+  /** Remetente real da mensagem (preenchido pelo backend). */
+  sender: MessageSender;
+}
+
+/** Conversation detail returned by GET /api/conversations/:id */
+export interface ConversationDetail {
+  id: number;
+  kind: 'social' | 'dating';
+  matchId: number | null;
+  canSend: boolean;
+  reason: string | null;
+}
+
+/** Other participant in a conversation (from /api/conversations/:id) */
+export interface ConversationOther extends PublicUser {}
+
+/** GET /api/conversations/:id response */
+export interface ConversationDetailResponse {
+  conversation: ConversationDetail;
+  other: ConversationOther;
+  messages: Message[];
+}
+
+/** Payload for POST /api/conversations */
+export interface CreateConversationPayload {
+  username: string;
+}
+
+/** Response for POST /api/conversations */
+export interface CreateConversationResponse {
+  conversation: {
+    id: number;
+    kind: 'social';
+    other: PublicUser;
+  };
+}
+
+/** Arquivo enviado no payload JSON de uma mensagem. */
+export interface MessageAttachmentInput {
+  dataUrl: string;
+  fileName: string;
+}
+
+/** Payload for POST /api/conversations/:id/messages */
+export interface SendMessagePayload {
+  text: string;
+  sharedPostId?: number | null;
+  media?: MessageAttachmentInput[];
+}
+
+/** Response for POST /api/conversations/:id/messages */
+export interface SendMessageResponse {
+  message: Message;
+}
+
+/** Response for POST /api/conversations/:id/read */
+export interface MarkReadResponse {
+  ok: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Chat Spaces & Channels (original Vibra domain)                             */
+/* -------------------------------------------------------------------------- */
+
+export interface Space {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  ownerId: number;
+  memberCount: number;
+  role: 'owner' | 'moderator' | 'member';
+  createdAt: number;
+  updatedAt: number;
+  avatar: string | null;
+  onlineCount: number;
+}
+
+export interface SpaceMember {
+  userId: number;
+  username: string;
+  name: string;
+  avatar: string | null;
+  role: 'owner' | 'moderator' | 'member';
+  joinedAt: number;
+  presence: 'online' | 'idle' | 'offline';
+}
+
+export interface Channel {
+  id: number;
+  spaceId: number;
+  name: string;
+  slug: string;
+  topic: string;
+  visibility: 'public' | 'private';
+  type: 'text' | 'voice';
+  position: number;
+  createdBy: number;
+  createdAt: number;
+  updatedAt: number;
+  /** Preenchido apenas quando o usuário atual é membro do canal. */
+  lastReadAt?: number;
+  /** Última mensagem para preview na lista. */
+  lastMessage?: {
+    id: number;
+    body: string;
+    senderId: number;
+    createdAt: number;
+  } | null;
+  unreadCount?: number;
+}
+
+export interface ChannelMessage {
+  id: number;
+  channelId: number;
+  senderId: number;
+  body: string;
+  sharedPostId: number | null;
+  /** Publicação completa, quando o backend inclui a expansão. */
+  sharedPost?: Post | null;
+  media: MessageMedia[];
+  createdAt: number;
+  editedAt: number | null;
+  deletedAt: number | null;
+  sender: MessageSender;
+  mine: boolean;
+}
+
+export interface SpacesResponse {
+  spaces: Space[];
+}
+
+export interface SpaceDetailResponse {
+  space: Space;
+  channels: Channel[];
+  members: SpaceMember[];
+}
+
+export interface ChannelMessagesResponse {
+  messages: ChannelMessage[];
+  nextCursor: number | null;
+}
+
+export interface CreateSpacePayload {
+  name: string;
+  description?: string;
+}
+
+export interface CreateChannelPayload {
+  name: string;
+  topic?: string;
+  visibility?: 'public' | 'private';
+  type?: 'text' | 'voice';
+}
+
+/* ===== Novas respostas do backend (contract clean-room) ===== */
+
+export interface CreateSpaceResponse {
+  space: Space;
+}
+
+export interface CreateChannelResponse {
+  channel: Channel;
+}
+
+export interface MembersResponse {
+  members: SpaceMember[];
+}
+
+export interface ConversationMessagesResponse {
+  messages: Message[];
+  nextCursor: number | null;
+}
+
+/** Resposta genérica para mutação de mensagem (canal ou conversa). */
+export interface MessageMutationResponse {
+  ok?: boolean;
+  message: Message;
+}
+
+/** Payload de edição de mensagem (campo texto). */
+export interface EditMessagePayload {
+  text: string;
+}
+
+/* ===== Shorts (Reels/TikTok style videos) ===== */
+export interface Short {
+  id: number;
+  userId: number;
+  title: string;
+  description: string;
+  hlsManifestUrl: string;
+  thumbnailUrl: string | null;
+  duration: number;
+  width: number;
+  height: number;
+  status: 'processing' | 'ready' | 'failed';
+  likesCount: number;
+  viewsCount: number;
+  liked: boolean;
+  user: {
+    id: number;
+    username: string;
+    name: string;
+    avatar: string | null;
+    verified: boolean;
+  };
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ShortsResponse {
+  shorts: Short[];
+  nextCursor: number | null;
+}
+
+export interface ShortPresignResponse {
+  uploadUrl: string;
+  videoId: number;
+  objectKey: string;
+}
+
+export interface ShortManifestResponse {
+  manifestUrl: string;
+}
+
+/* ===== Voice Channel Types ===== */
+export interface VoiceParticipant {
+  userId: number;
+  username: string;
+  name: string;
+  avatar: string | null;
+  isMuted: boolean;
+  isDeafened: boolean;
+  isSpeaking: boolean;
+  joinedAt: number;
+}
+
+export interface VoiceStateResponse {
+  participants: VoiceParticipant[];
+}
+
+export interface VoiceJoinResponse {
+  ok: boolean;
+}
+
+export interface VoiceMuteResponse {
+  ok: boolean;
+  muted: boolean;
+}
+
+export interface VoiceDeafenResponse {
+  ok: boolean;
+  deafened: boolean;
 }

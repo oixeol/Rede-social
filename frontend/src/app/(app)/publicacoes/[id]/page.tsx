@@ -63,10 +63,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const response = await serverApiRequest<PostDetailResponse>(`/api/posts/${postId}`);
     const post = response.post;
     return {
-      title: post.caption.slice(0, 100) || 'Publicação no Vibra',
+      title: post.caption.slice(0, 100) || 'Publicação no Orbit',
       description: post.caption.slice(0, 160),
       openGraph: {
-        title: post.caption.slice(0, 100) || 'Publicação no Vibra',
+        title: post.caption.slice(0, 100) || 'Publicação no Orbit',
         description: post.caption.slice(0, 160),
         images: post.media[0]?.url ? [post.media[0].url] : [],
         type: 'article',

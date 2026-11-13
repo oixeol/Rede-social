@@ -44,7 +44,7 @@ export function AparenciaSection({ me, onSaved }: { me: MeResponse; onSaved: () 
     <div>
       <SettingsHeading
         title="Aparência"
-        description="Ajuste o tema e as cores da interface do Vibra."
+        description="Ajuste o tema e as cores da interface do Orbit."
       />
 
       <div className="space-y-4">

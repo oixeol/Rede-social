@@ -10,6 +10,7 @@ import {
   Camera,
   Check,
   Compass,
+  Crown,
   Heart,
   Image as ImageIcon,
   Info,
@@ -24,7 +25,6 @@ import {
 
 import { VerifiedBadge } from '@/components/profile/profile-center';
 import { Avatar, initials } from '@/components/ui/avatar';
-import { Waves } from '@/components/ui/waves';
 import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import type { ProfileViewModel } from '@/lib/profile-view-model';
@@ -51,23 +51,22 @@ const BADGE_ICONS: Record<string, React.ReactNode> = {
 export function AboutCard({ profile }: { profile: ProfileViewModel }) {
   return (
     <section className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5">
-      <Waves className="-right-10 -bottom-6 h-[130px] w-[260px]" opacity={0.45} />
-
+      <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-transparent pointer-events-none" />
       <header className="relative flex items-center gap-2">
         <h2 className="text-[15px] font-bold text-foreground">Sobre mim</h2>
         <Info aria-hidden="true" className="size-4 text-muted" />
       </header>
 
-      <ul className="relative mt-4 space-y-2.5">
+      <ul className="relative mt-4 space-y-3">
         {profile.about.joined ? (
           <li className="flex items-center gap-2.5 text-[13px] text-muted">
-            <CalendarDays aria-hidden="true" className="size-4 shrink-0" />
+            <CalendarDays aria-hidden="true" className="size-4 shrink-0 text-brand/60" />
             {profile.about.joined}
           </li>
         ) : null}
         {profile.about.country ? (
           <li className="flex items-center gap-2.5 text-[13px] text-muted">
-            <MapPin aria-hidden="true" className="size-4 shrink-0" />
+            <MapPin aria-hidden="true" className="size-4 shrink-0 text-brand/60" />
             {profile.about.country}
           </li>
         ) : null}
@@ -90,19 +89,20 @@ export function BadgesCard({ badges }: { badges: Badge[] }) {
   if (badges.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5">
-      <header className="flex items-center gap-2">
+    <section className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5">
+      <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-transparent pointer-events-none" />
+      <header className="relative flex items-center gap-2">
         <h2 className="text-[15px] font-bold text-foreground">Insígnias</h2>
-        <Award aria-hidden="true" className="size-4 text-muted" />
+        <Award aria-hidden="true" className="size-4 text-brand/60" />
       </header>
 
-      <ul className="mt-4 grid grid-cols-3 gap-3" role="list">
+      <ul className="relative mt-4 grid grid-cols-3 gap-3" role="list">
         {badges.map((badge) => {
           const tooltipId = `badge-tooltip-${badge.id}`;
           const isOpen = openBadgeId === badge.id;
 
           return (
-            <li key={badge.id} className="relative flex flex-col items-center gap-2">
+            <li key={badge.id} className="relative flex flex-col items-center gap-2 group">
               <button
                 type="button"
                 onClick={() => setOpenBadgeId(isOpen ? null : badge.id)}
@@ -112,7 +112,7 @@ export function BadgesCard({ badges }: { badges: Badge[] }) {
                 aria-label={badge.label}
                 aria-describedby={tooltipId}
                 aria-expanded={isOpen}
-                className="group relative flex size-[52px] items-center justify-center rounded-full border-2 border-brand bg-surface-raised text-brand transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                className="group relative flex size-[52px] items-center justify-center rounded-full border-2 border-brand bg-surface-raised text-brand transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgb(from_var(--orbit-brand)_r_g_b_/_0.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               >
                 {BADGE_ICONS[badge.icon] ?? <Award className="size-[18px]" />}
                 <span
@@ -128,7 +128,7 @@ export function BadgesCard({ badges }: { badges: Badge[] }) {
                   {badge.description}
                 </span>
               </button>
-              <span className="max-w-full truncate text-center text-[11px] leading-4 text-muted">
+              <span className="max-w-full truncate text-center text-[11px] leading-4 text-muted group-hover:text-brand/80 transition-colors">
                 {badge.label}
               </span>
             </li>
@@ -141,6 +141,83 @@ export function BadgesCard({ badges }: { badges: Badge[] }) {
 
 const MAX_HIGHLIGHTS = 12;
 const MAX_HIGHLIGHT_LABEL = 24;
+
+/**
+ * Card de upsell do Orbit Premium — exibido apenas para usuários não-premium.
+ * Props: compact = versão menor para sidebar (padrão: false)
+ */
+export function PremiumUpsellCard({
+  isOwnProfile,
+  compact = false,
+}: { isOwnProfile: boolean; compact?: boolean }) {
+  if (!isOwnProfile) return null;
+
+  if (compact) {
+    return (
+      <Link
+        href={'/orbit-premium' as Route}
+        className="group relative block overflow-hidden rounded-xl border border-border bg-surface p-3 transition-all hover:border-brand/30 hover:shadow-[0_0_16px_rgb(from_var(--orbit-brand)_r_g_b_/_0.15)]"
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-brand/5 pointer-events-none" />
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand via-brand-hover to-brand shadow-[0_0_12px_rgb(from_var(--orbit-brand)_r_g_b_/_0.3)]">
+              <Crown className="size-4 text-on-brand" aria-hidden="true" />
+            </div>
+            <h2 className="truncate text-[13px] font-bold text-foreground group-hover:text-brand transition-colors">
+              Orbit Premium
+            </h2>
+          </div>
+          <ArrowRight className="size-4 shrink-0 text-brand transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <section className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5">
+      <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-brand/5 pointer-events-none" />
+      <div className="relative space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand via-brand-hover to-brand">
+            <Crown className="size-6 text-on-brand" aria-hidden="true" />
+            <span className="absolute inset-0 rounded-xl bg-gradient-to-br from-brand via-brand-hover to-brand opacity-0 hover:opacity-100 transition-opacity duration-300 animate-pulse-slow" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1 pt-1">
+            <h2 className="text-[15px] font-bold text-foreground">Orbit Premium</h2>
+            <p className="mt-1 text-[13px] text-muted">
+              Desbloqueie temas personalizados, badge exclusivo e mais.
+            </p>
+          </div>
+        </div>
+
+        <ul className="space-y-2 text-[13px] text-muted" role="list">
+          <li className="flex items-center gap-2">
+            <Check className="size-4 shrink-0 text-brand/60" aria-hidden="true" />
+            Paletas de cores personalizadas
+          </li>
+          <li className="flex items-center gap-2">
+            <Check className="size-4 shrink-0 text-brand/60" aria-hidden="true" />
+            Badge Premium no perfil
+          </li>
+          <li className="flex items-center gap-2">
+            <Check className="size-4 shrink-0 text-brand/60" aria-hidden="true" />
+            Suporte prioritário
+          </li>
+        </ul>
+
+        <Link
+          href={'/orbit-premium' as Route}
+          className="relative inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand via-brand-hover to-brand px-4 py-3 text-[13px] font-bold text-on-brand transition-all duration-200 hover:shadow-[0_0_20px_rgb(from_var(--orbit-brand)_r_g_b_/_0.4)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand overflow-hidden"
+        >
+          <span className="relative z-10">Assinar Orbit Premium</span>
+          <ArrowRight className="size-4 shrink-0 relative z-10" aria-hidden="true" />
+          <span className="absolute inset-0 bg-gradient-to-r from-brand via-brand-hover to-brand opacity-0 hover:opacity-100 transition-opacity duration-300" aria-hidden="true" />
+        </Link>
+      </div>
+    </section>
+  );
+}
 
 interface HighlightsResponse {
   user: { highlights: ProfileHighlight[] };
@@ -222,18 +299,22 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
   const canCreate = formOpen && label.trim().length > 0 && highlights.length < MAX_HIGHLIGHTS;
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5">
-      <header className="flex items-center justify-between gap-3">
-        <h2 className="text-[15px] font-bold text-foreground">Destaques</h2>
+    <section className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5">
+      <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-transparent pointer-events-none" />
+      <header className="relative flex items-center justify-between gap-3">
+        <h2 className="text-[15px] font-bold text-foreground">Momentos</h2>
         {isOwnProfile ? (
           <button
             type="button"
             onClick={openForm}
             disabled={highlights.length >= MAX_HIGHLIGHTS}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-[13px] font-semibold text-on-brand transition-colors hover:bg-[var(--vibra-brand-fill-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="relative inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-4 text-[13px] font-semibold text-on-brand transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 overflow-hidden"
           >
-            <Plus aria-hidden="true" className="size-4" />
-            Adicionar
+            <span className="absolute inset-0 bg-gradient-to-r from-brand via-brand-hover to-brand opacity-0 hover:opacity-100 transition-opacity duration-300" aria-hidden="true" />
+            <span className="relative flex items-center gap-2">
+              <Plus aria-hidden="true" className="size-4" />
+              Adicionar
+            </span>
           </button>
         ) : highlights.length > 0 ? (
           <Link
@@ -247,7 +328,7 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
       </header>
 
       {formOpen ? (
-        <form onSubmit={handleCreate} className="mt-4 space-y-4 rounded-xl border border-border bg-surface-raised p-4">
+        <form onSubmit={handleCreate} className="relative mt-4 space-y-4 rounded-xl border border-border bg-surface-raised p-4">
           <div className="space-y-1.5">
             <label htmlFor="highlight-label" className="block text-[13px] font-semibold text-foreground">
               Nome do destaque
@@ -283,7 +364,7 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
                   />
                   <span
                     aria-hidden="true"
-                    className="flex size-11 items-center justify-center rounded-xl border border-border bg-surface text-muted transition-colors peer-checked:border-brand peer-checked:bg-brand/10 peer-checked:text-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand"
+                    className="flex size-11 items-center justify-center rounded-xl border border-border bg-surface text-muted transition-all duration-200 peer-checked:border-brand peer-checked:bg-brand/10 peer-checked:text-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand hover:border-brand/30 hover:shadow-[0_0_8px_rgb(from_var(--orbit-brand)_r_g_b_/_0.2)]"
                   >
                     {HIGHLIGHT_ICONS[option]}
                   </span>
@@ -297,10 +378,13 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
             <button
               type="submit"
               disabled={!canCreate || saving}
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-[13px] font-semibold text-on-brand transition-colors hover:bg-[var(--vibra-brand-fill-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="relative inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-[13px] font-semibold text-on-brand transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 overflow-hidden"
             >
-              <Plus aria-hidden="true" className="size-4" />
-              {saving ? 'Salvando…' : 'Criar destaque'}
+              <span className="absolute inset-0 bg-gradient-to-r from-brand via-brand-hover to-brand opacity-0 hover:opacity-100 transition-opacity duration-300" aria-hidden="true" />
+              <span className="relative flex items-center gap-2">
+                <Plus aria-hidden="true" className="size-4" />
+                {saving ? 'Salvando…' : 'Criar destaque'}
+              </span>
             </button>
             <button
               type="button"
@@ -314,16 +398,16 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
       ) : null}
 
       {highlights.length > 0 ? (
-        <ul className="mt-4 grid grid-cols-4 gap-2" role="list">
+        <ul className="relative mt-4 grid grid-cols-4 gap-2" role="list">
           {highlights.map((highlight) => (
             <li key={highlight.id} className="group relative flex flex-col items-center gap-2">
               <span
                 aria-hidden="true"
-                className="flex size-[60px] items-center justify-center rounded-full border-2 border-brand bg-surface-raised text-brand"
+                className="relative flex size-[60px] items-center justify-center rounded-full border-2 border-brand bg-surface-raised text-brand transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgb(from_var(--orbit-brand)_r_g_b_/_0.4)] group-hover:border-brand-hover"
               >
                 <HighlightIcon icon={highlight.icon} />
               </span>
-              <span className="max-w-full truncate text-center text-[11px] leading-4 text-muted">
+              <span className="max-w-full truncate text-center text-[11px] leading-4 text-muted group-hover:text-brand/80 transition-colors">
                 {highlight.label}
               </span>
               {isOwnProfile ? (
@@ -341,7 +425,7 @@ export function HighlightsCard({ profile }: { profile: ProfileViewModel }) {
           ))}
         </ul>
       ) : (
-        <div className="mt-4 flex min-h-[88px] items-center justify-center rounded-xl border border-dashed border-border-strong px-4 text-center text-xs leading-5 text-muted">
+        <div className="relative mt-4 flex min-h-[88px] items-center justify-center rounded-xl border border-dashed border-border-strong bg-gradient-to-br from-brand/5 via-transparent to-transparent px-4 text-center text-xs leading-5 text-muted">
           Nenhum destaque publicado.
         </div>
       )}
@@ -412,8 +496,9 @@ export function SuggestionsCard({ profile }: { profile: ProfileViewModel }) {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5">
-      <header className="flex items-center justify-between">
+    <section className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5">
+      <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-transparent pointer-events-none" />
+      <header className="relative flex items-center justify-between">
         <h2 className="text-[15px] font-bold text-foreground">Sugestões para você</h2>
         <Link
           href={'/explorar' as Route}
@@ -425,7 +510,7 @@ export function SuggestionsCard({ profile }: { profile: ProfileViewModel }) {
       </header>
 
       {profile.suggestions.length > 0 ? (
-        <ul className="mt-4 space-y-3.5" role="list">
+        <ul className="relative mt-4 space-y-3.5" role="list">
           {profile.suggestions.map((suggestion) => {
             const state = states[suggestion.id];
             const isFollowing = state?.isFollowing ?? suggestion.isFollowing;
@@ -433,10 +518,10 @@ export function SuggestionsCard({ profile }: { profile: ProfileViewModel }) {
             const isPending = pendingId === suggestion.id;
 
             return (
-              <li key={suggestion.id} className="flex items-center gap-3">
+              <li key={suggestion.id} className="relative flex items-center gap-3 group">
                 <Link
                   href={`/perfil/${encodeURIComponent(suggestion.username)}` as Route}
-                  className="flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                  className="relative flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                   aria-label={`${initials(suggestion.name)} — ${suggestion.name}`}
                 >
                   <Avatar
@@ -445,10 +530,11 @@ export function SuggestionsCard({ profile }: { profile: ProfileViewModel }) {
                     name={suggestion.name}
                     size="md"
                   />
+                  <span className="absolute inset-0 rounded-full border-2 border-brand opacity-0 group-hover:opacity-20 transition-opacity" aria-hidden="true" />
                 </Link>
 
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1 truncate text-[13px] font-bold text-foreground">
+                  <p className="flex items-center gap-1 truncate text-[13px] font-bold text-foreground group-hover:text-brand transition-colors">
                     {suggestion.name}
                     {suggestion.verified ? <VerifiedBadge className="size-4 shrink-0" /> : null}
                   </p>
@@ -461,20 +547,23 @@ export function SuggestionsCard({ profile }: { profile: ProfileViewModel }) {
                   disabled={isPending}
                   aria-label={`${isFollowing || isRequested ? 'Deixar de seguir' : 'Seguir'} ${suggestion.name}`}
                   className={cn(
-                    'min-h-11 shrink-0 rounded-pill px-4 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                    'relative min-h-11 shrink-0 rounded-pill px-4 text-[12px] font-bold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 overflow-hidden',
                     isFollowing || isRequested
-                      ? 'bg-surface-subtle text-muted'
-                      : 'bg-[var(--vibra-brand-fill)] text-on-brand hover:bg-[var(--vibra-brand-fill-hover)]',
+                      ? 'bg-surface-subtle text-muted hover:bg-surface/80'
+                      : 'bg-brand text-on-brand hover:bg-brand-hover hover:shadow-[0_0_16px_rgb(from_var(--orbit-brand)_r_g_b_/_0.3)]',
                   )}
                 >
-                  {isRequested ? 'Solicitado' : isFollowing ? 'Seguindo' : 'Seguir'}
+                  <span className="relative z-10">{isRequested ? 'Solicitado' : isFollowing ? 'Seguindo' : 'Seguir'}</span>
+                  {!isFollowing && !isRequested && (
+                    <span className="absolute inset-0 bg-gradient-to-r from-brand via-brand-hover to-brand opacity-0 hover:opacity-100 transition-opacity duration-300" aria-hidden="true" />
+                  )}
                 </button>
               </li>
             );
           })}
         </ul>
       ) : (
-        <div className="mt-4 flex min-h-[88px] items-center justify-center rounded-xl border border-dashed border-border-strong px-4 text-center text-xs leading-5 text-muted">
+        <div className="relative mt-4 flex min-h-[88px] items-center justify-center rounded-xl border border-dashed border-border-strong bg-gradient-to-br from-brand/5 via-transparent to-transparent px-4 text-center text-xs leading-5 text-muted">
           Nenhuma sugestão disponível.
         </div>
       )}

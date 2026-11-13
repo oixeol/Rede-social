@@ -119,6 +119,20 @@ GRANT UPDATE (
 GRANT DELETE ON public.users TO authenticated;
 
 -- -----------------------------------------------------------------------------
+-- message_media é criada em migration posterior. Quando já existir, mantém
+-- leitura autenticada e escrita exclusiva do backend.
+-- -----------------------------------------------------------------------------
+DO $grants$
+BEGIN
+    IF to_regclass('public.message_media') IS NOT NULL THEN
+        REVOKE ALL PRIVILEGES ON TABLE public.message_media FROM anon, authenticated;
+        REVOKE ALL PRIVILEGES ON SEQUENCE public.message_media_id_seq FROM anon, authenticated;
+        GRANT SELECT ON TABLE public.message_media TO authenticated;
+    END IF;
+END
+$grants$;
+
+-- -----------------------------------------------------------------------------
 -- service_role: acesso total, sem depender de RLS
 -- -----------------------------------------------------------------------------
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;

@@ -1,166 +1,162 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Route } from 'next';
-import { useState, useEffect } from 'react';
-import { Compass, Users, Sparkles, Info, ExternalLink } from 'lucide-react';
+import { useMemo } from 'react';
+import { Compass, Crown, Hash, Heart, ImageIcon, MessageSquare, Users } from 'lucide-react';
 
-import { Avatar, initials } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Skeleton } from '@/components/ui/skeleton';
-import { apiRequest } from '@/lib/api';
-import type { SuggestionUser, ExploreTopic } from '@/lib/types';
+import { isSafeMediaSource } from '@/lib/media';
+import type { Post, Space } from '@/lib/types';
 
 interface InicioRailProps {
-  suggestions: SuggestionUser[];
+  recommendations: Post[];
+  spaces: Space[];
 }
 
-export function InicioRail({ suggestions: initialSuggestions }: InicioRailProps) {
-  const [suggestions, setSuggestions] = useState<SuggestionUser[]>(initialSuggestions);
-  const [trending, setTrending] = useState<ExploreTopic[]>([]);
-  const [loadingTrending, setLoadingTrending] = useState(true);
+function formatCount(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace('.0', '')} mi`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace('.0', '')} mil`;
+  return String(value);
+}
 
-  useEffect(() => {
-    let active = true;
-    async function fetchTrending() {
-      try {
-        const res = await apiRequest<{ topics: ExploreTopic[] }>('/api/explore?limit=10');
-        if (!active) return;
-        setTrending(res.topics.slice(0, 5));
-      } catch {
-        /* silencioso */
-      } finally {
-        if (active) setLoadingTrending(false);
-      }
-    }
-    fetchTrending();
-    return () => { active = false; };
-  }, []);
+function getMediaPreview(post: Post): { url: string; mediaType: 'image' | 'video' } | null {
+  const media = post.media?.find(
+    (item) => item.mediaType === 'image' || item.mediaType === 'video',
+  );
+  const candidate = media?.url || post.image;
+  if (!candidate || !isSafeMediaSource(candidate)) return null;
+  const mediaType = media?.mediaType === 'video' || post.mediaType === 'video' ? 'video' : 'image';
+  return { url: candidate, mediaType };
+}
 
-  async function handleFollow(username: string, currentlyFollowing: boolean) {
-    try {
-      const res = await apiRequest<{
-        isFollowing: boolean;
-        requested: boolean;
-        cancelled: boolean;
-        isPrivate: boolean;
-        stats: { followers: number };
-      }>(`/api/users/${encodeURIComponent(username)}/follow`, { method: 'POST' });
-      setSuggestions((prev) =>
-        prev.map((u) =>
-          u.username === username
-            ? { ...u, isFollowing: res.isFollowing, followRequested: res.requested, followers: res.stats.followers }
-            : u,
-        ),
-      );
-    } catch (err) {
-      console.error('Erro ao seguir:', err);
-    }
-  }
+function recommendationTitle(post: Post): string {
+  const caption = post.caption.trim();
+  if (!caption) return `Publicação de ${post.user.name}`;
+  const withoutTags = caption.replace(/#[\p{L}\p{N}_]+/gu, '').replace(/\s+/g, ' ').trim();
+  return withoutTags || `Publicação de ${post.user.name}`;
+}
+
+export function InicioRail({ recommendations, spaces }: { recommendations: Post[]; spaces: Space[] }) {
+  const rankedRecommendations = useMemo(
+    () =>
+      recommendations
+        .filter((post) => getMediaPreview(post) !== null)
+        .sort(
+          (a, b) =>
+            b.likes * 3 + b.comments * 2 + b.shares - (a.likes * 3 + a.comments * 2 + a.shares) ||
+            b.createdAt - a.createdAt,
+        )
+        .slice(0, 2),
+    [recommendations],
+  );
 
   return (
-    <aside className="hidden xl:block w-full max-w-xs sticky top-20 space-y-5" aria-label="Painel lateral">
-      {/* Sugestões para seguir */}
-      <Card className="p-4 space-y-4">
-        <header className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold text-foreground">Quem seguir</h2>
-          <a
-            href="/explorar"
-            className="text-xs font-medium text-brand hover:underline flex items-center gap-1"
+    <aside className="w-full space-y-5 xl:sticky xl:top-[calc(4rem+4px)]" aria-label="Recomendações e servidores">
+      <Card className="p-4">
+        <header className="flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-foreground">
+            <Hash className="size-5 text-brand" aria-hidden="true" />
+            Meus servidores
+          </h2>
+          <Link
+            href="/mensagens"
+            className="text-xs font-medium text-brand hover:underline"
           >
-            Ver tudo
-            <ExternalLink className="size-3" aria-hidden="true" />
-          </a>
+            Ver todos
+          </Link>
         </header>
-        {suggestions.length === 0 ? (
+        {spaces.length === 0 ? (
           <EmptyState
             icon={<Users className="size-5" />}
-            title="Você já segue todo mundo"
-            description="Não há sugestões no momento."
+            title="Nenhum servidor"
+            description="Você ainda não participa de nenhum servidor."
           />
         ) : (
-          <ul className="space-y-3" role="list">
-            {suggestions.slice(0, 5).map((user) => (
-              <li key={user.id} className="flex items-center gap-3">
+          <ul className="mt-3 space-y-2" role="list">
+            {spaces.slice(0, 5).map((space) => (
+              <li key={space.id}>
                 <Link
-                  href={`/perfil/${encodeURIComponent(user.username)}` as Route}
-                  className="flex items-center gap-2 shrink-0"
-                  aria-label={`${initials(user.name)} — ${user.name}`}
+                  href={`/mensagens?espaco=${space.id}` as Route}
+                  className="flex items-center justify-between rounded-xl p-2.5 transition-colors hover:bg-surface-subtle"
                 >
-                  <Avatar src={user.avatar} alt={user.name} name={user.name} size="sm" />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand font-bold text-xs">
+                      {space.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <strong className="block truncate text-sm font-semibold text-foreground">{space.name}</strong>
+                      <span className="block truncate text-xs text-muted">{space.memberCount} membro{space.memberCount === 1 ? '' : 's'}</span>
+                    </div>
+                  </div>
                 </Link>
-                <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/perfil/${encodeURIComponent(user.username)}` as Route}
-                    className="flex items-center gap-1 truncate"
-                  >
-                    <strong className="text-foreground truncate block">{user.name}</strong>
-                    <span className="text-xs text-muted truncate block">@{user.username}</span>
-                  </Link>
-                  {user.sharedInterests.length && (
-                    <p className="text-xs text-muted truncate mt-0.5">
-                      {user.sharedInterests.slice(0, 3).map((i) => `#${i}`).join(' · ')}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  size="sm"
-                  variant={user.isFollowing || user.followRequested ? 'secondary' : 'primary'}
-                  onClick={() => handleFollow(user.username, user.isFollowing)}
-                  disabled={user.isFollowing}
-                >
-                  {user.followRequested ? 'Solicitado' : user.isFollowing ? 'Seguindo' : 'Seguir'}
-                </Button>
               </li>
             ))}
           </ul>
         )}
       </Card>
 
-      {/* Assuntos em alta */}
-      <Card className="p-4 space-y-4">
-        <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-foreground">
-          <Sparkles className="size-5 text-brand" aria-hidden="true" />
-          Assuntos em alta
-        </h2>
-        {loadingTrending ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-full rounded-pill" label="Assunto" />
-          ))
-        ) : trending.length === 0 ? (
-          <EmptyState icon={<Compass className="size-5" />} title="Sem assuntos no momento" description="Volte mais tarde para ver o que está em alta." />
+      <Card className="p-4">
+        <h2 className="font-display text-lg font-semibold text-foreground">Recomendados para você</h2>
+        <p className="mt-1 text-xs leading-5 text-muted">
+          Publicações reais priorizadas por curtidas, comentários e compartilhamentos.
+        </p>
+        {rankedRecommendations.length === 0 ? (
+          <EmptyState
+            icon={<ImageIcon className="size-5" />}
+            title="Nenhuma recomendação"
+            description="Publique ou siga mais creators para receber publicações relacionadas."
+          />
         ) : (
-          <ul className="space-y-2" role="list">
-            {trending.map((topic) => (
-              <li key={topic.id}>
-                <Link
-                  href={`/explorar?topic=${encodeURIComponent(topic.id)}` as Route}
-                  className="flex items-center justify-between px-2 py-1.5 rounded-xl text-sm transition-colors hover:bg-surface-subtle"
-                >
-                  <span className="truncate font-medium text-foreground">#{topic.label}</span>
-                  <span className="ml-2 shrink-0 text-xs text-muted">{topic.count} {topic.count === 1 ? 'publicação' : 'publicações'}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <ol className="mt-3 space-y-2" role="list">
+            {rankedRecommendations.map((post) => {
+              const preview = getMediaPreview(post);
+              const title = recommendationTitle(post);
+              return (
+                <li key={post.id}>
+                  <Link
+                    href={`/publicacoes/${post.id}` as Route}
+                    className="group grid grid-cols-[68px_minmax(0,1fr)] gap-3 rounded-2xl p-2 transition-colors hover:bg-surface-subtle"
+                  >
+                    <span className="relative aspect-[9/16] overflow-hidden rounded-xl bg-background-secondary">
+                      {preview?.mediaType === 'video' ? (
+                        <video
+                          src={preview.url}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="size-full object-cover"
+                          aria-label={`Miniatura de ${title}`}
+                        />
+                      ) : preview ? (
+                        <Image
+                          src={preview.url}
+                          alt={`Miniatura de ${title}`}
+                          fill
+                          sizes="68px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 self-center">
+                      <span className="line-clamp-2 text-sm font-semibold leading-5 text-foreground transition-colors group-hover:text-brand">
+                        {title}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-muted">@{post.user.username}</span>
+                      <span className="mt-1.5 flex items-center gap-3 text-[11px] text-muted">
+                        <span className="inline-flex items-center gap-1"><Heart className="size-3" /> {formatCount(post.likes)}</span>
+                        <span className="inline-flex items-center gap-1"><MessageSquare className="size-3" /> {formatCount(post.comments)}</span>
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
         )}
-      </Card>
-
-      {/* Sobre o Vibra */}
-      <Card className="p-4 space-y-3">
-        <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-foreground">
-          <Info className="size-5 text-brand" aria-hidden="true" />
-          Sobre o Vibra
-        </h2>
-        <p className="text-sm text-muted leading-relaxed">
-          O Vibra é uma rede social brasileira focada em comunidades, conversas autênticas e descoberta de interesses.
-          Sem algoritmos invasivos, sem anúncios, só pessoas.
-        </p>
-        <p className="text-xs leading-5 text-muted">
-          Políticas, termos e diretrizes da comunidade ainda não estão publicados.
-        </p>
       </Card>
     </aside>
   );

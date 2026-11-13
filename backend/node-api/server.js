@@ -35,6 +35,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { createDatabase } = require('./lib/db');
+const { SseHub } = require('./lib/sse-hub');
+const { handleChatRoutes } = require('./lib/chat-spaces');
+const { ChatWsHub } = require('./lib/chat-ws-hub');
+const { presignPut, getBucket } = require('./lib/minio-client');
+const { enqueueTranscode, startTranscodeWorker, getHLSManifestUrl, deleteHLS } = require('./lib/video-transcode');
 const APP = require('./app.config');
 const APP_VERSION = require('./package.json').version;
 const dating = require('./lib/dating');
@@ -77,6 +82,7 @@ const DATA_DIR = process.env.VIBRA_DATA_DIR
   ? path.resolve(process.env.VIBRA_DATA_DIR)
   : path.join(ROOT, 'data');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+const STAGING_DIR = path.join(DATA_DIR, 'staging');
 const DB_PATH = path.join(DATA_DIR, 'vibra.db');
 const SESSION_COOKIE = 'vibra_session';
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
@@ -159,6 +165,7 @@ if (IS_PRODUCTION && IDENTITY_MODE === 'disabled') {
 }
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(STAGING_DIR, { recursive: true });
 
 /*
  * Persistência: SQLite local por padrão; PostgreSQL (Supabase) quando
@@ -167,6 +174,16 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
  */
 const db = createDatabase({ sqlitePath: DB_PATH });
 const USING_POSTGRES = db.mode === 'postgres';
+/* SSE revalida a sessão a cada keepalive: revogação/expiração encerra o stream. */
+const sseHub = new SseHub({
+  isSessionActive: (token, userId) => {
+    if (!token || !Number.isInteger(userId)) return false;
+    const row = db
+      .prepare('SELECT user_id FROM sessions WHERE token = ? AND created_at > ?')
+      .get(token, Date.now() - SESSION_TTL);
+    return !!row && row.user_id === userId;
+  },
+});
 
 if (USING_POSTGRES) {
   console.log('Banco de dados: PostgreSQL (Supabase).');
@@ -175,6 +192,31 @@ if (USING_POSTGRES) {
   db.exec('PRAGMA journal_mode = WAL');
   /* Foreign keys são desativadas por padrão no SQLite; este PRAGMA garante cascatas. */
   db.exec('PRAGMA foreign_keys = ON');
+}
+
+/* ------------------------------------------------------------------ */
+/* WebSocket Hub para chat, presence, typing, voice signaling         */
+/* ------------------------------------------------------------------ */
+const wsHub = new ChatWsHub({
+  isSessionActive: (token, userId) => {
+    if (!token || !Number.isInteger(userId)) return false;
+    const row = db
+      .prepare('SELECT user_id FROM sessions WHERE token = ? AND created_at > ?')
+      .get(token, Date.now() - SESSION_TTL);
+    return !!row && row.user_id === userId;
+  },
+  maxConnectionsPerUser: 5,
+});
+
+/* ------------------------------------------------------------------ */
+/* Video transcoding worker                                           */
+/* ------------------------------------------------------------------ */
+let transcodeWorker = null;
+try {
+  transcodeWorker = startTranscodeWorker(2);
+  console.log('[Transcode] Worker started (concurrency: 2)');
+} catch (err) {
+  console.warn('[Transcode] Worker failed to start (Redis/FFmpeg unavailable):', err.message);
 }
 
 /* ------------------------------------------------------------------ */
@@ -360,6 +402,16 @@ const SQLITE_SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
 
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens(user_id);
+  CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_tokens(expires_at);
+
   CREATE TABLE IF NOT EXISTS identity_verifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -447,9 +499,107 @@ const SQLITE_SCHEMA = `
     body TEXT NOT NULL DEFAULT '',
     shared_post_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
     created_at INTEGER NOT NULL,
+    edited_at INTEGER,
     deleted_at INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS message_media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    media_type TEXT NOT NULL CHECK (media_type IN ('image','video','file')),
+    mime_type TEXT,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    file_name TEXT,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_message_media_msg ON message_media(message_id, position, id);
+
+  /* Espaços e canais: chats coletivos separados das conversas diretas. */
+  CREATE TABLE IF NOT EXISTS chat_spaces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    avatar TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS chat_space_members (
+    space_id INTEGER NOT NULL REFERENCES chat_spaces(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'moderator', 'member')),
+    presence TEXT NOT NULL DEFAULT 'offline' CHECK (presence IN ('online', 'idle', 'offline')),
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (space_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_space_members_user ON chat_space_members(user_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS chat_channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    space_id INTEGER NOT NULL REFERENCES chat_spaces(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    topic TEXT NOT NULL DEFAULT '',
+    visibility TEXT NOT NULL DEFAULT 'public' CHECK (visibility IN ('public', 'private')),
+    type TEXT NOT NULL DEFAULT 'text' CHECK (type IN ('text', 'voice')),
+    position INTEGER NOT NULL DEFAULT 0,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE (space_id, slug)
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_channels_space ON chat_channels(space_id, position, id);
+
+  /* Voice state: quem está conectado em canal de voz (WebRTC P2P mesh) */
+  CREATE TABLE IF NOT EXISTS chat_voice_states (
+    channel_id INTEGER NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined_at INTEGER NOT NULL,
+    is_muted INTEGER NOT NULL DEFAULT 0,
+    is_deafened INTEGER NOT NULL DEFAULT 0,
+    is_speaking INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (channel_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_voice_states_user ON chat_voice_states(user_id);
+
+  CREATE TABLE IF NOT EXISTS chat_channel_members (
+    channel_id INTEGER NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    last_read_at INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (channel_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_channel_members_user ON chat_channel_members(user_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id INTEGER NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+    sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body TEXT NOT NULL DEFAULT '',
+    shared_post_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL,
+    edited_at INTEGER,
+    deleted_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_messages_channel ON chat_messages(channel_id, id);
+
+  CREATE TABLE IF NOT EXISTS chat_message_media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video', 'file')),
+    mime_type TEXT,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    file_name TEXT,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_message_media_msg ON chat_message_media(message_id, position, id);
 
   CREATE TABLE IF NOT EXISTS location_consents (
     match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -500,6 +650,98 @@ const SQLITE_SCHEMA = `
     PRIMARY KEY (community_id, user_id)
   );
   CREATE INDEX IF NOT EXISTS idx_community_members_user ON community_members(user_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS community_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    community_id INTEGER NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    text TEXT NOT NULL DEFAULT '',
+    reply_to_id INTEGER REFERENCES community_posts(id) ON DELETE SET NULL,
+    shared_post_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER,
+    deleted_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_community_posts_community ON community_posts(community_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_community_posts_user ON community_posts(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_community_posts_reply ON community_posts(reply_to_id);
+
+  CREATE TABLE IF NOT EXISTS community_post_media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video', 'file')),
+    mime_type TEXT,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    file_name TEXT,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_community_post_media_post ON community_post_media(post_id, position, id);
+
+  CREATE TABLE IF NOT EXISTS community_post_likes (
+    post_id INTEGER NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_community_post_likes_user ON community_post_likes(user_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS community_post_reposts (
+    post_id INTEGER NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_community_post_reposts_user ON community_post_reposts(user_id, created_at DESC);
+
+  /* Shorts/Reels: vídeos curtos com HLS streaming */
+  CREATE TABLE IF NOT EXISTS shorts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    hls_manifest_url TEXT NOT NULL,
+    thumbnail_url TEXT,
+    duration REAL NOT NULL DEFAULT 0,
+    width INTEGER NOT NULL DEFAULT 0,
+    height INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'processing' CHECK (status IN ('processing', 'ready', 'failed')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_shorts_user ON shorts(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_shorts_status ON shorts(status, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS shorts_likes (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    short_id INTEGER NOT NULL REFERENCES shorts(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, short_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_shorts_likes_short ON shorts_likes(short_id);
+
+  CREATE TABLE IF NOT EXISTS shorts_views (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    short_id INTEGER NOT NULL REFERENCES shorts(id) ON DELETE CASCADE,
+    watched_at INTEGER NOT NULL,
+    watch_time REAL NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, short_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_shorts_views_short ON shorts_views(short_id);
+
+  /* Convites de espaço: códigos alfanuméricos de 5 chars, 1h de validade, reutilizáveis após expiração */
+  CREATE TABLE IF NOT EXISTS space_invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code CHAR(5) NOT NULL UNIQUE,
+    space_id INTEGER NOT NULL REFERENCES chat_spaces(id) ON DELETE CASCADE,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL,
+    used_at INTEGER,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_space_invites_space ON space_invites(space_id, expires_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_space_invites_code ON space_invites(code);
 `;
 
 if (!USING_POSTGRES) db.exec(SQLITE_SCHEMA);
@@ -539,6 +781,9 @@ if (!USING_POSTGRES) {
   ensureColumn('stories', 'audience', "TEXT NOT NULL DEFAULT 'public'");
   ensureColumn('stories', 'caption', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('stories', 'mentions', "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn('messages', 'edited_at', 'INTEGER');
+  ensureColumn('chat_spaces', 'avatar', 'TEXT');
+  ensureColumn('chat_space_members', 'presence', "TEXT NOT NULL DEFAULT 'offline'");
 }
 
 /* ------------------------------------------------------------------ */
@@ -1042,11 +1287,11 @@ function notify(userId, kind, text, link = null) {
   );
 }
 
-/** Quantidade de notificações ainda não lidas pelo usuário. */
+/** Quantidade de notificações ainda não lidas pelo usuário (exclui menções de servidor). */
 function unreadNotifications(userId) {
   return db
-    .prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL')
-    .get(userId).n;
+    .prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL AND kind != ?')
+    .get(userId, 'server_mention').n;
 }
 
 /**
@@ -1077,7 +1322,7 @@ function addConversationMember(conversationId, userId) {
 function conversationMembers(conversationId) {
   return db
     .prepare(
-      `SELECT cm.user_id, u.username, u.name, u.avatar
+      `SELECT cm.user_id, u.*
        FROM conversation_members cm JOIN users u ON u.id = cm.user_id
        WHERE cm.conversation_id = ?`
     )
@@ -1249,6 +1494,77 @@ function datingConversationAccess(me, otherId) {
 }
 
 /**
+ * Verifica se um destinatário SSE pode receber evento de conversa.
+ * Reaplica membership ao vivo, bloqueio bilateral e, se for Namoro,
+ * acesso de identidade/idade e match ativo.
+ */
+function authorizeConversationRecipient(client, conversationId) {
+  const recipientId = Number(client?.userId);
+  if (!Number.isInteger(recipientId) || recipientId <= 0) return false;
+  if (!isConversationMember(conversationId, recipientId)) return false;
+  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(conversationId);
+  if (!conversation) return false;
+  const members = conversationMembers(conversationId);
+  const other = members.find((m) => m.user_id !== recipientId);
+  if (!other) return false;
+  if (isBlocked(recipientId, other.user_id)) return false;
+  if (conversation.kind === 'dating') {
+    const recipient = db.prepare('SELECT * FROM users WHERE id = ?').get(recipientId);
+    if (!recipient || !datingConversationAccess(recipient, other.user_id)) return false;
+    const match = db.prepare('SELECT ended_at FROM matches WHERE id = ?').get(conversation.match_id);
+    if (!match || match.ended_at) return false;
+  }
+  return true;
+}
+
+/**
+ * Adapta payload por destinatário: define `mine` conforme remetente.
+ */
+function ssePayloadForRecipient(client, payload) {
+  const message = payload?.message;
+  if (!message || typeof message !== 'object') return payload;
+  const senderId = Number(message.sender?.id);
+  const mine = Number.isInteger(senderId) && senderId === Number(client.userId);
+  return { ...payload, message: { ...message, mine } };
+}
+
+/**
+ * * Verifica acesso de Namoro para vários participantes em lote.
+ * Mantém as mesmas regras de `datingStatusFor`, mas evita uma consulta por
+ * conversa na listagem de mensagens.
+ */
+function batchDatingConversationAccess(me, otherMembers) {
+  const allowed = new Set();
+  if (!datingAccessFor(me)) return allowed;
+
+  const uniqueIds = [...new Set(otherMembers.map((member) => member.user_id).filter(Boolean))];
+  if (!uniqueIds.length) return allowed;
+  const placeholders = uniqueIds.map(() => '?').join(',');
+  const verifications = db
+    .prepare(
+      `SELECT user_id, status, is_simulation, expires_at
+       FROM identity_verifications WHERE user_id IN (${placeholders})`
+    )
+    .all(...uniqueIds);
+  const verificationByUser = new Map(verifications.map((verification) => [verification.user_id, verification]));
+  const timestamp = now();
+
+  for (const member of otherMembers) {
+    const verification = verificationByUser.get(member.user_id);
+    let status = verification ? verification.status : 'not_started';
+    if (status === 'approved' && verification.expires_at && verification.expires_at <= timestamp) {
+      status = 'expired';
+      db.prepare("UPDATE identity_verifications SET status = 'expired' WHERE user_id = ?").run(member.user_id);
+    }
+    const adult = publicAge(member.birth_date) !== null && publicAge(member.birth_date) >= 18;
+    const simulation = verification ? !!verification.is_simulation : IDENTITY_MODE === 'dev';
+    const simulationBlocked = IS_PRODUCTION && simulation;
+    if (status === 'approved' && adult && !simulationBlocked) allowed.add(member.user_id);
+  }
+  return allowed;
+}
+
+/**
  * Retenção mínima de dados temporários. Executado na inicialização e
  * periodicamente; em testes pode ser antecipado com CLEANUP_INTERVAL_MS=0.
  */
@@ -1278,6 +1594,20 @@ function cleanupRetention() {
        )`
     )
     .run(timestamp - 30 * 24 * 60 * 60 * 1000).changes;
+  result.deletedMessageMedia = db
+    .prepare(
+      `DELETE FROM message_media
+       WHERE message_id IN (SELECT id FROM messages WHERE deleted_at IS NOT NULL)`
+    )
+    .run().changes;
+  result.deletedChatMessageMedia = db
+    .prepare(
+      `DELETE FROM chat_message_media
+       WHERE message_id IN (SELECT id FROM chat_messages WHERE deleted_at IS NOT NULL)`
+    )
+    .run().changes;
+  cleanupOrphanMessageMedia();
+  cleanupStagingDirectory();
   return result;
 }
 
@@ -1299,6 +1629,29 @@ function json(res, status, data, headers = {}) {
     ...headers,
   });
   res.end(body);
+}
+
+/**
+ * Executa uma operação em transação.
+ *
+ * SQLite usa `BEGIN IMMEDIATE`; o driver PostgreSQL converte para `BEGIN`.
+ * Todas as queries ficam na mesma conexão serial do worker, portanto a
+ * transação engloba mensagem, anexos e atualizações relacionadas.
+ */
+function withTransaction(operation) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = operation();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      /* Preserva o erro original da operação. */
+    }
+    throw error;
+  }
 }
 
 function readBody(req, limit = 36 * 1024 * 1024) {
@@ -1446,6 +1799,9 @@ function requireUser(req) {
 }
 
 function userDTO(row) {
+  const status = String(row.subscription_status || '').trim().toLowerCase();
+  const hasActiveSubscription = ACTIVE_SUBSCRIPTION_STATUSES.has(status) &&
+    (row.subscription_ends_at === null || row.subscription_ends_at === undefined || Number(row.subscription_ends_at) > now());
   return {
     id: row.id,
     username: row.username,
@@ -1461,6 +1817,7 @@ function userDTO(row) {
     points: row.points || 0,
     highlights: parseHighlights(row.highlights),
     presence: PRESENCE_VALUES.has(row.presence) ? row.presence : DEFAULT_PRESENCE,
+    isPremium: hasActiveSubscription,
   };
 }
 
@@ -1639,6 +1996,363 @@ function acceptFollowRequestRow(request) {
 
 const IMAGE_RE = /^data:image\/(png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=\s]+)$/;
 const VIDEO_RE = /^data:video\/(mp4|webm);base64,([A-Za-z0-9+/=\s]+)$/;
+const MESSAGE_IMAGE_BYTES = 8 * 1024 * 1024;
+const MESSAGE_DOCUMENT_BYTES = 25 * 1024 * 1024;
+const MESSAGE_MEDIA_MAX_ITEMS = 4;
+const MESSAGE_MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+
+function messageMediaError(message, status = 400) {
+  return new HttpError(status, message);
+}
+
+function sanitizeMessageFileName(value) {
+  const name = String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180);
+  return name || 'documento';
+}
+
+function decodeMessageMediaDataUrl(dataUrl) {
+  if (typeof dataUrl !== 'string' || dataUrl.length > 35 * 1024 * 1024) {
+    throw messageMediaError('Anexo inválido.');
+  }
+  const match = /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i.exec(dataUrl);
+  if (!match) throw messageMediaError('Anexo inválido.');
+  const mimeType = match[1].toLowerCase();
+  const buffer = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
+  if (!buffer.length) throw messageMediaError('Arquivo vazio.');
+  return { mimeType, buffer };
+}
+
+const MESSAGE_PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const MESSAGE_OLE_SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+const MESSAGE_ZIP_LOCAL_SIGNATURE = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+const MESSAGE_ZIP_CENTRAL_SIGNATURE = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
+const MESSAGE_DOCX_MIME =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/** Extensão declarada pelo cliente → MIME canônico aceito pelo backend. */
+const MESSAGE_EXTENSION_MIME = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: MESSAGE_DOCX_MIME,
+  rtf: 'application/rtf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+};
+
+/** Caracteres de controle proibidos em texto (tab, LF e CR são permitidos). */
+const MESSAGE_TEXT_CONTROL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+
+function messageExtensionOf(fileName) {
+  const name = String(fileName || '').toLowerCase();
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0 || dot >= name.length - 1) return '';
+  return name.slice(dot + 1).replace(/[^a-z0-9]/g, '');
+}
+
+/** Assinatura rápida: usada só para escolher o limite de tamanho. */
+function quickMessageImageSignature(buffer) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(MESSAGE_PNG_SIGNATURE)) return 'png';
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpg';
+  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
+    return 'webp';
+  }
+  return null;
+}
+
+/** GIF fica fora do escopo desta etapa e nunca pode virar documento de texto. */
+function isMessageGif(buffer) {
+  if (buffer.length < 6) return false;
+  const header = buffer.toString('ascii', 0, 6);
+  return header === 'GIF87a' || header === 'GIF89a';
+}
+
+function isValidMessagePng(buffer) {
+  if (buffer.length < 45) return false;
+  if (buffer.readUInt32BE(8) !== 13) return false;
+  if (buffer.toString('ascii', 12, 16) !== 'IHDR') return false;
+  const iend = buffer.lastIndexOf(Buffer.from('IEND', 'ascii'));
+  if (iend < 16 || iend + 4 > buffer.length) return false;
+  return buffer.readUInt32BE(iend - 4) === 0;
+}
+
+function isValidMessageJpeg(buffer) {
+  if (buffer.length < 4) return false;
+  const eoi = buffer.lastIndexOf(Buffer.from([0xff, 0xd9]));
+  return eoi >= 0 && eoi >= buffer.length - 16;
+}
+
+function isValidMessageWebp(buffer) {
+  if (buffer.length < 16) return false;
+  const riffSize = buffer.readUInt32LE(4);
+  if (riffSize + 8 > buffer.length) return false;
+  const chunk = buffer.toString('ascii', 12, 16);
+  return chunk === 'VP8 ' || chunk === 'VP8L' || chunk === 'VP8X';
+}
+
+function isValidMessagePdf(buffer) {
+  if (buffer.length < 32) return false;
+  if (buffer.toString('ascii', 0, 5) !== '%PDF-') return false;
+  const tail = buffer.subarray(Math.max(0, buffer.length - 4096)).toString('latin1');
+  return tail.includes('%%EOF');
+}
+
+function isValidMessageRtf(buffer) {
+  if (buffer.length < 6) return false;
+  if (buffer.toString('ascii', 0, 5) !== '{\\rtf') return false;
+  return buffer.toString('latin1').trimEnd().endsWith('}');
+}
+
+function isValidMessageDoc(buffer) {
+  if (buffer.length < 512) return false;
+  if (!buffer.subarray(0, 8).equals(MESSAGE_OLE_SIGNATURE)) return false;
+  const hasDocument = buffer.includes(Buffer.from('WordDocument', 'utf16le'));
+  const hasTable = buffer.includes(Buffer.from('1Table', 'utf16le')) ||
+    buffer.includes(Buffer.from('0Table', 'utf16le'));
+  return hasDocument && hasTable;
+}
+
+/** Nomes de entradas do ZIP (cabeçalhos locais + diretório central). */
+function messageZipEntryNames(buffer) {
+  const names = new Set();
+  const scan = (signature, nameOffset, lengthOffset) => {
+    let index = buffer.indexOf(signature);
+    while (index !== -1) {
+      if (index + lengthOffset + 2 <= buffer.length) {
+        const nameLength = buffer.readUInt16LE(index + lengthOffset);
+        const start = index + nameOffset;
+        if (start + nameLength <= buffer.length) {
+          names.add(buffer.toString('utf8', start, start + nameLength));
+        }
+      }
+      index = buffer.indexOf(signature, index + 4);
+    }
+  };
+  scan(MESSAGE_ZIP_LOCAL_SIGNATURE, 30, 26);
+  scan(MESSAGE_ZIP_CENTRAL_SIGNATURE, 46, 28);
+  return names;
+}
+
+function isValidMessageDocx(buffer) {
+  if (buffer.length < 100) return false;
+  if (!buffer.subarray(0, 4).equals(MESSAGE_ZIP_LOCAL_SIGNATURE)) return false;
+  let hasContentTypes = false;
+  let hasDocument = false;
+  for (const name of messageZipEntryNames(buffer)) {
+    const lower = name.toLowerCase();
+    if (lower === '[content_types].xml') hasContentTypes = true;
+    if (lower === 'word/document.xml') hasDocument = true;
+  }
+  return hasContentTypes && hasDocument;
+}
+
+/** UTF-8 estrito: binário vira null em vez de texto corrompido. */
+function decodeMessageText(buffer) {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    return null;
+  }
+}
+
+/** Separa linhas CSV respeitando campos entre aspas. */
+function splitMessageCsvRows(text) {
+  const rows = [];
+  let current = '';
+  let inQuotes = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"') {
+      if (inQuotes && text[index + 1] === '"') {
+        current += '""';
+        index += 1;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      current += char;
+      continue;
+    }
+    if (!inQuotes && (char === '\n' || char === '\r')) {
+      if (char === '\r' && text[index + 1] === '\n') index += 1;
+      rows.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  if (current.length) rows.push(current);
+  return rows;
+}
+
+function messageCsvFieldCount(row) {
+  let fields = 1;
+  let inQuotes = false;
+  for (let index = 0; index < row.length; index += 1) {
+    const char = row[index];
+    if (char === '"') {
+      if (inQuotes && row[index + 1] === '"') {
+        index += 1;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (!inQuotes && char === ',') fields += 1;
+  }
+  return fields;
+}
+
+/**
+ * CSV precisa ter largura constante e evidência estrutural.
+ * Uma coluna com vários registros continua válida; texto simples não vira CSV.
+ */
+function isConsistentMessageCsv(text) {
+  const rows = splitMessageCsvRows(text).filter((row) => row.trim() !== '');
+  if (!rows.length) return false;
+  const counts = rows.map(messageCsvFieldCount);
+  const hasMultipleRecords = rows.length >= 2;
+  const hasMultipleColumns = counts[0] >= 2;
+  if (!hasMultipleRecords && !hasMultipleColumns) return false;
+  return counts.every((count) => count === counts[0]);
+}
+
+/**
+ * Classifica o anexo pelo conteúdo dos bytes.
+ * Retorna `{ ok: false, message }` para conteúdo ambíguo, corrompido ou spoofado.
+ */
+function classifyMessageMedia(buffer) {
+  if (quickMessageImageSignature(buffer) === 'png') {
+    if (!isValidMessagePng(buffer)) {
+      return { ok: false, message: 'PNG inválido ou corrompido.' };
+    }
+    return { ok: true, mediaType: 'image', mimeType: 'image/png', extension: 'png' };
+  }
+  if (quickMessageImageSignature(buffer) === 'jpg') {
+    if (!isValidMessageJpeg(buffer)) {
+      return { ok: false, message: 'JPEG inválido ou corrompido.' };
+    }
+    return { ok: true, mediaType: 'image', mimeType: 'image/jpeg', extension: 'jpg' };
+  }
+  if (quickMessageImageSignature(buffer) === 'webp') {
+    if (!isValidMessageWebp(buffer)) {
+      return { ok: false, message: 'WEBP inválido ou corrompido.' };
+    }
+    return { ok: true, mediaType: 'image', mimeType: 'image/webp', extension: 'webp' };
+  }
+  if (isMessageGif(buffer)) {
+    return { ok: false, message: 'GIF não é suportado. Envie PNG, JPG ou WEBP.' };
+  }
+  if (buffer.length >= 5 && buffer.toString('ascii', 0, 5) === '%PDF-') {
+    if (!isValidMessagePdf(buffer)) {
+      return { ok: false, message: 'PDF inválido ou corrompido.' };
+    }
+    return { ok: true, mediaType: 'file', mimeType: 'application/pdf', extension: 'pdf' };
+  }
+  if (buffer.length >= 5 && buffer.toString('ascii', 0, 5) === '{\\rtf') {
+    if (!isValidMessageRtf(buffer)) {
+      return { ok: false, message: 'RTF inválido ou corrompido.' };
+    }
+    return { ok: true, mediaType: 'file', mimeType: 'application/rtf', extension: 'rtf' };
+  }
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(MESSAGE_OLE_SIGNATURE)) {
+    if (!isValidMessageDoc(buffer)) {
+      return { ok: false, message: 'DOC inválido ou corrompido.' };
+    }
+    return { ok: true, mediaType: 'file', mimeType: 'application/msword', extension: 'doc' };
+  }
+  if (buffer.length >= 4 && buffer.subarray(0, 4).equals(MESSAGE_ZIP_LOCAL_SIGNATURE)) {
+    if (!isValidMessageDocx(buffer)) {
+      return { ok: false, message: 'DOCX inválido ou corrompido.' };
+    }
+    return { ok: true, mediaType: 'file', mimeType: MESSAGE_DOCX_MIME, extension: 'docx' };
+  }
+
+  const text = decodeMessageText(buffer);
+  if (text === null) {
+    return { ok: false, message: 'Formato não suportado ou arquivo corrompido.' };
+  }
+  if (MESSAGE_TEXT_CONTROL_RE.test(text)) {
+    return { ok: false, message: 'Arquivo de texto contém caracteres inválidos.' };
+  }
+  if (isConsistentMessageCsv(text)) {
+    return { ok: true, mediaType: 'file', mimeType: 'text/csv', extension: 'csv' };
+  }
+  return { ok: true, mediaType: 'file', mimeType: 'text/plain', extension: 'txt' };
+}
+
+function mapMessageMedia(row) {
+  return {
+    url: row.url,
+    mediaType: row.mediaType || row.media_type || 'file',
+    mimeType: row.mimeType || row.mime_type || null,
+    sizeBytes: Number(row.sizeBytes ?? row.size_bytes ?? 0),
+    fileName: row.fileName || row.file_name || null,
+  };
+}
+
+function validateMessageMediaItem(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    throw messageMediaError('Anexo inválido.');
+  }
+  const decoded = decodeMessageMediaDataUrl(item.dataUrl);
+  const fileName = sanitizeMessageFileName(item.fileName);
+  const extension = messageExtensionOf(fileName);
+  const classified = classifyMessageMedia(decoded.buffer);
+  if (!classified.ok) {
+    throw messageMediaError(classified.message);
+  }
+
+  const expectedMime = MESSAGE_EXTENSION_MIME[extension];
+  if (!expectedMime) {
+    throw messageMediaError(
+      'Formato não suportado. Envie PNG, JPG, WEBP, PDF, DOC, DOCX, RTF, TXT ou CSV.',
+    );
+  }
+  if (expectedMime !== classified.mimeType) {
+    throw messageMediaError('O conteúdo do anexo não corresponde à extensão declarada.');
+  }
+
+  const maxBytes = classified.mediaType === 'image' ? MESSAGE_IMAGE_BYTES : MESSAGE_DOCUMENT_BYTES;
+  if (decoded.buffer.length > maxBytes) {
+    throw messageMediaError(
+      classified.mediaType === 'image'
+        ? 'Imagem muito grande (limite de 8 MB).'
+        : 'Documento muito grande (limite de 25 MB).',
+      413,
+    );
+  }
+
+  return {
+    mediaType: classified.mediaType,
+    mimeType: classified.mimeType,
+    extension: classified.extension,
+    sizeBytes: decoded.buffer.length,
+    fileName,
+    buffer: decoded.buffer,
+  };
+}
+
+function saveMessageMedia(item, conversationId, userId, { kind = 'conversation' } = {}) {
+  const prefix = kind === 'channel' ? 'message-channel' : 'message';
+  const filename = `${prefix}-${conversationId}-${userId}-${crypto.randomUUID()}.${item.extension}`;
+  const stagedPath = path.join(STAGING_DIR, filename);
+  fs.writeFileSync(stagedPath, item.buffer, { flag: 'wx' });
+  return {
+    filename,
+    stagedPath,
+    finalPath: path.join(UPLOAD_DIR, filename),
+    url: `/uploads/${filename}`,
+  };
+}
 
 function saveUpload(dataUrl, prefix, { video = false } = {}) {
   if (typeof dataUrl !== 'string' || dataUrl.length > 35 * 1024 * 1024) {
@@ -1726,6 +2440,17 @@ function removeUploadIfUnused(url) {
   if (typeof url !== 'string' || !url.startsWith('/uploads/')) return;
   const filename = url.slice('/uploads/'.length);
   if (filename.includes('/') || filename.includes('\\')) return;
+
+  /* Anexos de mensagem têm namespace próprio. Confirme ausência em
+   * message_media e chat_message_media antes de apagar qualquer arquivo final. */
+  if (filename.startsWith('message-')) {
+    const referenced =
+      db.prepare('SELECT 1 AS ok FROM message_media WHERE url = ? LIMIT 1').get(url) ||
+      db.prepare('SELECT 1 AS ok FROM chat_message_media WHERE url = ? LIMIT 1').get(url);
+    if (!referenced) fs.rmSync(path.join(UPLOAD_DIR, filename), { force: true });
+    return;
+  }
+
   const used =
     db.prepare('SELECT 1 AS ok FROM posts WHERE image = ? LIMIT 1').get(url) ||
     db.prepare('SELECT 1 AS ok FROM post_media WHERE url = ? LIMIT 1').get(url) ||
@@ -1733,7 +2458,43 @@ function removeUploadIfUnused(url) {
     db.prepare('SELECT 1 AS ok FROM users WHERE banner = ? LIMIT 1').get(url) ||
     db.prepare('SELECT 1 AS ok FROM stories WHERE image = ? LIMIT 1').get(url) ||
     db.prepare('SELECT 1 AS ok FROM dating_profiles WHERE instr(photos, ?) > 0 LIMIT 1').get(`"${url}"`);
-  if (!used) fs.rm(path.join(UPLOAD_DIR, filename), { force: true }, () => {});
+  if (!used) fs.rmSync(path.join(UPLOAD_DIR, filename), { force: true });
+}
+
+/** Confirma no banco antes de remover arquivos de anexos sem referência. */
+function cleanupOrphanMessageMedia() {
+  const referenced = new Set([
+    ...db
+      .prepare('SELECT url FROM message_media')
+      .all()
+      .map((row) => (typeof row.url === 'string' ? row.url : '')),
+    ...db
+      .prepare('SELECT url FROM chat_message_media')
+      .all()
+      .map((row) => (typeof row.url === 'string' ? row.url : '')),
+  ]);
+
+  for (const filename of fs.readdirSync(UPLOAD_DIR)) {
+    if (!filename.startsWith('message-')) continue;
+    const url = `/uploads/${filename}`;
+    if (!referenced.has(url)) {
+      fs.rmSync(path.join(UPLOAD_DIR, filename), { force: true });
+    }
+  }
+}
+
+/** Remove staged files. Inicialização remove todos; execução remove apenas expirados. */
+function cleanupStagingDirectory(removeAll = false) {
+  const nowMs = Date.now();
+  const maxAgeMs = 60 * 60 * 1000;
+  for (const filename of fs.readdirSync(STAGING_DIR)) {
+    const filePath = path.join(STAGING_DIR, filename);
+    const stat = fs.statSync(filePath, { throwIfNoEntry: false });
+    if (!stat?.isFile()) continue;
+    if (removeAll || nowMs - stat.mtimeMs > maxAgeMs) {
+      fs.rmSync(filePath, { force: true });
+    }
+  }
 }
 
 /**
@@ -1828,6 +2589,7 @@ function mapPost(row) {
     reposted: false,
     saved: false,
     authorFollowing: false,
+    authorFollowRequested: false,
   };
 }
 
@@ -1857,10 +2619,16 @@ function withViewerState(posts, viewerId) {
     .all(viewerId, ...authorIds);
   const followingIds = new Set(followRows.map((row) => row.following_id));
 
+  const followRequestRows = db
+    .prepare(`SELECT target_id FROM follow_requests WHERE requester_id = ? AND target_id IN (${authorPlaceholders})`)
+    .all(viewerId, ...authorIds);
+  const followRequestedIds = new Set(followRequestRows.map((row) => row.target_id));
+
   for (const post of posts) {
     post.reposted = repostedIds.has(post.id);
     post.saved = savedIds.has(post.id);
     post.authorFollowing = followingIds.has(post.user.id);
+    post.authorFollowRequested = followRequestedIds.has(post.user.id);
   }
   return posts;
 }
@@ -1945,6 +2713,33 @@ function communityDTO(row) {
     isMember: !!row.is_member,
     role: row.role || null,
     createdAt: row.created_at,
+  };
+}
+
+function shortDTO(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title || '',
+    description: row.description || '',
+    hlsManifestUrl: row.hls_manifest_url,
+    thumbnailUrl: row.thumbnail_url,
+    duration: row.duration,
+    width: row.width,
+    height: row.height,
+    status: row.status,
+    likesCount: Number(row.likes_count || 0),
+    viewsCount: Number(row.views_count || 0),
+    liked: !!row.liked,
+    user: {
+      id: row.user_id,
+      username: row.username,
+      name: row.name,
+      avatar: row.avatar,
+      verified: !!row.verified,
+    },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -2089,8 +2884,75 @@ async function handleApi(req, res, pathname, url) {
 
   if (method === 'POST' && pathname === '/api/logout') {
     const token = cookieValue(req, SESSION_COOKIE);
+    const session = token
+      ? db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token)
+      : null;
     if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    if (session) sseHub.disconnectUser(session.user_id);
     return json(res, 200, { ok: true }, { 'Set-Cookie': `${SESSION_COOKIE}=; ${cookieAttributes()}; Max-Age=0` });
+  }
+
+  // POST /api/auth/forgot-password - Request password reset
+  if (method === 'POST' && pathname === '/api/auth/forgot-password') {
+    rateLimit(req, 'forgot-password', 5, 60 * 60 * 1000);
+    const body = await readBody(req);
+    const email = cleanText(body.email, 'E-mail', { min: 5, max: 120, required: true }).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new HttpError(400, 'E-mail inválido.');
+    }
+    const user = db.prepare('SELECT id, username, email FROM users WHERE email = ?').get(email);
+    // Always return success to prevent email enumeration
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = now() + 60 * 60 * 1000; // 1 hour
+      db.prepare(
+        'INSERT INTO password_reset_tokens (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)'
+      ).run(resetToken, user.id, now(), expiresAt);
+
+      // In production, send email here. For dev, log the token.
+      if (IS_PRODUCTION) {
+        // TODO: Integrate with email service (SendGrid, Resend, etc.)
+        console.log(`[Password Reset] Email would be sent to ${email} with token ${resetToken}`);
+      } else {
+        console.log(`[DEV] Password reset token for ${user.username} (${email}): ${resetToken}`);
+        console.log(`[DEV] Reset URL: /redefinir-senha?token=${resetToken}`);
+      }
+    }
+    return json(res, 200, { ok: true, message: 'Se o e-mail existir, você receberá instruções para redefinir a senha.' });
+  }
+
+  // POST /api/auth/reset-password - Reset password with token
+  if (method === 'POST' && pathname === '/api/auth/reset-password') {
+    rateLimit(req, 'reset-password', 10, 60 * 60 * 1000);
+    const body = await readBody(req);
+    const token = cleanText(body.token, 'Token', { min: 1, max: 64, required: true });
+    const password = cleanText(body.password, 'Nova senha', { min: 8, max: 100, required: true });
+    const confirmPassword = cleanText(body.confirmPassword, 'Confirmar senha', { min: 8, max: 100, required: true });
+
+    if (password !== confirmPassword) {
+      throw new HttpError(400, 'As senhas não coincidem.');
+    }
+    const passwordErrors = [];
+    if (!/[A-Z]/.test(password)) passwordErrors.push('pelo menos 1 letra maiúscula');
+    if (!/[0-9]/.test(password)) passwordErrors.push('pelo menos 1 número');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) passwordErrors.push('pelo menos 1 caractere especial');
+    if (passwordErrors.length > 0) {
+      throw new HttpError(400, `A senha deve conter: ${passwordErrors.join(', ')}.`);
+    }
+
+    const resetRecord = db.prepare(
+      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > ?'
+    ).get(token, now());
+    if (!resetRecord) {
+      throw new HttpError(400, 'Token inválido ou expirado.');
+    }
+
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), resetRecord.user_id);
+    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE token = ?').run(token);
+    // Invalidate all sessions for this user
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(resetRecord.user_id);
+
+    return json(res, 200, { ok: true, message: 'Senha redefinida com sucesso. Faça login com a nova senha.' });
   }
 
   // Verificação de disponibilidade de username (pública, sem autenticação)
@@ -2105,6 +2967,42 @@ async function handleApi(req, res, pathname, url) {
   }
 
   const me = requireUser(req);
+
+  /* Rotas de espaços, canais, mensagens e SSE. O módulo devolve `null`
+   * quando o caminho não pertence ao chat. */
+  const chatRoute = await handleChatRoutes({
+    req,
+    res,
+    pathname,
+    url,
+    me,
+    ctx: {
+      db,
+      readBody,
+      cleanText,
+      saveMessageMedia,
+      validateMessageMediaItem,
+      mapMessageMedia,
+      removeUploadIfUnused,
+      withTransaction,
+      now,
+      rateLimit,
+      sseHub,
+      cookieValue,
+      isBlocked,
+      isConversationMember,
+      datingConversationAccess,
+      authorizeConversationRecipient,
+      ssePayloadForRecipient,
+      mapPost,
+      POST_SELECT,
+      json,
+    },
+  });
+  if (chatRoute) {
+    if (chatRoute.handled) return undefined;
+    return json(res, chatRoute.status, chatRoute.body);
+  }
 
   if (method === 'POST' && pathname === '/api/uploads/video') {
     rateLimit(req, 'video-upload', 30, 60 * 60 * 1000);
@@ -2377,22 +3275,43 @@ async function handleApi(req, res, pathname, url) {
   if (method === 'GET' && pathname === '/api/feed') {
     const limit = Math.min(40, Math.max(1, Number(url.searchParams.get('limit')) || 18));
     const before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
+    const mediaType = url.searchParams.get('mediaType') || '';
+    const clauses = [
+      `(p.user_id = ? OR p.user_id IN (
+         SELECT following_id FROM follows WHERE follower_id = ?
+       ))`,
+      'p.created_at < ?',
+      `NOT EXISTS (
+         SELECT 1 FROM blocks b
+         WHERE (b.blocker_id = ? AND b.blocked_id = p.user_id)
+            OR (b.blocker_id = p.user_id AND b.blocked_id = ?)
+       )`,
+    ];
+    const params = [me.id, me.id, me.id, before, me.id, me.id];
+    const requestedMediaTypes = [
+      ...new Set(
+        mediaType
+          .split(',')
+          .map((value) => value.trim())
+          .filter((value) => value === 'video' || value === 'image'),
+      ),
+    ];
+    if (requestedMediaTypes.length === 1) {
+      clauses.push('p.media_type = ?');
+      params.push(requestedMediaTypes[0]);
+    } else if (requestedMediaTypes.length > 1) {
+      clauses.push(`p.media_type IN (${requestedMediaTypes.map(() => '?').join(',')})`);
+      params.push(...requestedMediaTypes);
+    }
+    params.push(limit);
     const rows = db
       .prepare(
         `${POST_SELECT}
-         WHERE (p.user_id = ? OR p.user_id IN (
-           SELECT following_id FROM follows WHERE follower_id = ?
-         ))
-         AND p.created_at < ?
-         AND NOT EXISTS (
-           SELECT 1 FROM blocks b
-           WHERE (b.blocker_id = ? AND b.blocked_id = p.user_id)
-              OR (b.blocker_id = p.user_id AND b.blocked_id = ?)
-         )
+         WHERE ${clauses.join(' AND ')}
          ORDER BY p.created_at DESC, p.id DESC
          LIMIT ?`
       )
-      .all(me.id, me.id, me.id, before, me.id, me.id, limit);
+      .all(...params);
     const posts = withPreviews(rows.map(mapPost));
     withViewerState(posts, me.id);
     return json(res, 200, {
@@ -2406,6 +3325,7 @@ async function handleApi(req, res, pathname, url) {
     const before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
     const topic = url.searchParams.get('topic') || '';
     const q = (url.searchParams.get('q') || '').trim();
+    const mediaType = url.searchParams.get('mediaType') || '';
     const clauses = [
       'p.created_at < ?',
       `NOT EXISTS (
@@ -2428,6 +3348,21 @@ async function handleApi(req, res, pathname, url) {
       const like = `%${q.replace(/[%_]/g, '')}%`;
       params.push(like, like, like);
     }
+    const requestedMediaTypes = [
+      ...new Set(
+        mediaType
+          .split(',')
+          .map((value) => value.trim())
+          .filter((value) => value === 'video' || value === 'image'),
+      ),
+    ];
+    if (requestedMediaTypes.length === 1) {
+      clauses.push('p.media_type = ?');
+      params.push(requestedMediaTypes[0]);
+    } else if (requestedMediaTypes.length > 1) {
+      clauses.push(`p.media_type IN (${requestedMediaTypes.map(() => '?').join(',')})`);
+      params.push(...requestedMediaTypes);
+    }
     params.push(limit);
     const rows = db
       .prepare(`${POST_SELECT} WHERE ${clauses.join(' AND ')} ORDER BY p.created_at DESC, p.id DESC LIMIT ?`)
@@ -2446,7 +3381,7 @@ async function handleApi(req, res, pathname, url) {
              WHERE (b.blocker_id = ? AND b.blocked_id = u.id)
                 OR (b.blocker_id = u.id AND b.blocked_id = ?)
            )
-         ORDER BY follower_count DESC, u.created_at ASC
+         ORDER BY follower_count DESC, u.id ASC
          LIMIT 12`
       )
       .all(me.id, me.id, me.id);
@@ -2463,7 +3398,7 @@ async function handleApi(req, res, pathname, url) {
           sharedInterests: shared,
         };
       })
-      .sort((a, b) => b.sharedInterests.length - a.sharedInterests.length || b.followers - a.followers)
+      .sort((a, b) => b.followers - a.followers || a.id - b.id)
       .slice(0, 6);
 
     /* Tópicos em alta são agregados apenas sobre o mesmo conteúdo público
@@ -2618,6 +3553,650 @@ async function handleApi(req, res, pathname, url) {
       )
       .all(me.id, target.id);
     return json(res, 200, { communities: rows.map(communityDTO) });
+  }
+
+  // --- community posts --------------------------------------------------
+  const communitySlugMatch = matchRoute(pathname, '/api/communities/:slug');
+  if (communitySlugMatch) {
+    const slug = communitySlugMatch.slug;
+    const community = db.prepare('SELECT * FROM communities WHERE slug = ?').get(slug);
+    if (!community) throw new HttpError(404, 'Comunidade não encontrada.');
+
+    // Verify membership for write operations
+    const isMember = db.prepare(
+      'SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?'
+    ).get(community.id, me.id);
+
+    // GET /api/communities/:slug/posts - list posts
+    if (method === 'GET' && pathname.endsWith('/posts')) {
+      const cursor = parseLimit(url.searchParams.get('cursor'));
+      const limit = parseLimit(url.searchParams.get('limit'), 20, 50);
+      let where = 'WHERE cp.community_id = ? AND cp.deleted_at IS NULL';
+      const params = [community.id];
+      if (cursor) {
+        where += ' AND cp.created_at < ?';
+        params.push(cursor);
+      }
+      const rows = db
+        .prepare(
+          `SELECT cp.*, u.username, u.name, u.avatar,
+                  CASE WHEN EXISTS (SELECT 1 FROM identity_verifications iv WHERE iv.user_id = u.id AND iv.status = 'approved') THEN 1 ELSE 0 END AS verified,
+                  (SELECT COUNT(*) FROM community_post_likes cpl WHERE cpl.post_id = cp.id) AS likes_count,
+                  (SELECT COUNT(*) FROM community_post_reposts cpr WHERE cpr.post_id = cp.id) AS reposts_count,
+                  (SELECT COUNT(*) FROM community_posts cpr WHERE cpr.reply_to_id = cp.id) AS replies_count,
+                  EXISTS (SELECT 1 FROM community_post_likes cpl WHERE cpl.post_id = cp.id AND cpl.user_id = ?) AS liked,
+                  EXISTS (SELECT 1 FROM community_post_reposts cpr WHERE cpr.post_id = cp.id AND cpr.user_id = ?) AS reposted
+           FROM community_posts cp
+           JOIN users u ON u.id = cp.user_id
+           ${where}
+           ORDER BY cp.created_at DESC, cp.id DESC
+           LIMIT ?`
+        )
+        .all(...params, me.id, me.id, limit + 1);
+      const hasMore = rows.length > limit;
+      const posts = hasMore ? rows.slice(0, limit) : rows;
+      const nextCursor = hasMore ? posts[posts.length - 1].created_at : null;
+
+      // Fetch media for posts
+      const postIds = posts.map((p) => p.id);
+      let mediaByPost = {};
+      if (postIds.length > 0) {
+        const placeholders = postIds.map(() => '?').join(',');
+        const mediaRows = db
+          .prepare(
+            `SELECT * FROM community_post_media WHERE post_id IN (${placeholders}) ORDER BY position`
+          )
+          .all(...postIds);
+        for (const m of mediaRows) {
+          mediaByPost[m.post_id] = mediaByPost[m.post_id] || [];
+          mediaByPost[m.post_id].push({
+            url: m.url,
+            mediaType: m.media_type,
+            mimeType: m.mime_type,
+            sizeBytes: m.size_bytes,
+            fileName: m.file_name,
+          });
+        }
+      }
+
+      return json(res, 200, {
+        posts: posts.map((row) => ({
+          id: row.id,
+          communityId: row.community_id,
+          userId: row.user_id,
+          text: row.text,
+          replyToId: row.reply_to_id,
+          sharedPostId: row.shared_post_id,
+          media: mediaByPost[row.id] || [],
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          deletedAt: row.deleted_at,
+          user: {
+            id: row.user_id,
+            username: row.username,
+            name: row.name,
+            avatar: row.avatar,
+            verified: !!row.verified,
+          },
+          likesCount: Number(row.likes_count || 0),
+          repostsCount: Number(row.reposts_count || 0),
+          repliesCount: Number(row.replies_count || 0),
+          liked: !!row.liked,
+          reposted: !!row.reposted,
+        })),
+        nextCursor,
+      });
+    }
+
+    // GET /api/communities/:slug/posts/:id - get single post with replies
+    const singlePostMatch = matchRoute(pathname, '/api/communities/:slug/posts/:id');
+    if (singlePostMatch && method === 'GET') {
+      const postId = parsePositiveId(singlePostMatch.id);
+      if (!postId) return badRequest('ID inválido.');
+      const post = db
+        .prepare(
+          `SELECT cp.*, u.username, u.name, u.avatar,
+                  CASE WHEN EXISTS (SELECT 1 FROM identity_verifications iv WHERE iv.user_id = u.id AND iv.status = 'approved') THEN 1 ELSE 0 END AS verified,
+                  (SELECT COUNT(*) FROM community_post_likes cpl WHERE cpl.post_id = cp.id) AS likes_count,
+                  (SELECT COUNT(*) FROM community_post_reposts cpr WHERE cpr.post_id = cp.id) AS reposts_count,
+                  (SELECT COUNT(*) FROM community_posts cpr WHERE cpr.reply_to_id = cp.id) AS replies_count,
+                  EXISTS (SELECT 1 FROM community_post_likes cpl WHERE cpl.post_id = cp.id AND cpl.user_id = ?) AS liked,
+                  EXISTS (SELECT 1 FROM community_post_reposts cpr WHERE cpr.post_id = cp.id AND cpr.user_id = ?) AS reposted
+           FROM community_posts cp
+           JOIN users u ON u.id = cp.user_id
+           WHERE cp.id = ? AND cp.deleted_at IS NULL AND cp.community_id = ?`
+        )
+        .get(me.id, me.id, postId, community.id);
+      if (!post) throw new HttpError(404, 'Post não encontrado.');
+
+      // Fetch media
+      const mediaRows = db.prepare('SELECT * FROM community_post_media WHERE post_id = ? ORDER BY position').all(postId);
+      const media = mediaRows.map((m) => ({
+        url: m.url,
+        mediaType: m.media_type,
+        mimeType: m.mime_type,
+        sizeBytes: m.size_bytes,
+        fileName: m.file_name,
+      }));
+
+      // Fetch replies
+      const replies = db
+        .prepare(
+          `SELECT cp.*, u.username, u.name, u.avatar,
+                  CASE WHEN EXISTS (SELECT 1 FROM identity_verifications iv WHERE iv.user_id = u.id AND iv.status = 'approved') THEN 1 ELSE 0 END AS verified,
+                  (SELECT COUNT(*) FROM community_post_likes cpl WHERE cpl.post_id = cp.id) AS likes_count,
+                  (SELECT COUNT(*) FROM community_post_reposts cpr WHERE cpr.post_id = cp.id) AS reposts_count,
+                  (SELECT COUNT(*) FROM community_posts cpr WHERE cpr.reply_to_id = cp.id) AS replies_count,
+                  EXISTS (SELECT 1 FROM community_post_likes cpl WHERE cpl.post_id = cp.id AND cpl.user_id = ?) AS liked,
+                  EXISTS (SELECT 1 FROM community_post_reposts cpr WHERE cpr.post_id = cp.id AND cpr.user_id = ?) AS reposted
+           FROM community_posts cp
+           JOIN users u ON u.id = cp.user_id
+           WHERE cp.reply_to_id = ? AND cp.deleted_at IS NULL
+           ORDER BY cp.created_at ASC`
+        )
+        .all(me.id, me.id, postId);
+
+      const replyMedia = {};
+      for (const r of replies) {
+        const mRows = db.prepare('SELECT * FROM community_post_media WHERE post_id = ? ORDER BY position').all(r.id);
+        replyMedia[r.id] = mRows.map((m) => ({
+          url: m.url,
+          mediaType: m.media_type,
+          mimeType: m.mime_type,
+          sizeBytes: m.size_bytes,
+          fileName: m.file_name,
+        }));
+      }
+
+      return json(res, 200, {
+        post: {
+          id: post.id,
+          communityId: post.community_id,
+          userId: post.user_id,
+          text: post.text,
+          replyToId: post.reply_to_id,
+          sharedPostId: post.shared_post_id,
+          media,
+          createdAt: post.created_at,
+          updatedAt: post.updated_at,
+          deletedAt: post.deleted_at,
+          user: {
+            id: post.user_id,
+            username: post.username,
+            name: post.name,
+            avatar: post.avatar,
+            verified: !!post.verified,
+          },
+          likesCount: Number(post.likes_count || 0),
+          repostsCount: Number(post.reposts_count || 0),
+          repliesCount: Number(post.replies_count || 0),
+          liked: !!post.liked,
+          reposted: !!post.reposted,
+        },
+        replies: replies.map((row) => ({
+          id: row.id,
+          communityId: row.community_id,
+          userId: row.user_id,
+          text: row.text,
+          replyToId: row.reply_to_id,
+          sharedPostId: row.shared_post_id,
+          media: replyMedia[row.id] || [],
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          deletedAt: row.deleted_at,
+          user: {
+            id: row.user_id,
+            username: row.username,
+            name: row.name,
+            avatar: row.avatar,
+            verified: !!row.verified,
+          },
+          likesCount: Number(row.likes_count || 0),
+          repostsCount: Number(row.reposts_count || 0),
+          repliesCount: Number(row.replies_count || 0),
+          liked: !!row.liked,
+          reposted: !!row.reposted,
+        })),
+      });
+    }
+
+    // POST /api/communities/:slug/posts - create post
+    if (method === 'POST' && pathname.endsWith('/posts')) {
+      if (!isMember) throw new HttpError(403, 'Apenas membros podem postar nesta comunidade.');
+      rateLimit(req, 'community-post', 30, 60 * 1000);
+      const body = await readBody(req);
+      if (!isPlainObject(body)) return badRequest('Corpo inválido.');
+      const text = cleanText(body.text || '', 'Texto', { max: 280, multiline: true });
+      const replyToId = body.replyToId ? parsePositiveId(body.replyToId) : null;
+      const sharedPostId = body.sharedPostId ? parsePositiveId(body.sharedPostId) : null;
+      const requestedMedia = body.media === undefined || body.media === null ? [] : body.media;
+      if (!Array.isArray(requestedMedia)) return badRequest('Mídia inválida.');
+      if (requestedMedia.length > 4) return badRequest('Máximo 4 anexos por post.');
+      const mediaItems = requestedMedia.map(validateMessageMediaItem);
+      const totalBytes = mediaItems.reduce((t, i) => t + i.sizeBytes, 0);
+      if (totalBytes > 25 * 1024 * 1024) return badRequest('Anexos muito grandes (máx 25 MB).');
+      if (!text && !replyToId && !sharedPostId && mediaItems.length === 0) {
+        return badRequest('Escreva algo ou anexe um arquivo.');
+      }
+
+      const timestamp = now();
+      const savedMedia = [];
+      try {
+        for (const item of mediaItems) {
+          savedMedia.push({
+            ...item,
+            ...saveMessageMedia(item, `community-${community.id}`, me.id, { kind: 'community' }),
+          });
+        }
+        const postId = withTransaction(() => {
+          const result = db
+            .prepare(
+              `INSERT INTO community_posts (community_id, user_id, text, reply_to_id, shared_post_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)`
+            )
+            .run(community.id, me.id, text, replyToId, sharedPostId, timestamp);
+          const id = Number(result.lastInsertRowid);
+          for (const [pos, item] of savedMedia.entries()) {
+            db.prepare(
+              `INSERT INTO community_post_media (post_id, url, media_type, mime_type, size_bytes, file_name, position, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+            ).run(id, item.url, item.mediaType, item.mimeType, item.sizeBytes, item.fileName, pos, timestamp);
+          }
+          // Notify parent post author if this is a reply (and not self-reply)
+          if (replyToId) {
+            const parentPost = db.prepare('SELECT user_id, community_id FROM community_posts WHERE id = ?').get(replyToId);
+            if (parentPost && parentPost.user_id !== me.id) {
+              db.prepare(
+                `INSERT INTO notifications (user_id, actor_id, kind, entity_type, entity_id, created_at)
+                 VALUES (?, ?, 'community_post_reply', 'community_post', ?, ?)`
+              ).run(parentPost.user_id, me.id, id, timestamp);
+            }
+            // SSE: notify community members of new reply
+            const recipientIds = db
+              .prepare('SELECT user_id FROM community_members WHERE community_id = ?')
+              .all(community.id)
+              .map((row) => row.user_id);
+            sseHub.publish(
+              recipientIds,
+              'community.post.replied',
+              { scope: 'community', communityId: community.id, postId: replyToId, replyId: id, userId: me.id },
+              (client) => {
+                const membership = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?').get(community.id, client.userId);
+                return membership !== undefined;
+              },
+            );
+          }
+          for (const item of savedMedia) {
+            require('node:fs').renameSync(item.stagedPath, item.finalPath);
+          }
+          return id;
+        });
+        const post = db
+          .prepare(
+            `SELECT cp.*, u.username, u.name, u.avatar
+             FROM community_posts cp JOIN users u ON u.id = cp.user_id
+             WHERE cp.id = ?`
+          )
+          .get(postId);
+        const postDTO = {
+          id: post.id,
+          communityId: post.community_id,
+          userId: post.user_id,
+          text: post.text,
+          replyToId: post.reply_to_id,
+          sharedPostId: post.shared_post_id,
+          media: savedMedia.map((m) => ({
+            url: m.url,
+            mediaType: m.mediaType,
+            mimeType: m.mimeType,
+            sizeBytes: m.sizeBytes,
+            fileName: m.fileName,
+          })),
+          createdAt: post.created_at,
+          updatedAt: post.updated_at,
+          deletedAt: post.deleted_at,
+          user: { id: post.user_id, username: post.username, name: post.name, avatar: post.avatar, verified: 0 },
+          likesCount: 0,
+          repostsCount: 0,
+          repliesCount: 0,
+          liked: false,
+          reposted: false,
+        };
+        // SSE: notify community members
+        const recipientIds = db
+          .prepare('SELECT user_id FROM community_members WHERE community_id = ?')
+          .all(community.id)
+          .map((row) => row.user_id);
+        sseHub.publish(
+          recipientIds,
+          'community.post.created',
+          { scope: 'community', communityId: community.id, post: postDTO },
+          (client) => {
+            const membership = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?').get(community.id, client.userId);
+            return membership !== undefined;
+          },
+        );
+        return json(res, 201, { post: postDTO });
+      } catch (err) {
+        for (const item of savedMedia) {
+          require('node:fs').rmSync(item.stagedPath, { force: true });
+          removeUploadIfUnused(item.url);
+        }
+        throw err;
+      }
+    }
+  }
+
+  // POST /api/community-posts/:id/like
+  const cpLikeMatch = matchRoute(pathname, '/api/community-posts/:id/like');
+  if (cpLikeMatch && method === 'POST') {
+    const postId = parsePositiveId(cpLikeMatch.id);
+    if (!postId) return badRequest('ID inválido.');
+    const post = db.prepare('SELECT * FROM community_posts WHERE id = ? AND deleted_at IS NULL').get(postId);
+    if (!post) throw new HttpError(404, 'Post não encontrado.');
+    // Verify membership
+    const isMember = db.prepare(
+      'SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?'
+    ).get(post.community_id, me.id);
+    if (!isMember) throw new HttpError(403, 'Acesso negado.');
+    const existing = db.prepare('SELECT 1 FROM community_post_likes WHERE post_id = ? AND user_id = ?').get(postId, me.id);
+    if (existing) return json(res, 200, { liked: true });
+    db.prepare('INSERT INTO community_post_likes (post_id, user_id, created_at) VALUES (?, ?, ?)').run(postId, me.id, now());
+    // Notify post author (if not self)
+    if (post.user_id !== me.id) {
+      db.prepare(
+        `INSERT INTO notifications (user_id, actor_id, kind, entity_type, entity_id, created_at)
+         VALUES (?, ?, 'community_post_like', 'community_post', ?, ?)`
+      ).run(post.user_id, me.id, postId, now());
+    }
+    // SSE: notify community members
+    const recipientIds = db
+      .prepare('SELECT user_id FROM community_members WHERE community_id = ?')
+      .all(post.community_id)
+      .map((row) => row.user_id);
+    sseHub.publish(
+      recipientIds,
+      'community.post.liked',
+      { scope: 'community', communityId: post.community_id, postId, userId: me.id, liked: true },
+      (client) => {
+        const membership = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?').get(post.community_id, client.userId);
+        return membership !== undefined;
+      },
+    );
+    return json(res, 200, { liked: true });
+  }
+
+  // DELETE /api/community-posts/:id/like
+  if (cpLikeMatch && method === 'DELETE') {
+    const postId = parsePositiveId(cpLikeMatch.id);
+    if (!postId) return badRequest('ID inválido.');
+    const post = db.prepare('SELECT * FROM community_posts WHERE id = ? AND deleted_at IS NULL').get(postId);
+    if (!post) throw new HttpError(404, 'Post não encontrado.');
+    db.prepare('DELETE FROM community_post_likes WHERE post_id = ? AND user_id = ?').run(postId, me.id);
+    // SSE: notify community members
+    const recipientIds = db
+      .prepare('SELECT user_id FROM community_members WHERE community_id = ?')
+      .all(post.community_id)
+      .map((row) => row.user_id);
+    sseHub.publish(
+      recipientIds,
+      'community.post.liked',
+      { scope: 'community', communityId: post.community_id, postId, userId: me.id, liked: false },
+      (client) => {
+        const membership = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?').get(post.community_id, client.userId);
+        return membership !== undefined;
+      },
+    );
+    return json(res, 200, { liked: false });
+  }
+
+  // POST /api/community-posts/:id/repost
+  const cpRepostMatch = matchRoute(pathname, '/api/community-posts/:id/repost');
+  if (cpRepostMatch && method === 'POST') {
+    const postId = parsePositiveId(cpRepostMatch.id);
+    if (!postId) return badRequest('ID inválido.');
+    const post = db.prepare('SELECT * FROM community_posts WHERE id = ? AND deleted_at IS NULL').get(postId);
+    if (!post) throw new HttpError(404, 'Post não encontrado.');
+    const isMember = db.prepare(
+      'SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?'
+    ).get(post.community_id, me.id);
+    if (!isMember) throw new HttpError(403, 'Acesso negado.');
+    const existing = db.prepare('SELECT 1 FROM community_post_reposts WHERE post_id = ? AND user_id = ?').get(postId, me.id);
+    if (existing) return json(res, 200, { reposted: true });
+    db.prepare('INSERT INTO community_post_reposts (post_id, user_id, created_at) VALUES (?, ?, ?)').run(postId, me.id, now());
+    // Notify post author (if not self)
+    if (post.user_id !== me.id) {
+      db.prepare(
+        `INSERT INTO notifications (user_id, actor_id, kind, entity_type, entity_id, created_at)
+         VALUES (?, ?, 'community_post_repost', 'community_post', ?, ?)`
+      ).run(post.user_id, me.id, postId, now());
+    }
+    // SSE: notify community members
+    const recipientIds = db
+      .prepare('SELECT user_id FROM community_members WHERE community_id = ?')
+      .all(post.community_id)
+      .map((row) => row.user_id);
+    sseHub.publish(
+      recipientIds,
+      'community.post.reposted',
+      { scope: 'community', communityId: post.community_id, postId, userId: me.id, reposted: true },
+      (client) => {
+        const membership = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?').get(post.community_id, client.userId);
+        return membership !== undefined;
+      },
+    );
+    return json(res, 200, { reposted: true });
+  }
+
+  // DELETE /api/community-posts/:id/repost
+  if (cpRepostMatch && method === 'DELETE') {
+    const postId = parsePositiveId(cpRepostMatch.id);
+    if (!postId) return badRequest('ID inválido.');
+    const post = db.prepare('SELECT * FROM community_posts WHERE id = ? AND deleted_at IS NULL').get(postId);
+    if (!post) throw new HttpError(404, 'Post não encontrado.');
+    db.prepare('DELETE FROM community_post_reposts WHERE post_id = ? AND user_id = ?').run(postId, me.id);
+    // SSE: notify community members
+    const recipientIds = db
+      .prepare('SELECT user_id FROM community_members WHERE community_id = ?')
+      .all(post.community_id)
+      .map((row) => row.user_id);
+    sseHub.publish(
+      recipientIds,
+      'community.post.reposted',
+      { scope: 'community', communityId: post.community_id, postId, userId: me.id, reposted: false },
+      (client) => {
+        const membership = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?').get(post.community_id, client.userId);
+        return membership !== undefined;
+      },
+    );
+    return json(res, 200, { reposted: false });
+  }
+
+  // DELETE /api/community-posts/:id - delete post
+  const cpDeleteMatch = matchRoute(pathname, '/api/community-posts/:id');
+  if (cpDeleteMatch && method === 'DELETE') {
+    const postId = parsePositiveId(cpDeleteMatch.id);
+    if (!postId) return badRequest('ID inválido.');
+    const post = db.prepare('SELECT * FROM community_posts WHERE id = ? AND deleted_at IS NULL').get(postId);
+    if (!post) throw new HttpError(404, 'Post não encontrado.');
+    if (post.user_id !== me.id) throw new HttpError(403, 'Apenas o autor pode excluir o post.');
+    const isMember = db.prepare(
+      'SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?'
+    ).get(post.community_id, me.id);
+    if (!isMember) throw new HttpError(403, 'Acesso negado.');
+    const timestamp = now();
+    db.prepare('UPDATE community_posts SET deleted_at = ? WHERE id = ?').run(timestamp, postId);
+    // SSE: notify community members
+    const recipientIds = db
+      .prepare('SELECT user_id FROM community_members WHERE community_id = ?')
+      .all(post.community_id)
+      .map((row) => row.user_id);
+    sseHub.publish(
+      recipientIds,
+      'community.post.deleted',
+      { scope: 'community', communityId: post.community_id, postId },
+      (client) => {
+        const membership = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?').get(post.community_id, client.userId);
+        return membership !== undefined;
+      },
+    );
+    return json(res, 200, { ok: true });
+  }
+
+  // POST /api/communities/:slug/join - join community
+  const joinMatch = matchRoute(pathname, '/api/communities/:slug/join');
+  if (joinMatch && method === 'POST') {
+    const slug = joinMatch.slug;
+    const community = db.prepare('SELECT * FROM communities WHERE slug = ?').get(slug);
+    if (!community) throw new HttpError(404, 'Comunidade não encontrada.');
+    const existing = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?').get(community.id, me.id);
+    if (existing) return json(res, 200, { joined: true, member: true });
+    db.prepare('INSERT INTO community_members (community_id, user_id, role, created_at) VALUES (?, ?, ?, ?)')
+      .run(community.id, me.id, 'member', now());
+    return json(res, 200, { joined: true, member: true });
+  }
+
+  // DELETE /api/communities/:slug/join - leave community
+  if (joinMatch && method === 'DELETE') {
+    const slug = joinMatch.slug;
+    const community = db.prepare('SELECT * FROM communities WHERE slug = ?').get(slug);
+    if (!community) throw new HttpError(404, 'Comunidade não encontrada.');
+    // Prevent owner from leaving
+    const isOwner = db.prepare('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ? AND role = ?').get(community.id, me.id, 'owner');
+    if (isOwner) throw new HttpError(400, 'O proprietário não pode sair da comunidade. Transfira a propriedade primeiro.');
+    db.prepare('DELETE FROM community_members WHERE community_id = ? AND user_id = ?').run(community.id, me.id);
+    return json(res, 200, { joined: false, member: false });
+  }
+
+  // --- shorts (videos curtos estilo Reels/TikTok) -----------------------
+  // GET /api/shorts - list shorts (feed)
+  if (method === 'GET' && pathname === '/api/shorts') {
+    const cursor = parseLimit(url.searchParams.get('cursor'));
+    const limit = parseLimit(url.searchParams.get('limit'), 20, 50);
+    let where = 'WHERE s.status = ?';
+    const params = ['ready'];
+    if (cursor) {
+      where += ' AND s.created_at < ?';
+      params.push(cursor);
+    }
+    params.push(limit);
+    const rows = db
+      .prepare(
+        `SELECT s.*, u.username, u.name, u.avatar,
+                CASE WHEN EXISTS (SELECT 1 FROM identity_verifications iv WHERE iv.user_id = u.id AND iv.status = 'approved') THEN 1 ELSE 0 END AS verified,
+                (SELECT COUNT(*) FROM shorts_likes sl WHERE sl.short_id = s.id) AS likes_count,
+                (SELECT COUNT(*) FROM shorts_views sv WHERE sv.short_id = s.id) AS views_count,
+                EXISTS (SELECT 1 FROM shorts_likes sl WHERE sl.short_id = s.id AND sl.user_id = ?) AS liked
+         FROM shorts s
+         JOIN users u ON u.id = s.user_id
+         ${where}
+         ORDER BY s.created_at DESC, s.id DESC
+         LIMIT ?`
+      )
+      .all(me.id, ...params);
+    return json(res, 200, { shorts: rows.map(shortDTO) });
+  }
+
+  // GET /api/shorts/:id - get single short
+  const shortIdMatch = matchRoute(pathname, '/api/shorts/:id');
+  if (method === 'GET' && shortIdMatch) {
+    const id = parsePositiveId(shortIdMatch.id);
+    if (!id) return badRequest('ID inválido.');
+    const row = db
+      .prepare(
+        `SELECT s.*, u.username, u.name, u.avatar,
+                CASE WHEN EXISTS (SELECT 1 FROM identity_verifications iv WHERE iv.user_id = u.id AND iv.status = 'approved') THEN 1 ELSE 0 END AS verified,
+                (SELECT COUNT(*) FROM shorts_likes sl WHERE sl.short_id = s.id) AS likes_count,
+                (SELECT COUNT(*) FROM shorts_views sv WHERE sv.short_id = s.id) AS views_count,
+                EXISTS (SELECT 1 FROM shorts_likes sl WHERE sl.short_id = s.id AND sl.user_id = ?) AS liked
+         FROM shorts s
+         JOIN users u ON u.id = s.user_id
+         WHERE s.id = ? AND s.status = 'ready'`
+      )
+      .get(me.id, id);
+    if (!row) throw new HttpError(404, 'Short não encontrado.');
+    // Record view
+    db.prepare('INSERT OR IGNORE INTO shorts_views (user_id, short_id, watched_at, watch_time) VALUES (?, ?, ?, ?)')
+      .run(me.id, id, now(), 0);
+    return json(res, 200, { short: shortDTO(row) });
+  }
+
+  // POST /api/shorts/presign - get presigned URL for direct upload
+  if (method === 'POST' && pathname === '/api/shorts/presign') {
+    rateLimit(req, 'shorts-presign', 30, 60 * 1000);
+    const body = await readBody(req);
+    const filename = cleanText(body.filename, 'Arquivo', { min: 1, max: 255, required: true });
+    const contentType = cleanText(body.contentType, 'Tipo', { min: 1, max: 100, required: true });
+    if (!contentType.startsWith('video/')) {
+      return badRequest('Apenas arquivos de vídeo são permitidos.');
+    }
+    const videoId = crypto.randomUUID();
+    const ext = path.extname(filename) || '.mp4';
+    const objectKey = `shorts/${me.id}/${videoId}/source${ext}`;
+    const uploadUrl = await presignPut(objectKey, 3600);
+    // Create pending short record
+    db.prepare(
+      `INSERT INTO shorts (user_id, title, description, hls_manifest_url, thumbnail_url, duration, width, height, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?)`
+    ).run(me.id, body.title || '', body.description || '', '', '', 0, 0, 0, now(), now());
+    const shortId = db.prepare('SELECT last_insert_rowid() as id').get().id;
+    // Enqueue transcode job
+    await enqueueTranscode(shortId.toString(), objectKey, { isMinioSource: true });
+    return json(res, 200, { uploadUrl, videoId: shortId, objectKey });
+  }
+
+  // GET /api/shorts/:id/manifest - get HLS manifest URL
+  if (method === 'GET' && shortIdMatch && pathname.endsWith('/manifest')) {
+    const id = parsePositiveId(shortIdMatch.id);
+    if (!id) return badRequest('ID inválido.');
+    const short = db.prepare('SELECT * FROM shorts WHERE id = ? AND status = ?').get(id, 'ready');
+    if (!short) throw new HttpError(404, 'Short não encontrado ou ainda processando.');
+    return json(res, 200, { manifestUrl: short.hls_manifest_url });
+  }
+
+  // POST /api/shorts/:id/like
+  if (method === 'POST' && shortIdMatch && pathname.endsWith('/like')) {
+    const id = parsePositiveId(shortIdMatch.id);
+    if (!id) return badRequest('ID inválido.');
+    const short = db.prepare('SELECT * FROM shorts WHERE id = ? AND status = ?').get(id, 'ready');
+    if (!short) throw new HttpError(404, 'Short não encontrado.');
+    const existing = db.prepare('SELECT 1 FROM shorts_likes WHERE short_id = ? AND user_id = ?').get(id, me.id);
+    if (existing) return json(res, 200, { liked: true });
+    db.prepare('INSERT INTO shorts_likes (short_id, user_id, created_at) VALUES (?, ?, ?)').run(id, me.id, now());
+    return json(res, 200, { liked: true });
+  }
+
+  // DELETE /api/shorts/:id/like
+  if (method === 'DELETE' && shortIdMatch && pathname.endsWith('/like')) {
+    const id = parsePositiveId(shortIdMatch.id);
+    if (!id) return badRequest('ID inválido.');
+    db.prepare('DELETE FROM shorts_likes WHERE short_id = ? AND user_id = ?').run(id, me.id);
+    return json(res, 200, { liked: false });
+  }
+
+  // POST /api/shorts/:id/view - record view progress
+  if (method === 'POST' && shortIdMatch && pathname.endsWith('/view')) {
+    const id = parsePositiveId(shortIdMatch.id);
+    if (!id) return badRequest('ID inválido.');
+    const short = db.prepare('SELECT * FROM shorts WHERE id = ? AND status = ?').get(id, 'ready');
+    if (!short) throw new HttpError(404, 'Short não encontrado.');
+    const body = await readBody(req);
+    const watchTime = Math.max(0, Number(body.watchTime) || 0);
+    db.prepare('INSERT OR REPLACE INTO shorts_views (user_id, short_id, watched_at, watch_time) VALUES (?, ?, ?, ?)')
+      .run(me.id, id, now(), watchTime);
+    return json(res, 200, { ok: true });
+  }
+
+  // DELETE /api/shorts/:id - delete own short
+  if (method === 'DELETE' && shortIdMatch) {
+    const id = parsePositiveId(shortIdMatch.id);
+    if (!id) return badRequest('ID inválido.');
+    const short = db.prepare('SELECT * FROM shorts WHERE id = ?').get(id);
+    if (!short) throw new HttpError(404, 'Short não encontrado.');
+    if (short.user_id !== me.id) throw new HttpError(403, 'Apenas o autor pode excluir.');
+    await deleteHLS(id.toString());
+    db.prepare('DELETE FROM shorts WHERE id = ?').run(id);
+    return json(res, 200, { ok: true });
   }
 
   // --- users ----------------------------------------------------------
@@ -3458,6 +5037,10 @@ async function handleApi(req, res, pathname, url) {
     if (story.audience === 'close_friends' && !isCloseFriend(story.user_id, me.id)) {
       throw new HttpError(403, 'Este story é apenas para melhores amigos.');
     }
+    const storyOwner = db.prepare('SELECT * FROM users WHERE id = ?').get(story.user_id);
+    if (!storyOwner || !canMessageTarget(me, storyOwner)) {
+      throw new HttpError(403, 'Este perfil não aceita mensagens suas no momento.');
+    }
     const body = await readBody(req);
     const text = cleanText(body.text, 'Resposta', { min: 1, max: 500, required: true });
     let conversation = db
@@ -3480,63 +5063,137 @@ async function handleApi(req, res, pathname, url) {
     } else {
       db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now(), conversation.id);
     }
-    db.prepare('INSERT INTO messages (conversation_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)').run(
-      conversation.id,
-      me.id,
-      `Respondeu ao seu story: ${text}`,
-      now()
+    const storyReplyAt = now();
+    const storyReplyResult = db
+      .prepare('INSERT INTO messages (conversation_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)')
+      .run(conversation.id, me.id, `Respondeu ao seu story: ${text}`, storyReplyAt);
+    const storyReplyMessageId = Number(storyReplyResult.lastInsertRowid);
+    sseHub.publish(
+      conversationMembers(conversation.id).map((member) => member.user_id),
+      'message.created',
+      {
+        scope: 'conversation',
+        conversationId: conversation.id,
+        message: {
+          id: storyReplyMessageId,
+          body: `Respondeu ao seu story: ${text}`,
+          sharedPostId: null,
+          sharedPost: null,
+          media: [],
+          createdAt: storyReplyAt,
+          editedAt: null,
+          deletedAt: null,
+          mine: true,
+          sender: {
+            id: me.id,
+            username: me.username,
+            name: me.name,
+            avatar: me.avatar || null,
+            verified: isVerifiedUser(me.id),
+          },
+        },
+      },
+      (client) => authorizeConversationRecipient(client, conversation.id),
+      ssePayloadForRecipient,
     );
-    notify(story.user_id, 'story_reply', `${me.name} respondeu ao seu story.`, `/?conversation=${conversation.id}`);
+    notify(story.user_id, 'story_reply', `${me.name} respondeu ao seu story.`, `/mensagens?conversa=${conversation.id}`);
     return json(res, 201, { ok: true, conversationId: conversation.id });
   }
 
   // --- conversas / mensagens -----------------------------------------
   if (method === 'GET' && pathname === '/api/conversations') {
+    /* Uma consulta monta conversa, leitura, última mensagem e não lidas.
+       Isso evita o N+1 que bloqueava a worker PostgreSQL em cada polling. */
     const rows = db
       .prepare(
-        `SELECT c.* FROM conversations c
+        `SELECT c.*, cm.last_read_at,
+                lm.id AS last_id, lm.sender_id AS last_sender_id,
+                lm.body AS last_body, lm.shared_post_id AS last_shared_post_id,
+                lm.created_at AS last_created_at,
+                last_sender.username AS last_sender_username,
+                last_sender.name AS last_sender_name,
+                last_sender.avatar AS last_sender_avatar,
+                CASE WHEN EXISTS (
+                  SELECT 1 FROM identity_verifications last_verified
+                  WHERE last_verified.user_id = lm.sender_id AND last_verified.status = 'approved'
+                ) THEN 1 ELSE 0 END AS last_sender_verified,
+                (SELECT COUNT(*) FROM messages unread
+                 WHERE unread.conversation_id = c.id
+                   AND unread.sender_id != ?
+                   AND unread.deleted_at IS NULL
+                   AND unread.created_at > cm.last_read_at) AS unread_count
+         FROM conversations c
          JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id = ?
+         LEFT JOIN messages lm ON lm.id = (
+           SELECT candidate.id FROM messages candidate
+           WHERE candidate.conversation_id = c.id AND candidate.deleted_at IS NULL
+           ORDER BY candidate.created_at DESC, candidate.id DESC
+           LIMIT 1
+         )
+         LEFT JOIN users last_sender ON last_sender.id = lm.sender_id
          ORDER BY c.updated_at DESC
          LIMIT 50`
       )
-      .all(me.id);
+      .all(me.id, me.id);
+    if (!rows.length) return json(res, 200, { conversations: [] });
+
+    const conversationIds = rows.map((row) => row.id);
+    const placeholders = conversationIds.map(() => '?').join(',');
+    const memberRows = db
+      .prepare(
+        `SELECT cm.conversation_id, cm.user_id, u.*
+         FROM conversation_members cm
+         JOIN users u ON u.id = cm.user_id
+         WHERE cm.conversation_id IN (${placeholders}) AND cm.user_id != ?`
+      )
+      .all(...conversationIds, me.id);
+    const membersByConversation = new Map();
+    for (const member of memberRows) {
+      const members = membersByConversation.get(member.conversation_id) || [];
+      members.push(member);
+      membersByConversation.set(member.conversation_id, members);
+    }
+
+    const blockRows = db
+      .prepare('SELECT blocker_id, blocked_id FROM blocks WHERE blocker_id = ? OR blocked_id = ?')
+      .all(me.id, me.id);
+    const blockedUserIds = new Set(
+      blockRows.map((block) => (block.blocker_id === me.id ? block.blocked_id : block.blocker_id)),
+    );
+
+    const datingAccessByUser = batchDatingConversationAccess(me, memberRows);
     const conversations = [];
     for (const row of rows) {
-      const others = conversationMembers(row.id).filter((member) => member.user_id !== me.id);
+      const others = membersByConversation.get(row.id) || [];
       if (!others.length) continue;
-      if (isBlocked(me.id, others[0].user_id)) continue;
-      if (row.kind === 'dating' && !datingConversationAccess(me, others[0].user_id)) continue;
-      const membership = db
-        .prepare('SELECT last_read_at FROM conversation_members WHERE conversation_id = ? AND user_id = ?')
-        .get(row.id, me.id);
-      const last = db
-        .prepare(
-          `SELECT id, sender_id, body, shared_post_id, created_at
-           FROM messages WHERE conversation_id = ? AND deleted_at IS NULL
-           ORDER BY created_at DESC, id DESC LIMIT 1`
-        )
-        .get(row.id);
-      const unread = db
-        .prepare(
-          `SELECT COUNT(*) AS n FROM messages
-           WHERE conversation_id = ? AND sender_id != ? AND deleted_at IS NULL AND created_at > ?`
-        )
-        .get(row.id, me.id, membership ? membership.last_read_at : 0).n;
+      const other = others[0];
+      if (blockedUserIds.has(other.user_id)) continue;
+      if (row.kind === 'dating' && !datingAccessByUser.has(other.user_id)) continue;
       conversations.push({
         id: row.id,
         kind: row.kind,
         matchId: row.match_id,
-        other: userDTO(others[0]),
-        lastMessage: last
+        other: userDTO({
+          ...other,
+          id: other.user_id,
+        }),
+        lastMessage: row.last_id
           ? {
-              id: last.id,
-              body: last.body,
-              sharedPostId: last.shared_post_id,
-              createdAt: last.created_at,
-              mine: last.sender_id === me.id,
+              id: row.last_id,
+              body: row.last_body,
+              sharedPostId: row.last_shared_post_id,
+              createdAt: row.last_created_at,
+              mine: row.last_sender_id === me.id,
+              sender: {
+                id: row.last_sender_id,
+                username: row.last_sender_username,
+                name: row.last_sender_name,
+                avatar: row.last_sender_avatar || null,
+                verified: !!row.last_sender_verified,
+              },
             }
           : null,
-        unread,
+        unread: Number(row.unread_count || 0),
         updatedAt: row.updated_at,
       });
     }
@@ -3571,7 +5228,7 @@ async function handleApi(req, res, pathname, url) {
       conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(Number(result.lastInsertRowid));
       addConversationMember(conversation.id, me.id);
       addConversationMember(conversation.id, target.id);
-      notify(target.id, 'message', `${me.name} iniciou uma conversa com você.`, `/?conversation=${conversation.id}`);
+      notify(target.id, 'message', `${me.name} iniciou uma conversa com você.`, `/mensagens?conversa=${conversation.id}`);
     }
     return json(res, 200, {
       conversation: {
@@ -3616,11 +5273,41 @@ async function handleApi(req, res, pathname, url) {
     }
     const rows = db
       .prepare(
-        `SELECT id, sender_id, body, shared_post_id, created_at
-         FROM messages WHERE conversation_id = ? AND deleted_at IS NULL
-         ORDER BY created_at ASC, id ASC LIMIT 200`
+        `SELECT m.id, m.sender_id, m.body, m.shared_post_id, m.created_at,
+                m.edited_at, m.deleted_at,
+                sender.username AS sender_username,
+                sender.name AS sender_name,
+                sender.avatar AS sender_avatar,
+                CASE WHEN EXISTS (
+                  SELECT 1 FROM identity_verifications sender_verified
+                  WHERE sender_verified.user_id = m.sender_id AND sender_verified.status = 'approved'
+                ) THEN 1 ELSE 0 END AS sender_verified
+         FROM messages m
+         JOIN users sender ON sender.id = m.sender_id
+         WHERE m.conversation_id = ? AND m.deleted_at IS NULL
+         ORDER BY m.id DESC LIMIT 200`
       )
       .all(conversationId);
+    /* Mais recentes primeiro no banco; exibição permanece em ordem crescente. */
+    rows.reverse();
+    const messageIds = rows.map((row) => row.id);
+    const mediaByMessage = new Map();
+    if (messageIds.length) {
+      const placeholders = messageIds.map(() => '?').join(',');
+      const mediaRows = db
+        .prepare(
+          `SELECT message_id, url, media_type, mime_type, size_bytes, file_name
+           FROM message_media
+           WHERE message_id IN (${placeholders})
+           ORDER BY message_id, position, id`
+        )
+        .all(...messageIds);
+      for (const media of mediaRows) {
+        const items = mediaByMessage.get(media.message_id) || [];
+        items.push(mapMessageMedia(media));
+        mediaByMessage.set(media.message_id, items);
+      }
+    }
     const sharedIds = [...new Set(rows.map((row) => row.shared_post_id).filter(Boolean))];
     const sharedPosts = new Map();
     if (sharedIds.length) {
@@ -3632,13 +5319,27 @@ async function handleApi(req, res, pathname, url) {
     }
     return json(res, 200, {
       conversation: { id: conversation.id, kind: conversation.kind, matchId: conversation.match_id, canSend, reason },
-      other: userDTO(other),
+      other: userDTO({
+        ...other,
+        id: other.user_id,
+      }),
       messages: rows.map((row) => ({
         id: row.id,
         body: row.body,
         sharedPost: row.shared_post_id ? sharedPosts.get(row.shared_post_id) || null : null,
+        sharedPostId: row.shared_post_id,
+        media: mediaByMessage.get(row.id) || [],
         createdAt: row.created_at,
+        editedAt: row.edited_at || null,
+        deletedAt: row.deleted_at || null,
         mine: row.sender_id === me.id,
+        sender: {
+          id: row.sender_id,
+          username: row.sender_username,
+          name: row.sender_name,
+          avatar: row.sender_avatar || null,
+          verified: !!row.sender_verified,
+        },
       })),
     });
   }
@@ -3674,34 +5375,120 @@ async function handleApi(req, res, pathname, url) {
       const post = db.prepare('SELECT id, user_id FROM posts WHERE id = ?').get(sharedPostId);
       if (!post || isBlocked(me.id, post.user_id)) throw new HttpError(404, 'Publicação não encontrada.');
     }
-    if (!text && !sharedPostId) throw new HttpError(400, 'Escreva uma mensagem.');
+
+    const requestedMedia = body.media === undefined || body.media === null ? [] : body.media;
+    if (!Array.isArray(requestedMedia)) throw messageMediaError('Anexos inválidos.');
+    if (requestedMedia.length > MESSAGE_MEDIA_MAX_ITEMS) {
+      throw messageMediaError(`Envie no máximo ${MESSAGE_MEDIA_MAX_ITEMS} anexos por mensagem.`);
+    }
+    const mediaItems = requestedMedia.map(validateMessageMediaItem);
+    const totalMediaBytes = mediaItems.reduce((total, item) => total + item.sizeBytes, 0);
+    if (totalMediaBytes > MESSAGE_MEDIA_MAX_BYTES) {
+      throw messageMediaError('Anexos grandes demais (limite total de 25 MB).', 413);
+    }
+    if (!text && !sharedPostId && mediaItems.length === 0) {
+      throw new HttpError(400, 'Escreva uma mensagem ou anexe um arquivo.');
+    }
+
     const timestamp = now();
-    const result = db
-      .prepare(
-        'INSERT INTO messages (conversation_id, sender_id, body, shared_post_id, created_at) VALUES (?, ?, ?, ?, ?)'
-      )
-      .run(conversationId, me.id, text, sharedPostId, timestamp);
-    db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(timestamp, conversationId);
-    db.prepare('UPDATE conversation_members SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?').run(
-      timestamp,
-      conversationId,
-      me.id
-    );
-    notify(
-      other.user_id,
-      'message',
-      sharedPostId ? `${me.name} compartilhou uma publicação com você.` : `${me.name} enviou uma mensagem.`,
-      `/?conversation=${conversationId}`
-    );
-    return json(res, 201, {
-      message: {
-        id: Number(result.lastInsertRowid),
+    const savedMedia = [];
+    try {
+      for (const item of mediaItems) {
+        savedMedia.push({
+          ...item,
+          ...saveMessageMedia(item, conversationId, me.id),
+        });
+      }
+
+      const messageId = withTransaction(() => {
+        const result = db
+          .prepare(
+            'INSERT INTO messages (conversation_id, sender_id, body, shared_post_id, created_at) VALUES (?, ?, ?, ?, ?)'
+          )
+          .run(conversationId, me.id, text, sharedPostId, timestamp);
+        const id = Number(result.lastInsertRowid);
+        for (const [position, item] of savedMedia.entries()) {
+          db.prepare(
+            `INSERT INTO message_media
+             (message_id, url, media_type, mime_type, size_bytes, file_name, position, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).run(
+            id,
+            item.url,
+            item.mediaType,
+            item.mimeType,
+            item.sizeBytes,
+            item.fileName,
+            position,
+            timestamp
+          );
+        }
+        db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(timestamp, conversationId);
+        db.prepare('UPDATE conversation_members SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?').run(
+          timestamp,
+          conversationId,
+          me.id
+        );
+
+        /* Renomeia dentro da transação: falha no move causa rollback do banco.
+         * Crash antes do COMMIT deixa arquivo sem referência, removido na
+         * próxima limpeza após confirmar ausência em message_media. */
+        for (const item of savedMedia) {
+          fs.renameSync(item.stagedPath, item.finalPath);
+        }
+
+        notify(
+          other.user_id,
+          'message',
+          sharedPostId ? `${me.name} compartilhou uma publicação com você.` : `${me.name} enviou uma mensagem.`,
+          `/mensagens?conversa=${conversationId}`
+        );
+        return id;
+      });
+
+      const messageDTO = {
+        id: messageId,
         body: text,
         sharedPostId,
+        sharedPost: null,
+        media: savedMedia.map(mapMessageMedia),
         createdAt: timestamp,
+        editedAt: null,
+        deletedAt: null,
         mine: true,
-      },
-    });
+        sender: {
+          id: me.id,
+          username: me.username,
+          name: me.name,
+          avatar: me.avatar || null,
+          verified: isVerifiedUser(me.id),
+        },
+      };
+      if (sharedPostId) {
+        const sharedPost = db.prepare(`${POST_SELECT} WHERE p.id = ?`).get(me.id, sharedPostId);
+        if (sharedPost) messageDTO.sharedPost = mapPost(sharedPost);
+      }
+      sseHub.publish(
+        conversationMembers(conversationId).map((member) => member.user_id),
+        'message.created',
+        {
+          scope: 'conversation',
+          conversationId,
+          message: messageDTO,
+        },
+        (client) => authorizeConversationRecipient(client, conversationId),
+        ssePayloadForRecipient,
+      );
+
+      return json(res, 201, { message: messageDTO });
+    } catch (error) {
+      /* Depois do rollback, confirma message_media antes de apagar arquivo final. */
+      for (const item of savedMedia) {
+        fs.rmSync(item.stagedPath, { force: true });
+        removeUploadIfUnused(item.url);
+      }
+      throw error;
+    }
   }
 
   const readMatch = matchRoute(pathname, '/api/conversations/:id/read');
@@ -3709,8 +5496,12 @@ async function handleApi(req, res, pathname, url) {
     const conversationId = Number(readMatch.id);
     if (!isConversationMember(conversationId, me.id)) throw new HttpError(404, 'Conversa não encontrada.');
     const conversation = db.prepare('SELECT kind FROM conversations WHERE id = ?').get(conversationId);
-    if (conversation && conversation.kind === 'dating' && !datingAccessFor(me)) {
-      throw new HttpError(403, 'O Namoro exige verificação de identidade e idade aprovada.', 'dating_locked');
+    if (!conversation) throw new HttpError(404, 'Conversa não encontrada.');
+    const other = conversationMembers(conversationId).find((member) => member.user_id !== me.id);
+    if (!other) throw new HttpError(404, 'Conversa não encontrada.');
+    if (isBlocked(me.id, other.user_id)) throw new HttpError(404, 'Conversa indisponível.');
+    if (conversation.kind === 'dating' && !datingConversationAccess(me, other.user_id)) {
+      throw new HttpError(403, 'O Namoro exige verificação de identidade e idade aprovada para as duas pessoas.', 'dating_locked');
     }
     db.prepare('UPDATE conversation_members SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?').run(
       now(),
@@ -3720,14 +5511,14 @@ async function handleApi(req, res, pathname, url) {
     return json(res, 200, { ok: true });
   }
 
-  // --- notificações ---------------------------------------------------
+  // --- notificações globais (exclui menções de servidor) ---
   if (method === 'GET' && pathname === '/api/notifications') {
     const rows = db
       .prepare(
         `SELECT id, kind, text, link, created_at, read_at FROM notifications
-         WHERE user_id = ? ORDER BY created_at DESC LIMIT 30`
+         WHERE user_id = ? AND kind != ? ORDER BY created_at DESC LIMIT 30`
       )
-      .all(me.id);
+      .all(me.id, 'server_mention');
     return json(res, 200, {
       notifications: rows.map((row) => ({
         id: row.id,
@@ -3871,20 +5662,29 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
+  '.csv': 'text/csv; charset=utf-8',
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.rtf': 'application/rtf',
 };
 
-function serveFile(res, filePath, cacheControl = 'no-cache') {
+function serveFile(res, filePath, cacheControl = 'no-cache', options = {}) {
   fs.stat(filePath, (error, stat) => {
     if (error || !stat.isFile()) {
       json(res, 404, { error: 'Arquivo não encontrado.' });
       return;
     }
-    res.writeHead(200, {
-      'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+    const headers = {
+      'Content-Type': options.contentType || MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
       'Content-Length': stat.size,
       'Cache-Control': cacheControl,
       'X-Content-Type-Options': 'nosniff',
-    });
+    };
+    if (options.contentDisposition) {
+      headers['Content-Disposition'] = options.contentDisposition;
+    }
+    res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);
   });
 }
@@ -3896,6 +5696,86 @@ function resolveInside(base, relative) {
     return null;
   }
   return target;
+}
+
+function getChannel(db, channelId) {
+  return db.prepare('SELECT * FROM chat_channels WHERE id = ?').get(channelId);
+}
+
+function isChannelMember(db, channelId, userId) {
+  return !!db
+    .prepare('SELECT 1 AS ok FROM chat_channel_members WHERE channel_id = ? AND user_id = ?')
+    .get(channelId, userId);
+}
+
+function getSpaceMembership(db, spaceId, userId) {
+  return db
+    .prepare('SELECT role FROM chat_space_members WHERE space_id = ? AND user_id = ?')
+    .get(spaceId, userId);
+}
+
+/** Anexos de mensagem (DM e canal) só podem ser lidos por membros elegíveis. */
+function getMessageUploadAccess(req, url) {
+  const user = currentUser(req);
+  if (!user) return { allowed: false };
+
+  // 1) Tentar mensagem direta (message_media)
+  const dmRow = db
+    .prepare(
+      `SELECT mm.media_type, mm.mime_type, mm.file_name, m.conversation_id, c.kind, c.match_id
+       FROM message_media mm
+       JOIN messages m ON m.id = mm.message_id
+       JOIN conversations c ON c.id = m.conversation_id
+       WHERE mm.url = ? AND m.deleted_at IS NULL
+       LIMIT 1`
+    )
+    .get(url);
+  if (dmRow) {
+    if (!isConversationMember(dmRow.conversation_id, user.id)) return { allowed: false };
+    const members = conversationMembers(dmRow.conversation_id);
+    const other = members.find((member) => member.user_id !== user.id);
+    if (other) {
+      if (isBlocked(user.id, other.user_id)) return { allowed: false };
+      if (dmRow.kind === 'dating') {
+        if (!datingConversationAccess(user, other.user_id)) return { allowed: false };
+        const match = db.prepare('SELECT ended_at FROM matches WHERE id = ?').get(dmRow.match_id);
+        if (!match || match.ended_at) return { allowed: false };
+      }
+    }
+    return {
+      allowed: true,
+      mediaType: dmRow.media_type,
+      mimeType: dmRow.mime_type,
+      fileName: dmRow.file_name,
+    };
+  }
+
+  // 2) Tentar mensagem de canal (chat_message_media)
+  const chRow = db
+    .prepare(
+      `SELECT cmm.media_type, cmm.mime_type, cmm.file_name, cm.channel_id, c.space_id
+       FROM chat_message_media cmm
+       JOIN chat_messages cm ON cm.id = cmm.message_id
+       JOIN chat_channels c ON c.id = cm.channel_id
+       WHERE cmm.url = ? AND cm.deleted_at IS NULL
+       LIMIT 1`
+    )
+    .get(url);
+  if (chRow) {
+    // Precisa ser membro do canal E do espaço
+    const channel = getChannel(db, chRow.channel_id);
+    if (!channel) return { allowed: false };
+    if (!isChannelMember(db, chRow.channel_id, user.id)) return { allowed: false };
+    if (!getSpaceMembership(db, channel.space_id, user.id)) return { allowed: false };
+    return {
+      allowed: true,
+      mediaType: chRow.media_type,
+      mimeType: chRow.mime_type,
+      fileName: chRow.file_name,
+    };
+  }
+
+  return { allowed: false };
 }
 
 /* ------------------------------------------------------------------ */
@@ -4462,14 +6342,14 @@ function seedIfEmpty() {
     userIds[0],
     'message',
     'Bruno Lima enviou uma mensagem.',
-    `/?conversation=${socialId}`,
+    `/mensagens?conversa=${socialId}`,
     t - 25 * 60 * 1000
   );
   insertNotification.run(
     userIds[0],
     'match',
     'Você e Ana Souza deram match. A conversa está aberta.',
-    `/?conversation=${dateConversationId}`,
+    `/mensagens?conversa=${dateConversationId}`,
     t - 36 * 60 * 60 * 1000
   );
   insertNotification.run(
@@ -4486,6 +6366,7 @@ function seedIfEmpty() {
 
 const seededDemo = seedIfEmpty();
 cleanupRetention();
+cleanupStagingDirectory(true);
 
 if (SEED_ONLY) {
   console.log(seededDemo ? 'Seed de demonstração concluído.' : 'Banco já contém usuários; nada foi alterado.');
@@ -4515,6 +6396,22 @@ const server = http.createServer(async (req, res) => {
     if (pathname.startsWith('/uploads/')) {
       const file = resolveInside(UPLOAD_DIR, pathname.slice('/uploads/'.length));
       if (!file) return json(res, 403, { error: 'Acesso negado.' });
+      const url = `/uploads/${path.basename(file)}`;
+      const isMessageAttachment = path.basename(file).startsWith('message-');
+      if (isMessageAttachment) {
+        const access = getMessageUploadAccess(req, url);
+        if (!access.allowed) {
+          return json(res, 404, { error: 'Arquivo não encontrado.' });
+        }
+        const isFile = access.mediaType === 'file';
+        const safeFileName = sanitizeMessageFileName(access.fileName || path.basename(file));
+        return serveFile(res, file, 'private, no-store', {
+          contentType: access.mimeType || 'application/octet-stream',
+          contentDisposition: isFile
+            ? `attachment; filename="${safeFileName.replace(/"/g, '')}"`
+            : undefined,
+        });
+      }
       return serveFile(res, file, 'public, max-age=31536000, immutable');
     }
 
@@ -4544,6 +6441,16 @@ server.on('error', (error) => {
   throw error;
 });
 
+/* Attach WebSocket to HTTP server (after server is created) */
+wsHub.attach(server, (token) => {
+  if (!token) return null;
+  const row = db.prepare('SELECT * FROM users WHERE id = (SELECT user_id FROM sessions WHERE token = ? AND created_at > ?)').get(token, Date.now() - SESSION_TTL);
+  return row || null;
+});
+
+/* Start ping interval for WebSocket connections */
+wsHub.startPingInterval(30000);
+
 server.listen(PORT, HOST, () => {
   const displayHost = HOST === '0.0.0.0' || HOST === '::' ? '127.0.0.1' : HOST;
   const urlHost = displayHost.includes(':') ? `[${displayHost}]` : displayHost;
@@ -4568,9 +6475,18 @@ server.listen(PORT, HOST, () => {
   console.log('');
 });
 
-process.on('SIGINT', () => {
+function shutdown() {
+  sseHub.close();
   server.close(() => {
     db.close();
     process.exit(0);
   });
-});
+  /* Streams SSE podem manter `server.close()` pendente. Fecha após o limite. */
+  setTimeout(() => {
+    db.close();
+    process.exit(0);
+  }, 2_000).unref();
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

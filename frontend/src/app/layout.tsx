@@ -3,17 +3,17 @@ import Script from 'next/script';
 import { headers } from 'next/headers';
 import { connection } from 'next/server';
 
-import { inter, lora } from '@/lib/fonts';
+import { inter } from '@/lib/fonts';
 
 import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Vibra',
-    template: '%s · Vibra',
+    default: 'Orbit',
+    template: '%s · Orbit',
   },
   description: 'Rede social e descoberta de afinidades para adultos, com privacidade por padrão.',
-  applicationName: 'Vibra',
+  applicationName: 'Orbit',
 };
 
 export const viewport: Viewport = {
@@ -21,8 +21,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   colorScheme: 'dark light',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#FAFAFA' },
-    { media: '(prefers-color-scheme: dark)', color: '#121214' },
+    { media: '(prefers-color-scheme: light)', color: '#FAFAF9' },
+    { media: '(prefers-color-scheme: dark)', color: '#0E0E10' },
   ],
 };
 
@@ -32,7 +32,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <html lang="pt-BR" data-theme="dark" suppressHydrationWarning>
-      <body className={`${inter.variable} ${lora.variable}`}>
+      <body className={inter.variable}>
         <Script src="/theme-init.js" strategy="beforeInteractive" nonce={nonce} />
         <a className="skip-link" href="#conteudo">
           Pular para o conteúdo

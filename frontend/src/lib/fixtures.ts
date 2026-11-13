@@ -36,6 +36,7 @@ export function createFixtureProfile(): ProfileResponse {
       points: 0,
       messagePolicy: 'everyone',
       presence: 'available',
+      isPremium: false,
       createdAt: Date.UTC(2026, 0, 1),
     },
     stats: {

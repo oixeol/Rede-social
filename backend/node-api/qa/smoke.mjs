@@ -261,6 +261,20 @@ ok('feed com autor e contagem', feed.data.posts.every((post) => post.user && typ
 
 const explore = await api('/api/explore');
 ok('descobrir carregado', explore.status === 200 && explore.data.posts.length >= 9);
+const explorePeople = explore.data.people || [];
+const explorePeopleOrdered = explorePeople.every(
+  (person, index) =>
+    index === 0 ||
+    explorePeople[index - 1].followers > person.followers ||
+    (explorePeople[index - 1].followers === person.followers && explorePeople[index - 1].id < person.id),
+);
+ok(
+  'pessoas do explorar ordenadas por seguidores',
+  explorePeople.length >= 1 &&
+    explorePeople.every((person) => Number.isInteger(person.followers) && person.followers >= 0) &&
+    explorePeopleOrdered,
+  explorePeople.map((person) => `${person.name}:${person.followers}`).join(', '),
+);
 
 const stories = await api('/api/stories');
 ok('stories carregados', stories.status === 200 && stories.data.groups.length >= 3);
@@ -280,6 +294,17 @@ await api('/api/users/ana.souza/follow', { method: 'POST' });
 
 const postId = feed.data.posts.find((post) => post.user.id !== 1)?.id || feed.data.posts[0].id;
 const postBefore = await api(`/api/posts/${postId}`);
+const shareBefore = postBefore.data.post.shares ?? 0;
+const firstShare = await api(`/api/posts/${postId}/share`, { method: 'POST' });
+const repeatedShare = await api(`/api/posts/${postId}/share`, { method: 'POST' });
+ok(
+  'compartilhamento único por usuário',
+  firstShare.status === 200 &&
+    repeatedShare.status === 200 &&
+    repeatedShare.data.shares === firstShare.data.shares &&
+    firstShare.data.shares >= shareBefore,
+  `${shareBefore} → ${firstShare.data?.shares}`,
+);
 const like = await api(`/api/posts/${postId}/like`, { method: 'POST' });
 ok('curtir publicação', like.status === 200 && like.data.liked !== postBefore.data.post.liked);
 

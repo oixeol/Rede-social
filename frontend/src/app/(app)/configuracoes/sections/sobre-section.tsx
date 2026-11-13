@@ -35,10 +35,10 @@ export function SobreSection() {
 
   return (
     <div>
-      <SettingsHeading title="Sobre" description="Informações sobre o Vibra e sua conta." />
+      <SettingsHeading title="Sobre" description="Informações sobre o Orbit e sua conta." />
 
       <div className="space-y-4">
-        <SettingsCard label="Sobre o Vibra">
+        <SettingsCard label="Sobre o Orbit">
           <div className="flex items-start gap-3">
             <span
               aria-hidden="true"
@@ -60,7 +60,7 @@ export function SobreSection() {
           <ul role="list" className="space-y-2 text-sm leading-6 text-muted">
             <li>Seu conteúdo permanece sob seu controle: perfil privado está disponível na aba Privacidade.</li>
             <li>Você pode encerrar sessões e trocar a senha a qualquer momento na aba Segurança.</li>
-            <li>Preferências salvas valem para este dispositivo e para sua conta no Vibra.</li>
+            <li>Preferências salvas valem para este dispositivo e para sua conta no Orbit.</li>
           </ul>
         </SettingsCard>
       </div>

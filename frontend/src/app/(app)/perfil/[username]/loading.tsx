@@ -85,8 +85,8 @@ export default function Loading() {
         <aside className="hidden min-w-0 space-y-4 xl:block" aria-label="Carregando informações laterais">
           {/* Sobre mim */}
           <Skeleton className="h-40 w-full rounded-2xl border border-border" label="Sobre mim" />
-          {/* Destaques */}
-          <Skeleton className="h-36 w-full rounded-2xl border border-border" label="Destaques" />
+          {/* Momentos */}
+          <Skeleton className="h-36 w-full rounded-2xl border border-border" label="Momentos" />
           {/* Sugestões */}
           <Skeleton className="h-48 w-full rounded-2xl border border-border" label="Sugestões para você" />
         </aside>

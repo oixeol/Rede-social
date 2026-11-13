@@ -2,225 +2,193 @@
 
 @theme inline {
   --font-sans: var(--font-inter);
-  --font-display: var(--font-lora);
+  --font-display: var(--font-inter);
 
-  --color-background: var(--vibra-background);
-  --color-background-secondary: var(--vibra-background-secondary);
-  --color-surface: var(--vibra-surface);
-  --color-surface-raised: var(--vibra-surface-raised);
-  --color-surface-subtle: var(--vibra-surface-subtle);
-  --color-foreground: var(--vibra-foreground);
-  --color-muted: var(--vibra-muted);
-  --color-subtle: var(--vibra-subtle);
-  --color-border: var(--vibra-border);
-  --color-border-strong: var(--vibra-border-strong);
-  --color-brand: var(--vibra-brand);
-  --color-brand-hover: var(--vibra-brand-hover);
-  --color-brand-fill: var(--vibra-brand-fill);
-  --color-brand-fill-hover: var(--vibra-brand-fill-hover);
-  --color-brand-soft: var(--vibra-brand-soft);
-  --color-on-brand: var(--vibra-on-brand);
-  --color-accent: var(--vibra-accent);
-  --color-accent-soft: var(--vibra-accent-soft);
-  --color-success: var(--vibra-success);
-  --color-warning: var(--vibra-warning);
-  --color-danger: var(--vibra-danger);
-  --color-danger-soft: var(--vibra-danger-soft);
+  --color-background: var(--orbit-background);
+  --color-background-secondary: var(--orbit-background-secondary);
+  --color-surface: var(--orbit-surface);
+  --color-surface-raised: var(--orbit-surface-raised);
+  --color-surface-subtle: var(--orbit-surface-subtle);
+  --color-foreground: var(--orbit-foreground);
+  --color-muted: var(--orbit-muted);
+  --color-subtle: var(--orbit-subtle);
+  --color-border: var(--orbit-border);
+  --color-border-strong: var(--orbit-border-strong);
+  --color-brand: var(--orbit-brand);
+  --color-brand-hover: var(--orbit-brand-hover);
+  --color-brand-fill: var(--orbit-brand-fill);
+  --color-brand-fill-hover: var(--orbit-brand-fill-hover);
+  --color-brand-soft: var(--orbit-brand-soft);
+  --color-on-brand: var(--orbit-on-brand);
+  --color-success: var(--orbit-success);
+  --color-warning: var(--orbit-warning);
+  --color-danger: var(--orbit-danger);
+  --color-danger-soft: var(--orbit-danger-soft);
+  --color-online: var(--orbit-online);
 
-  --radius-pill: 999px;
-  --radius-card: 1rem;
-  --radius-panel: 1.25rem;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
 
-  --shadow-card: 0 14px 34px rgb(0 0 0 / 0.08);
-  --shadow-float: 0 18px 50px rgb(0 0 0 / 0.16);
-  --shadow-brand: 0 10px 30px rgb(255 106 0 / 0.22);
+  --shadow-float: 0 12px 32px rgb(0 0 0 / 0.24);
+  --shadow-popover: 0 8px 24px rgb(0 0 0 / 0.18);
 }
 
 /* =============================================================================
-   TOKENS DE TEMA — Visual Vibra (Preto / Laranja / Branco)
-   Paleta da referência:
-   - Fundo geral:        #121214
-   - Fundo secundário:   #0D0D0D
-   - Cards:              #0D0D0D
-   - Borda:              1px #1A1A1C
-   - Laranja principal:  #FF6A00
-   - Laranja secundário: #FF8C00
-   - Laranja intenso:    #FF4500
-   - Texto principal:    #FFFFFF
-   - Texto secundário:   #A1A1AA
-   - Verde online:       #22C55E
-   - Vermelho notif:     #EF4444
+   TOKENS DE TEMA — Visual Orbit (Coral / Neutros quentes)
+   Paleta da especificação:
+   - Escuro:
+     Fundo:           #0E0E10
+     Superfície:      #17171A
+     Superfície alta: #1C1C21
+     Borda:           #26262B
+     Borda forte:     #333338
+     Texto:           #F4F4F5
+     Texto secundário: #A1A1AA
+     Texto terciário:  #71717A
+   - Claro:
+     Fundo:           #FAFAF9
+     Superfície:      #FFFFFF
+     Superfície alta: #F5F5F4
+     Borda:           #E7E5E4
+     Borda forte:     #D6D3D1
+     Texto:           #18181B
+     Texto secundário: #52525B
+     Texto terciário:  #78787C
+   - Coral (único destaque): #FF5B3A
+   - Cores semânticas separadas do destaque
    ============================================================================= */
 
 :root {
   color-scheme: dark;
 
-  /* Superfícies */
-  --vibra-background: #121214;
-  --vibra-background-secondary: #0D0D0D;
-  --vibra-surface: #0D0D0D;
-  --vibra-surface-raised: #0D0D0D;
-  --vibra-surface-subtle: #151517;
-  --vibra-foreground: #FFFFFF;
-  --vibra-muted: #A1A1AA;
-  /* Texto terciário: contraste >= 4.5:1 sobre as superfícies escuras. */
-  --vibra-subtle: #85858E;
-  --vibra-border: #1A1A1C;
-  --vibra-border-strong: #2A2A2C;
+  /* Superfícies escuras */
+  --orbit-background: #0E0E10;
+  --orbit-background-secondary: #0A0A0C;
+  --orbit-surface: #17171A;
+  --orbit-surface-raised: #1C1C21;
+  --orbit-surface-subtle: #121215;
+  --orbit-foreground: #F4F4F5;
+  --orbit-muted: #A1A1AA;
+  --orbit-subtle: #71717A;
+  --orbit-border: #26262B;
+  --orbit-border-strong: #333338;
 
-  /* Brand: laranja vibrante */
-  --vibra-brand: #FF6A00;
-  --vibra-brand-hover: #FF8C00;
-  --vibra-brand-fill: #FF6A00;
-  --vibra-brand-fill-hover: #FF4500;
-  --vibra-brand-soft: #3A1600;
-  --vibra-on-brand: #0A0A0A;
+  /* Coral: único destaque */
+  --orbit-brand: #FF5B3A;
+  --orbit-brand-hover: #FF7A5C;
+  --orbit-brand-fill: #FF5B3A;
+  --orbit-brand-fill-hover: #E85032;
+  --orbit-brand-soft: #3D1E18;
+  --orbit-on-brand: #0A0A0A;
 
-  /* Accent: laranja secundário */
-  --vibra-accent: #FF8C00;
-  --vibra-accent-soft: #3A1600;
+  /* Cores semânticas (não usam coral) */
+  --orbit-success: #22C55E;
+  --orbit-warning: #F5A623;
+  --orbit-danger: #EF4444;
+  --orbit-danger-soft: #3D1A1A;
+  --orbit-online: #22C55E;
 
-  --vibra-success: #22C55E;
-  --vibra-warning: #F5B942;
-  --vibra-danger: #EF4444;
-  --vibra-danger-soft: #3A1414;
+  /* Botão "Seguir": fundo claro, texto preto bold */
+  --orbit-follow-bg: #E7E5E4;
+  --orbit-follow-text: #18181B;
 
-  /* Pills de navegação (item ativo) */
-  --vibra-nav-active-bg: #3A1600;
-  --vibra-nav-active-border: #FF6A00;
-  --vibra-nav-active-text: #FF8C00;
-
-  /* Botão "Seguir" da referência: fundo claro, texto preto bold */
-  --vibra-follow-bg: #E4E4E7;
-  --vibra-follow-text: #09090B;
-
-  /* Gradiente laranja do logo e do botão "Assinar agora" */
-  --vibra-premium-from: #FF8C00;
-  --vibra-premium-to: #FF4500;
-
-  /* Ondas laranja decorativas */
-  --vibra-wave-from: #FF6A00;
-  --vibra-wave-to: #FF8C00;
+  /* Item ativo na navegação */
+  --orbit-nav-active-bg: #3D1E18;
+  --orbit-nav-active-border: #FF5B3A;
+  --orbit-nav-active-text: #FF7A5C;
 }
 
-/*
- * Variante clara. Mantém mesma função e estrutura do tema escuro, com
- * superfícies brancas, texto preto e o mesmo núcleo de identidade laranja.
- */
+/* Variante clara */
 [data-theme="light"] {
   color-scheme: light;
 
-  --vibra-background: #FAFAFA;
-  --vibra-background-secondary: #F4F4F5;
-  --vibra-surface: #FFFFFF;
-  --vibra-surface-raised: #FFFFFF;
-  --vibra-surface-subtle: #F4F4F5;
-  --vibra-foreground: #111111;
-  --vibra-muted: #52525B;
-  /* Texto terciário: contraste >= 4.5:1 sobre as superfícies claras. */
-  --vibra-subtle: #65656E;
-  --vibra-border: #E4E4E7;
-  --vibra-border-strong: #D4D4D8;
+  --orbit-background: #FAFAF9;
+  --orbit-background-secondary: #F5F5F4;
+  --orbit-surface: #FFFFFF;
+  --orbit-surface-raised: #FFFFFF;
+  --orbit-surface-subtle: #F5F5F4;
+  --orbit-foreground: #18181B;
+  --orbit-muted: #52525B;
+  --orbit-subtle: #78787C;
+  --orbit-border: #E7E5E4;
+  --orbit-border-strong: #D6D3D1;
 
-  --vibra-brand: #B45309;
-  --vibra-brand-hover: #92400E;
-  --vibra-brand-fill: #FF6A00;
-  --vibra-brand-fill-hover: #FF4500;
-  --vibra-brand-soft: #FFEDD5;
-  --vibra-on-brand: #0A0A0A;
+  --orbit-brand: #E85032;
+  --orbit-brand-hover: #D1452A;
+  --orbit-brand-fill: #FF5B3A;
+  --orbit-brand-fill-hover: #E85032;
+  --orbit-brand-soft: #FFF1EF;
+  --orbit-on-brand: #FFFFFF;
 
-  --vibra-accent: #92400E;
-  --vibra-accent-soft: #FFEDD5;
+  --orbit-success: #16A34A;
+  --orbit-warning: #B45309;
+  --orbit-danger: #DC2626;
+  --orbit-danger-soft: #FEF2F2;
+  --orbit-online: #16A34A;
 
-  --vibra-success: #16A34A;
-  --vibra-warning: #B45309;
-  --vibra-danger: #DC2626;
-  --vibra-danger-soft: #FEE2E2;
+  --orbit-follow-bg: #E7E5E4;
+  --orbit-follow-text: #18181B;
 
-  --vibra-nav-active-bg: #FFEDD5;
-  --vibra-nav-active-border: #FF6A00;
-  --vibra-nav-active-text: #FF4500;
-
-  --vibra-follow-bg: #E4E4E7;
-  --vibra-follow-text: #09090B;
-
-  --vibra-premium-from: #FF8C00;
-  --vibra-premium-to: #FF4500;
-
-  --vibra-wave-from: #FF6A00;
-  --vibra-wave-to: #FF8C00;
+  --orbit-nav-active-bg: #FFF1EF;
+  --orbit-nav-active-border: #FF5B3A;
+  --orbit-nav-active-text: #E85032;
 }
 
-/*
- * Paletas de assinatura.
- * O backend limita `theme_palette` à allow-list e restaura `orange`
- * quando a assinatura expira. A paleta escolhe o accent principal;
- * fundos, superfícies e texto permanecem neutros conforme o modo.
- */
+/* Paletas de assinatura (apenas alteram o coral) */
 [data-palette="orange"] {
-  --vibra-brand: #FF6A00;
-  --vibra-brand-hover: #FF8C00;
-  --vibra-brand-fill: #FF6A00;
-  --vibra-brand-fill-hover: #FF4500;
-  --vibra-brand-soft: #3A1600;
-  --vibra-on-brand: #0A0A0A;
-  --vibra-accent: #FF8C00;
-  --vibra-accent-soft: #3A1600;
+  --orbit-brand: #FF5B3A;
+  --orbit-brand-hover: #FF7A5C;
+  --orbit-brand-fill: #FF5B3A;
+  --orbit-brand-fill-hover: #E85032;
+  --orbit-brand-soft: #3D1E18;
+  --orbit-on-brand: #0A0A0A;
 }
 
 [data-theme="light"] [data-palette="orange"] {
-  --vibra-brand: #B45309;
-  --vibra-brand-hover: #92400E;
-  --vibra-brand-fill: #FF6A00;
-  --vibra-brand-fill-hover: #FF4500;
-  --vibra-brand-soft: #FFEDD5;
-  --vibra-on-brand: #0A0A0A;
-  --vibra-accent: #92400E;
-  --vibra-accent-soft: #FFEDD5;
+  --orbit-brand: #E85032;
+  --orbit-brand-hover: #D1452A;
+  --orbit-brand-fill: #FF5B3A;
+  --orbit-brand-fill-hover: #E85032;
+  --orbit-brand-soft: #FFF1EF;
+  --orbit-on-brand: #FFFFFF;
 }
 
 [data-palette="black"] {
-  --vibra-brand: #F5F5F5;
-  --vibra-brand-hover: #FFFFFF;
-  --vibra-brand-fill: #0D0D0D;
-  --vibra-brand-fill-hover: #1A1A1C;
-  --vibra-brand-soft: #1A1A1C;
-  --vibra-on-brand: #FFFFFF;
-  --vibra-accent: #FFFFFF;
-  --vibra-accent-soft: #1A1A1C;
+  --orbit-brand: #F5F5F5;
+  --orbit-brand-hover: #FFFFFF;
+  --orbit-brand-fill: #18181B;
+  --orbit-brand-fill-hover: #18181B;
+  --orbit-brand-soft: #26262B;
+  --orbit-on-brand: #F4F4F5;
 }
 
 [data-theme="light"] [data-palette="black"] {
-  --vibra-brand: #111111;
-  --vibra-brand-hover: #242424;
-  --vibra-brand-fill: #111111;
-  --vibra-brand-fill-hover: #242424;
-  --vibra-brand-soft: #E4E4E7;
-  --vibra-on-brand: #FFFFFF;
-  --vibra-accent: #111111;
-  --vibra-accent-soft: #E4E4E7;
+  --orbit-brand: #18181B;
+  --orbit-brand-hover: #27272A;
+  --orbit-brand-fill: #18181B;
+  --orbit-brand-fill-hover: #18181B;
+  --orbit-brand-soft: #E7E5E4;
+  --orbit-on-brand: #FFFFFF;
 }
 
 [data-palette="white"] {
-  --vibra-brand: #FFFFFF;
-  --vibra-brand-hover: #E4E4E7;
-  --vibra-brand-fill: #FFFFFF;
-  --vibra-brand-fill-hover: #E4E4E7;
-  --vibra-brand-soft: #0D0D0D;
-  --vibra-on-brand: #111111;
-  --vibra-accent: #FFFFFF;
-  --vibra-accent-soft: #0D0D0D;
+  --orbit-brand: #FFFFFF;
+  --orbit-brand-hover: #E7E5E4;
+  --orbit-brand-fill: #FFFFFF;
+  --orbit-brand-fill-hover: #E7E5E4;
+  --orbit-brand-soft: #18181B;
+  --orbit-on-brand: #18181B;
 }
 
 [data-theme="light"] [data-palette="white"] {
-  --vibra-brand: #52525B;
-  --vibra-brand-hover: #242424;
-  --vibra-brand-fill: #FFFFFF;
-  --vibra-brand-fill-hover: #E4E4E7;
-  --vibra-brand-soft: #E4E4E7;
-  --vibra-on-brand: #111111;
-  --vibra-accent: #52525B;
-  --vibra-accent-soft: #E4E4E7;
+  --orbit-brand: #52525B;
+  --orbit-brand-hover: #18181B;
+  --orbit-brand-fill: #FFFFFF;
+  --orbit-brand-fill-hover: #E7E5E4;
+  --orbit-brand-soft: #E7E5E4;
+  --orbit-on-brand: #18181B;
 }
 
 @layer base {
@@ -229,15 +197,15 @@
   }
 
   html {
-    background: var(--vibra-background);
+    background: var(--orbit-background);
     scroll-behavior: smooth;
   }
 
   body {
     min-height: 100vh;
     margin: 0;
-    background: var(--vibra-background);
-    color: var(--vibra-foreground);
+    background: var(--orbit-background);
+    color: var(--orbit-foreground);
     font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
@@ -253,8 +221,8 @@
   }
 
   select option {
-    background: #0D0D0D;
-    color: #ffffff;
+    background: var(--orbit-surface);
+    color: var(--orbit-foreground);
   }
 
   button:not(:disabled),
@@ -263,20 +231,14 @@
   }
 
   ::selection {
-    background: var(--vibra-brand);
-    color: var(--vibra-on-brand);
+    background: var(--orbit-brand);
+    color: var(--orbit-on-brand);
   }
 
   :focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--vibra-brand-fill) 68%, var(--vibra-foreground));
-    outline-offset: 3px;
+    outline: 2px solid var(--orbit-brand);
+    outline-offset: 2px;
   }
-}
-
-/* Selects nativos: fundo preto e texto branco (não depende do tema). */
-.vibra-select-dark {
-  background-color: #0D0D0D;
-  color: #ffffff;
 }
 
 .sr-only {
@@ -297,16 +259,27 @@
   left: 0.75rem;
   z-index: 100;
   transform: translateY(-150%);
-  border-radius: 999px;
-  background: var(--vibra-foreground);
-  color: var(--vibra-background);
+  border-radius: var(--radius-full);
+  background: var(--orbit-foreground);
+  color: var(--orbit-background);
   padding: 0.65rem 1rem;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 0.875rem;
   transition: transform 160ms ease;
 }
 
 .skip-link:focus {
   transform: translateY(0);
+}
+
+/* Ocultar scrollbar mantendo scroll funcional */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -322,4 +295,292 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Pulse ring — elemento de assinatura para ao vivo / Roda ativa / presença */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Slow pulse for avatar glow */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-slow {
+    animation: none;
+    opacity: 0.3;
+  }
+}
+
+.pulse-ring {
+  position: relative;
+}
+
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid var(--orbit-brand);
+  animation: pulse-ring 2s ease-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring::before {
+    animation: none;
+    opacity: 0.4;
+  }
+}
+
+/* Skeleton loading */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--orbit-surface-subtle) 25%,
+    var(--orbit-surface-raised) 50%,
+    var(--orbit-surface-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--orbit-surface-subtle);
+  }
+}
+
+/* Transições padrão: 120-200ms */
+.transition-default {
+  transition: all 160ms ease;
+}
+
+.transition-fast {
+  transition: all 120ms ease;
+}
+
+/* Botões base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+  transition: all 160ms ease;
+  white-space: nowrap;
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--orbit-brand);
+  color: var(--orbit-on-brand);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--orbit-brand-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  background: var(--orbit-brand-fill-hover);
+}
+
+.btn-secondary {
+  background: var(--orbit-surface-raised);
+  color: var(--orbit-foreground);
+  border: 1px solid var(--orbit-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--orbit-surface-subtle);
+  border-color: var(--orbit-border-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--orbit-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--orbit-surface-subtle);
+  color: var(--orbit-foreground);
+}
+
+.btn-danger {
+  background: var(--orbit-danger-soft);
+  color: var(--orbit-danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--orbit-danger);
+  color: #FFFFFF;
+}
+
+.btn-follow {
+  background: var(--orbit-follow-bg);
+  color: var(--orbit-follow-text);
+  border: 1px solid transparent;
+}
+
+.btn-follow:hover:not(:disabled) {
+  background: var(--orbit-border-strong);
+}
+
+[data-theme="light"] .btn-follow {
+  background: var(--orbit-follow-bg);
+  color: var(--orbit-follow-text);
+}
+
+[data-theme="light"] .btn-follow:hover:not(:disabled) {
+  background: var(--orbit-border-strong);
+}
+
+/* Inputs */
+.input {
+  width: 100%;
+  height: 44px;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  color: var(--orbit-foreground);
+  background: var(--orbit-surface);
+  border: 1px solid var(--orbit-border);
+  border-radius: var(--radius-md);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.input::placeholder {
+  color: var(--orbit-subtle);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--orbit-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orbit-brand) 20%, transparent);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-error {
+  border-color: var(--orbit-danger);
+}
+
+.input-error:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orbit-danger) 20%, transparent);
+}
+
+/* Cards */
+.card {
+  background: var(--orbit-surface);
+  border: 1px solid var(--orbit-border);
+  border-radius: var(--radius-lg);
+}
+
+.card-hover:hover {
+  border-color: var(--orbit-border-strong);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: var(--radius-full);
+}
+
+.badge-brand {
+  background: var(--orbit-brand-soft);
+  color: var(--orbit-brand);
+}
+
+.badge-danger {
+  background: var(--orbit-danger);
+  color: #FFFFFF;
+}
+
+.badge-success {
+  background: color-mix(in srgb, var(--orbit-success) 15%, transparent);
+  color: var(--orbit-success);
+}
+
+.badge-online {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--orbit-online);
+}
+
+/* Avatar */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--orbit-surface-subtle);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  color: var(--orbit-muted);
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Separators */
+.divider {
+  height: 1px;
+  background: var(--orbit-border);
+}
+
+.divider-strong {
+  height: 1px;
+  background: var(--orbit-border-strong);
 }

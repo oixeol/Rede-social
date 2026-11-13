@@ -51,36 +51,38 @@ export function ProfileStats({
 
   return (
     <>
-      <dl className="flex flex-wrap items-stretch" aria-label="Estatísticas do perfil">
-        {items.map((item, index) => (
-          <div
-            key={item.key}
-            className={cn(
-              'flex min-w-0 flex-col-reverse items-start',
-              index > 0 && 'border-l border-border pl-6',
-              index < items.length - 1 && 'pr-6',
-            )}
-          >
-            <dt className="text-[13px] leading-[18px] text-muted">{item.label}</dt>
-            <dd className="text-[20px] leading-[26px] font-bold text-foreground">
-              {item.key === 'posts' ? (
-                item.value
-              ) : (
-                <button
-                  ref={item.key === 'followers' ? triggerRef : undefined}
-                  type="button"
-                  onClick={() => setOpenKind(item.key)}
-                  aria-haspopup="dialog"
-                  aria-label={`${item.value} ${item.label}. Ver lista`}
-                  className="rounded-md text-[20px] leading-[26px] font-bold text-foreground transition-colors hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                >
-                  {item.value}
-                </button>
+      <div className="relative flex flex-wrap gap-x-8 gap-y-4 pb-2">
+        {/* Subtle brand glow line */}
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-brand/30 to-transparent -ml-4 -mr-4" />
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4 relative z-10" aria-label="Estatísticas do perfil">
+          {items.map((item, index) => (
+            <div key={item.key} className="flex items-center gap-8">
+              <div className="flex flex-col items-start gap-1 group">
+                {(item.key === 'followers' || item.key === 'following') ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpenKind(item.key)}
+                    aria-haspopup="dialog"
+                    aria-label={`${item.value} ${item.label}. Ver lista`}
+                    className="flex items-baseline gap-1 text-foreground hover:text-brand transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand rounded"
+                  >
+                    <span className="text-[22px] leading-[28px] font-bold">{item.value}</span>
+                    <span className="text-[13px] leading-[18px] text-muted">{item.label}</span>
+                  </button>
+                ) : (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[22px] leading-[28px] font-bold text-foreground">{item.value}</span>
+                    <span className="text-[13px] leading-[18px] text-muted">{item.label}</span>
+                  </div>
+                )}
+              </div>
+              {index < items.length - 1 && (
+                <div className="h-6 w-[1.5px] bg-border-strong/60 blur-[0.5px]" aria-hidden="true" />
               )}
-            </dd>
-          </div>
-        ))}
-      </dl>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {openKind ? (
         <FollowListModal

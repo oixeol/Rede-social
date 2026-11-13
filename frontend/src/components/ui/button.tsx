@@ -14,7 +14,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand-fill text-on-brand shadow-[0_5px_16px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.24)] hover:bg-brand-fill-hover',
+    'bg-brand-fill text-on-brand shadow-[0_5px_16px_rgb(from_var(--orbit-brand-fill)_r_g_b_/_0.24)] hover:bg-brand-fill-hover',
   secondary:
     'border border-border-strong bg-surface-raised text-foreground hover:border-brand/35 hover:bg-brand-soft/45',
   ghost: 'bg-transparent text-foreground hover:bg-surface-subtle',

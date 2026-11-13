@@ -17,7 +17,7 @@ export default function InicioError({ error, retry }: InicioErrorProps) {
   }, [error]);
 
   return (
-    <div className="mx-auto w-full max-w-[1180px]">
+    <div className="mx-auto w-full max-w-[1240px]">
       <ErrorState
         title="Não foi possível carregar o Início"
         description="Tente novamente. Se o problema continuar, aguarde alguns instantes."

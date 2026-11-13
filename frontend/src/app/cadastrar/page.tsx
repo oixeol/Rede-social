@@ -21,7 +21,7 @@ export default function CadastrarPage() {
       <main id="conteudo" className="flex-1 pt-16 px-4 lg:px-8 py-10 flex items-center justify-center">
         <div className="w-full max-w-2xl">
           <div className="text-center mb-8">
-            <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Criar conta no Vibra</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Criar conta no Orbit</h1>
             <p className="mt-2 text-sm text-muted">Preencha seus dados para começar</p>
           </div>
           <SignupForm />

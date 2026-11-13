@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PerfilPageProps): Promise<Met
     const profile = await getProfile(username);
     return {
       title: `${profile.user.name} (@${profile.user.username})`,
-      description: profile.user.bio || `Perfil de ${profile.user.name} no Vibra.`,
+      description: profile.user.bio || `Perfil de ${profile.user.name} no Orbit.`,
     };
   } catch {
     return { title: 'Perfil' };

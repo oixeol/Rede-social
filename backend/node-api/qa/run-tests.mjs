@@ -68,10 +68,23 @@ try {
   await waitForServer();
   const configCode = await run('qa/production-tests.mjs');
   const smokeCode = await run('qa/smoke.mjs');
+  const attachmentsCode = smokeCode === 0 ? await run('qa/message-attachments-test.mjs') : 1;
   const datingCode = smokeCode === 0 ? await run('qa/dating-tests.mjs') : 1;
   const retentionCode = smokeCode === 0 ? await run('qa/retention-tests.mjs') : 1;
+  /* Chat roda sempre: falha anterior não pode esconder regressões do módulo. */
+  const chatCode = await run('qa/chat-spaces-tests.mjs');
+  /* PostgreSQL/RLS: roda só com POSTGRES_QA=1 e DATABASE_URL válidos. */
+  const chatPostgresCode = await run('qa/chat-spaces-postgres-tests.mjs');
   exitCode =
-    configCode === 0 && smokeCode === 0 && datingCode === 0 && retentionCode === 0 ? 0 : 1;
+    configCode === 0 &&
+    smokeCode === 0 &&
+    attachmentsCode === 0 &&
+    datingCode === 0 &&
+    retentionCode === 0 &&
+    chatCode === 0 &&
+    chatPostgresCode === 0
+      ? 0
+      : 1;
 } catch (error) {
   console.error(error.message);
 } finally {

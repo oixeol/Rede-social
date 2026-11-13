@@ -6,7 +6,7 @@ import { NotificacoesView } from './notificacoes-view';
 
 export const metadata: Metadata = {
   title: 'Notificações',
-  description: 'Veja as novidades da sua conta no Vibra.',
+  description: 'Veja as novidades da sua conta no Orbit.',
 };
 
 export default async function NotificacoesPage() {

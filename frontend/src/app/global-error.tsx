@@ -26,7 +26,7 @@ export default function GlobalError({ error, retry }: GlobalErrorProps) {
   return (
     <html lang="pt-BR">
       <head>
-        <title>Erro inesperado · Vibra</title>
+        <title>Erro inesperado · Orbit</title>
         <style>{`
           *,*::before,*::after { box-sizing: border-box; }
           html, body { margin: 0; padding: 0; min-height: 100%; }
@@ -67,7 +67,7 @@ export default function GlobalError({ error, retry }: GlobalErrorProps) {
       <body>
         <main role="alert" aria-labelledby="global-error-title" aria-describedby="global-error-desc" style={{ textAlign: 'center' }}>
           <h1 id="global-error-title">Algo deu errado</h1>
-          <p id="global-error-desc">Não foi possível carregar o Vibra.</p>
+          <p id="global-error-desc">Não foi possível carregar o Orbit.</p>
           <button type="button" onClick={retry}>Tentar novamente</button>
         </main>
       </body>

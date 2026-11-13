@@ -21,10 +21,10 @@ export interface StatusMenuProps {
 
 /** Cor do ponto por estado de presença. */
 const PRESENCE_COLOR: Record<Presence, string> = {
-  available: 'bg-[var(--vibra-success)]',
-  away: 'bg-[var(--vibra-warning)]',
-  dnd: 'bg-[var(--vibra-danger)]',
-  invisible: 'bg-[var(--vibra-muted)]',
+  available: 'bg-[var(--orbit-online)]',
+  away: 'bg-[var(--orbit-warning)]',
+  dnd: 'bg-[var(--orbit-danger)]',
+  invisible: 'bg-[var(--orbit-muted)]',
 };
 
 const PRESENCE_LABEL: Record<Presence, string> = {
@@ -35,10 +35,10 @@ const PRESENCE_LABEL: Record<Presence, string> = {
 };
 
 const PRESENCE_ICON: Record<Presence, ReactNode> = {
-  available: <Circle className="size-4 text-[var(--vibra-success)]" aria-hidden="true" />,
-  away: <Moon className="size-4 text-[var(--vibra-warning)]" aria-hidden="true" />,
-  dnd: <BellOff className="size-4 text-[var(--vibra-danger)]" aria-hidden="true" />,
-  invisible: <Ghost className="size-4 text-[var(--vibra-muted)]" aria-hidden="true" />,
+  available: <Circle className="size-4 text-[var(--orbit-online)]" aria-hidden="true" />,
+  away: <Moon className="size-4 text-[var(--orbit-warning)]" aria-hidden="true" />,
+  dnd: <BellOff className="size-4 text-[var(--orbit-danger)]" aria-hidden="true" />,
+  invisible: <Ghost className="size-4 text-[var(--orbit-muted)]" aria-hidden="true" />,
 };
 
 export function StatusMenu({
@@ -80,7 +80,7 @@ export function StatusMenu({
   const dot = (
     <span
       className={cn(
-        'block size-[15px] rounded-full border-2 border-[var(--vibra-background)]',
+        'block size-[15px] rounded-full border-2 border-[var(--orbit-background)]',
         PRESENCE_COLOR[presence],
         pending && 'opacity-60',
         className,
@@ -101,6 +101,10 @@ export function StatusMenu({
       label="Alterar status de presença"
       items={items}
       align="end"
+      /* Painel abre à direita do ponto, sem cobrir a barra lateral. */
+      menuClassName="right-auto left-full ml-3"
+      /* Bolinha 10% para cima e 10% para a esquerda dentro do avatar. */
+      triggerClassName="-translate-x-[10%] -translate-y-[10%]"
       trigger={dot}
     />
   );

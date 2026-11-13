@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { LoginBackground } from '@/components/auth/login-background';
 import { LoginQrActions } from '@/components/auth/login-qr-actions';
 import { LoginQrPanel } from '@/components/auth/login-qr-panel';
-import { VibraLogo } from '@/components/shell/vibra-logo';
+import { OrbitLogo } from '@/components/shell/orbit-logo';
 import { LoginForm } from './login-form';
 
 export const metadata: Metadata = {
@@ -20,10 +20,10 @@ export default function EntrarPage() {
         <header className="px-6 pt-7 sm:px-10 sm:pt-9">
           <Link
             href="/"
-            aria-label="Vibra – página inicial"
+            aria-label="Orbit – página inicial"
             className="inline-flex items-center gap-2 transition-opacity hover:opacity-85"
           >
-            <VibraLogo />
+            <OrbitLogo />
           </Link>
         </header>
 

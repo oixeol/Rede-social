@@ -115,7 +115,6 @@ export function ExplorarView({ explore: initialExplore }: ExplorarViewProps) {
                 }`}
               >
                 <span>{item.label}</span>
-                <span className="text-xs text-subtle">({item.count})</span>
               </button>
             ))}
             {topic ? (

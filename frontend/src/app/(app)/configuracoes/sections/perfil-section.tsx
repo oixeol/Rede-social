@@ -66,7 +66,7 @@ export function PerfilSection({
     <div>
       <SettingsHeading
         title="Perfil"
-        description="Como você aparece para outras pessoas no Vibra."
+        description="Como você aparece para outras pessoas no Orbit."
       />
 
       <form onSubmit={handleSubmit} className="space-y-4">

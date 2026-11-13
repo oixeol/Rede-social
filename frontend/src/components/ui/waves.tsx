@@ -5,9 +5,9 @@ import { useId } from 'react';
 import { cn } from '@/lib/cn';
 
 /**
- * Ondas laranja decorativas (gradiente laranja translúcido).
+ * Ondas decorativas (gradiente coral translúcido).
  *
- * Usadas no canto inferior direito dos cards "Sobre mim" e "Vibra Premium".
+ * Usadas no canto inferior direito dos cards "Sobre mim" e "Orbit Premium".
  * É puramente decorativa: o SVG não recebe foco nem interação.
  *
  * O `id` do gradiente é único por instância (via `useId`) para evitar
@@ -20,7 +20,7 @@ export interface WavesProps {
 }
 
 export function Waves({ className, opacity = 0.55 }: WavesProps) {
-  const gradientId = `vibra-wave-${useId().replace(/:/g, '')}`;
+  const gradientId = `orbit-wave-${useId().replace(/:/g, '')}`;
 
   return (
     <svg
@@ -32,9 +32,9 @@ export function Waves({ className, opacity = 0.55 }: WavesProps) {
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0" stopColor="var(--vibra-wave-from)" stopOpacity="0" />
-          <stop offset="0.45" stopColor="var(--vibra-wave-from)" stopOpacity="0.85" />
-          <stop offset="1" stopColor="var(--vibra-wave-to)" stopOpacity="0.15" />
+          <stop offset="0" stopColor="var(--orbit-brand)" stopOpacity="0" />
+          <stop offset="0.45" stopColor="var(--orbit-brand)" stopOpacity="0.85" />
+          <stop offset="1" stopColor="var(--orbit-brand-hover)" stopOpacity="0.15" />
         </linearGradient>
       </defs>
       <path

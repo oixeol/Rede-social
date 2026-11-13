@@ -1,29 +1,31 @@
 import type { Metadata } from 'next';
+import { getMe, serverApiRequest } from '@/lib/server-api';
+import type { CommunitiesResponse, Community, MeResponse } from '@/lib/types';
 
-import { Users } from 'lucide-react';
-
-import { EmptyState } from '@/components/ui/empty-state';
+import { ComunidadesClient } from './comunidades-client';
 
 export const metadata: Metadata = {
   title: 'Comunidades',
-  description: 'Encontre comunidades para conversar no Vibra.',
+  description: 'Participe de comunidades e acompanhe discussões no Orbit.',
 };
 
-export default function ComunidadesPage() {
-  return (
-    <div className="mx-auto w-full max-w-3xl">
-      <header className="mb-6">
-        <p className="text-xs font-bold tracking-[0.18em] text-brand uppercase">Comunidades</p>
-        <h1 className="mt-1 font-display text-3xl font-semibold tracking-[-0.025em] text-foreground sm:text-4xl">
-          Comunidades
-        </h1>
-      </header>
+export default async function ComunidadesPage() {
+  const [meResult, communitiesResult] = await Promise.allSettled([
+    getMe(),
+    serverApiRequest<CommunitiesResponse>('/api/communities'),
+  ]);
 
-      <EmptyState
-        icon={<Users className="size-5" />}
-        title="Comunidades ainda não estão disponíveis"
-        description="A API do Vibra ainda não oferece uma rota para listar comunidades. Assim que essa integração existir, as comunidades que você acompanha aparecerão aqui."
-      />
-    </div>
+  const me = meResult.status === 'fulfilled' ? meResult.value : null;
+  const communities = communitiesResult.status === 'fulfilled' ? communitiesResult.value.communities : [];
+  const myCommunities = communities.filter((c) => c.isMember);
+  const otherCommunities = communities.filter((c) => !c.isMember);
+
+  return (
+    <ComunidadesClient
+      initialMe={me}
+      initialCommunities={communities}
+      initialMyCommunities={myCommunities}
+      initialOtherCommunities={otherCommunities}
+    />
   );
 }

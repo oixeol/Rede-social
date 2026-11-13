@@ -25,6 +25,8 @@ export interface ProfileViewModel {
   isMe: boolean;
   /** Estado da bolinha de status do perfil. */
   presence: Presence;
+  /** Assinatura Orbit Premium ativa. */
+  isPremium: boolean;
   stats: {
     posts: number;
     followers: number;
@@ -67,10 +69,15 @@ export interface ProfileAbout {
 function formatJoinedDate(timestamp: number): string {
   if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
 
-  return `Entrou em ${new Intl.DateTimeFormat('pt-BR', {
-    month: 'long',
+  const date = new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'short',
     year: 'numeric',
-  }).format(new Date(timestamp))}`;
+  })
+    .format(new Date(timestamp))
+    .replace(/\./g, '');
+
+  return `Entrou em ${date}`;
 }
 
 /**
@@ -125,6 +132,7 @@ export function createProfileViewModel(
     verified: stats.verified === 1,
     isMe: profile.isMe,
     presence: user.presence ?? 'available',
+    isPremium: user.isPremium ?? false,
     stats: {
       posts: stats.posts,
       followers: stats.followers,

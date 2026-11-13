@@ -31,11 +31,11 @@ import { cn } from '@/lib/cn';
 import { isSafeMediaSource } from '@/lib/media';
 
 /**
- * Tela de PERFIL do Vibra — componentes da coluna central.
+ * Tela de PERFIL do Orbit — componentes da coluna central.
  *
  * Estrutura (referência):
  * 1. Banner com ilustração noturna + botão "…"
- * 2. Avatar grande sobreposto com anel laranja 3px, glow e ponto verde
+ * 2. Avatar grande sobreposto com anel coral 3px, glow e ponto verde
  * 3. Nome + selo verificado, @username, bio, botões de ação
  * 4. Estatísticas
  * 5. Abas em container pílula (role="tablist", navegação por teclado)
@@ -48,7 +48,7 @@ export interface ProfileHeaderProps {
 
 export function ProfileBanner({ profile }: ProfileHeaderProps) {
   return (
-    <div className="relative h-[207px] overflow-hidden rounded-[22px] border border-border bg-surface-raised">
+    <div className="relative h-[200px] w-full overflow-hidden rounded-[24px] border border-border bg-surface-raised">
       {isSafeMediaSource(profile.banner) ? (
         <Image
           src={profile.banner}
@@ -62,10 +62,13 @@ export function ProfileBanner({ profile }: ProfileHeaderProps) {
         />
       ) : (
         <div
-          className="size-full bg-gradient-to-br from-brand-soft via-surface to-accent-soft"
+          className="size-full bg-gradient-to-br from-brand-soft via-surface to-brand-soft relative"
           role="img"
           aria-label={profile.bannerAlt}
-        />
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--orbit-brand)_0%,_transparent_70%)] opacity-20" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,_var(--orbit-brand-soft)_0%,_transparent_50%,_var(--orbit-surface)_100%)]" />
+        </div>
       )}
     </div>
   );
@@ -83,34 +86,41 @@ export function ProfileIdentity({ profile }: ProfileHeaderProps) {
 
   return (
     <div className="relative w-fit shrink-0">
-      <span className="block size-[90px] rounded-full border-[3px] border-brand bg-surface-raised shadow-[0_0_0_4px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.18),0_0_28px_rgb(from_var(--vibra-brand-fill)_r_g_b_/_0.35)] sm:size-[120px]">
-        {isSafeMediaSource(profile.avatar) ? (
-          <Image
-            src={profile.avatar}
-            alt={profile.avatarAlt}
-            width={115}
-            height={115}
-            loading="eager"
-            fetchPriority="high"
-            unoptimized
-            className="size-[84px] rounded-full object-cover sm:size-[114px]"
-          />
-        ) : (
-          <span
-            role="img"
-            aria-label={profile.avatarAlt}
-            className="flex size-[84px] items-center justify-center rounded-full bg-gradient-to-br from-brand-fill to-accent text-3xl font-bold text-on-brand sm:size-[114px]"
-          >
-            {profile.name
-              .trim()
-              .split(/\s+/)
-              .slice(0, 2)
-              .map((part) => part[0])
-              .join('')
-              .toUpperCase() || '?'}
-          </span>
-        )}
-      </span>
+      <div className="relative">
+        {/* Outer glow ring */}
+        <span className="absolute -inset-1 rounded-full bg-gradient-to-br from-brand via-brand-hover to-brand blur-lg opacity-40 animate-pulse-slow" aria-hidden="true" />
+        {/* Middle ring */}
+        <span className="absolute -inset-[2px] rounded-full border border-brand/30 bg-gradient-to-br from-brand/20 to-transparent" aria-hidden="true" />
+        {/* Main avatar ring */}
+        <span className="relative block size-[104px] rounded-full ring-4 ring-brand bg-surface-raised shadow-[0_0_0_4px_rgb(from_var(--orbit-brand-fill)_r_g_b_/_0.15),0_0_32px_rgb(from_var(--orbit-brand-fill)_r_g_b_/_0.3),0_8px_24px_rgb(0_0_0_/_0.4)] sm:size-[128px]">
+          {isSafeMediaSource(profile.avatar) ? (
+            <Image
+              src={profile.avatar}
+              alt={profile.avatarAlt}
+              width={120}
+              height={120}
+              loading="eager"
+              fetchPriority="high"
+              unoptimized
+              className="size-[96px] rounded-full object-cover sm:size-[120px]"
+            />
+          ) : (
+            <span
+              role="img"
+              aria-label={profile.avatarAlt}
+              className="flex size-[96px] items-center justify-center rounded-full bg-gradient-to-br from-brand-fill via-brand to-brand-hover text-3xl font-bold text-on-brand sm:size-[120px]"
+            >
+              {profile.name
+                .trim()
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part[0])
+                .join('')
+                .toUpperCase() || '?'}
+            </span>
+          )}
+        </span>
+      </div>
 
       {/* Ponto de status ancorado na borda do avatar (canto inferior direito).
           No próprio perfil, abre o menu de presença.
@@ -170,7 +180,7 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
     const url = new URL(`/perfil/${encodeURIComponent(profile.username)}`, window.location.origin).toString();
     if (navigator.share) {
       try {
-        await navigator.share({ title: `Perfil de ${profile.name} no Vibra`, url });
+        await navigator.share({ title: `Perfil de ${profile.name} no Orbit`, url });
         setStatusMessage('Perfil compartilhado.');
         return;
       } catch (error) {
@@ -229,26 +239,30 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
           type="button"
           onClick={handleFollow}
           disabled={followState.followRequested}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--vibra-brand-fill)] px-4 text-xs font-semibold text-on-brand transition-colors hover:bg-[var(--vibra-brand-fill-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="relative inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-4 text-xs font-semibold text-on-brand transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 overflow-hidden"
           data-following={followState.isFollowing}
           data-requested={followState.followRequested}
         >
-          {followState.followRequested ? (
-            <>
-              <Heart aria-hidden="true" className="size-4 fill-on-brand text-on-brand" />
-              Solicitado
-            </>
-          ) : followState.isFollowing ? (
-            <>
-              <Heart aria-hidden="true" className="size-4 fill-on-brand text-on-brand" />
-              Seguindo
-            </>
-          ) : (
-            <>
-              <Heart aria-hidden="true" className="size-4" />
-              Seguir
-            </>
-          )}
+          {/* Glow effect */}
+          <span className="absolute inset-0 bg-gradient-to-r from-brand via-brand-hover to-brand opacity-0 hover:opacity-100 transition-opacity duration-300" aria-hidden="true" />
+          <span className="relative flex items-center gap-2">
+            {followState.followRequested ? (
+              <>
+                <Heart aria-hidden="true" className="size-4 fill-on-brand text-on-brand" />
+                Solicitado
+              </>
+            ) : followState.isFollowing ? (
+              <>
+                <Heart aria-hidden="true" className="size-4 fill-on-brand text-on-brand" />
+                Seguindo
+              </>
+            ) : (
+              <>
+                <Heart aria-hidden="true" className="size-4" />
+                Seguir
+              </>
+            )}
+          </span>
         </button>
       ) : (
         <Link
@@ -264,7 +278,7 @@ export function ProfileActions({ profile, onFollowerChange }: { profile: Profile
         type="button"
         onClick={handleShareProfile}
         aria-label="Compartilhar perfil"
-        className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-foreground transition-colors hover:bg-surface-subtle"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-foreground transition-colors hover:bg-surface-subtle hover:border-brand/30 hover:shadow-[0_0_12px_rgb(from_var(--orbit-brand)_r_g_b_/_0.15)]"
       >
         <Share2 aria-hidden="true" className="size-4" />
       </button>
@@ -353,9 +367,18 @@ export function ProfileTabs({ active, onChange, profile, reelsEnabled }: Profile
       role="tablist"
       aria-label="Conteúdo do perfil"
       aria-orientation="horizontal"
-      className="flex w-full items-center gap-1 rounded-2xl border border-border bg-surface p-1 lg:gap-[72px]"
+      className="relative flex w-full items-center gap-1 rounded-[14px] border border-border bg-surface p-1"
       ref={listRef}
     >
+      {/* Active tab indicator with glow */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0.5 rounded-[12px] bg-brand shadow-[0_0_12px_rgb(from_var(--orbit-brand)_r_g_b_/_0.4),0_2px_8px_rgb(from_var(--orbit-brand)_r_g_b_/_0.3)] transition-all duration-300 ease-out"
+        style={{
+          left: `calc(100% / ${filteredTabs.length} * ${filteredTabs.findIndex(t => t.id === active)})`,
+          width: `calc(100% / ${filteredTabs.length})`,
+        }}
+      />
       {filteredTabs.map((tab, index) => {
         const isActive = tab.id === active;
 
@@ -372,22 +395,16 @@ export function ProfileTabs({ active, onChange, profile, reelsEnabled }: Profile
             onClick={() => onChange(tab.id)}
             onKeyDown={(e) => handleKeyDown(e, index)}
             className={cn(
-              'relative flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 text-[13px] font-semibold transition-colors lg:flex-none',
+              'relative flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[12px] px-4 text-[13px] font-semibold transition-colors z-10',
               isActive
-                ? 'bg-surface-raised text-foreground'
+                ? 'text-on-brand'
                 : 'text-muted hover:bg-surface-subtle hover:text-foreground',
             )}
           >
             <span aria-hidden="true" className="shrink-0">
               {tab.icon}
             </span>
-            <span className="hidden truncate sm:inline">{tab.label}</span>
-            {isActive && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full bg-brand"
-              />
-            )}
+            <span className="truncate">{tab.label}</span>
           </button>
         );
       })}
@@ -404,20 +421,22 @@ function ProfilePostGrid({ posts }: ProfileGridProps) {
 
   if (mediaPosts.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border-strong bg-surface/60 px-5 py-10 text-center">
-        <p className="text-sm text-muted">Nenhuma publicação com mídia.</p>
+      <div className="relative rounded-2xl border border-dashed border-border-strong bg-surface/60 px-5 py-10 text-center overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-brand/5 via-transparent to-brand/5" />
+        <p className="relative text-sm text-muted">Nenhuma publicação com mídia.</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4" role="list" aria-label="Publicações">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]" role="list" aria-label="Publicações">
       {mediaPosts.map((post) => (
-        <div key={post.id} role="listitem" className="min-w-0">
+        <div key={post.id} role="listitem" className="min-w-0 group">
           <PostCard
             post={post}
             compact
           />
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-brand/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         </div>
       ))}
     </div>
