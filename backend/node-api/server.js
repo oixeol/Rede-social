@@ -2860,6 +2860,54 @@ async function handleApi(req, res, pathname, url) {
     });
   }
 
+  // TESTE: rota para verificar schema do banco
+  if (pathname === '/api/auth/debug-schema') {
+    const env = require('./lib/env');
+    const { Pool } = require('pg');
+    const databaseUrl = env.supabase || env.DATABASE_URL || env.SUPABASE_URL || '';
+    
+    if (!databaseUrl) {
+      return json(res, 500, { error: 'No database URL' });
+    }
+    
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      ssl: { rejectUnauthorized: false },
+      family: 4,
+    });
+    
+    try {
+      const tables = await pool.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name IN ('user', 'session', 'account', 'verification')
+        ORDER BY table_name
+      `);
+      
+      const results = { tables: [] };
+      
+      for (const table of tables.rows) {
+        const columns = await pool.query(`
+          SELECT column_name, data_type, is_nullable, column_default
+          FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = $1
+          ORDER BY ordinal_position
+        `, [table.table_name]);
+        results.tables.push({
+          name: table.table_name,
+          columns: columns.rows
+        });
+      }
+      
+      await pool.end();
+      return json(res, 200, results);
+    } catch (err) {
+      await pool.end();
+      return json(res, 500, { error: err.message, stack: err.stack });
+    }
+  }
+
   // Better Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
     console.log('[DEBUG] Better Auth route:', pathname);
