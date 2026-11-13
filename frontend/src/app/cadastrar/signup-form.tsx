@@ -9,7 +9,8 @@ import { useEffect, useId, useRef, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { apiRequest, ApiError } from '@/lib/api';
+import { ApiError, apiRequest } from '@/lib/api';
+import { signUp } from '@/lib/auth-client';
 import { getCountries, getStatesByCountry, type Country, type State } from '@/lib/countries';
 
 interface SignupResponse {
@@ -308,19 +309,17 @@ export function SignupForm() {
     setInvalidField(null);
 
     try {
-      await apiRequest<SignupResponse>('/api/register', {
-        method: 'POST',
-        body: {
-          username: username.trim().toLowerCase(),
-          name: `${firstName.trim()} ${lastName.trim()}`,
-          email: email.trim().toLowerCase(),
-          birthDate,
-          gender,
-          country,
-          state,
-          password,
-        },
-      });
+      await signUp.email({
+        email: email.trim().toLowerCase(),
+        password,
+        name: `${firstName.trim()} ${lastName.trim()}`,
+        username: username.trim().toLowerCase(),
+        birthDate,
+        gender,
+        country,
+        state,
+        callbackURL: '/inicio',
+      } as any);
       router.push('/inicio' as Route);
       router.refresh();
     } catch (caught) {

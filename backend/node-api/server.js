@@ -43,6 +43,11 @@ const { enqueueTranscode, startTranscodeWorker, getHLSManifestUrl, deleteHLS } =
 const APP = require('./app.config');
 const APP_VERSION = require('./package.json').version;
 const dating = require('./lib/dating');
+const { auth } = require('./lib/auth');
+const { toNodeHandler } = require('better-auth/node');
+
+/** Better Auth handler for /api/auth/* routes */
+const betterAuthHandler = toNodeHandler(auth);
 
 /* Carrega .env da raiz do repositório (sem dependência externa). */
 function loadRepoEnv() {
@@ -1778,6 +1783,27 @@ function sessionCookie(token) {
 function currentUser(req) {
   const token = cookieValue(req, SESSION_COOKIE);
   if (!token) return null;
+
+  // Try Better Auth session validation first
+  try {
+    const session = auth.api.getSession({
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+    });
+    if (session?.user) {
+      // Fetch user from existing users table (migration: link via email or id)
+      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(session.user.id);
+      if (user) return user;
+      // Fallback: try by email
+      if (session.user.email) {
+        const userByEmail = db.prepare('SELECT * FROM users WHERE email = ?').get(session.user.email);
+        if (userByEmail) return userByEmail;
+      }
+    }
+  } catch {
+    // Better Auth session validation failed, fall through to legacy
+  }
+
+  // Legacy session validation (old sessions table)
   const row = db
     .prepare(
       `SELECT u.* FROM sessions s
@@ -2783,6 +2809,11 @@ async function handleApi(req, res, pathname, url) {
   const method = req.method;
   maybeCleanupRetention();
 
+  // Better Auth handles all /api/auth/* routes
+  if (pathname.startsWith('/api/auth/')) {
+    return betterAuthHandler(req, res);
+  }
+
   if (method === 'GET' && pathname === '/api/config') {
     return json(res, 200, {
       app: { name: APP.name, slug: APP.slug, tagline: APP.tagline, version: APP_VERSION },
@@ -2800,160 +2831,32 @@ async function handleApi(req, res, pathname, url) {
     return handleIdentityWebhook(req, res);
   }
 
-  // --- auth ---------------------------------------------------------
+  // --- auth (backwards compatibility proxies to Better Auth) -------------
   if (method === 'POST' && pathname === '/api/register') {
-    rateLimit(req, 'register', 10, 60 * 60 * 1000);
-    const body = await readBody(req);
-
-    // Username escolhido pela pessoa. Obrigatório e único.
-    const username = cleanText(body.username, 'Usuário', { min: 3, max: 24, required: true }).toLowerCase();
-    if (!/^[a-z0-9._]+$/.test(username)) {
-      throw new HttpError(400, 'Usuário deve ter apenas letras, números, ponto e underline.');
-    }
-
-    // Nome completo
-    const name = cleanText(body.name, 'Nome', { min: 1, max: 80, required: true });
-
-    // E-mail (opcional mas se fornecido deve ser válido)
-    let email = null;
-    if (body.email) {
-      email = cleanText(body.email, 'E-mail', { min: 5, max: 120, required: true }).toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        throw new HttpError(400, 'E-mail inválido.');
-      }
-      // Verificar se e-mail já existe
-      if (db.prepare('SELECT 1 AS ok FROM users WHERE email = ?').get(email)) {
-        throw new HttpError(409, 'Este e-mail já está cadastrado.');
-      }
-    }
-
-    // Senha com validação de segurança
-    const password = cleanText(body.password, 'Senha', { min: 8, max: 100, required: true });
-    const passwordErrors = [];
-    if (!/[A-Z]/.test(password)) passwordErrors.push('pelo menos 1 letra maiúscula');
-    if (!/[0-9]/.test(password)) passwordErrors.push('pelo menos 1 número');
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) passwordErrors.push('pelo menos 1 caractere especial');
-    if (passwordErrors.length > 0) {
-      throw new HttpError(400, `A senha deve conter: ${passwordErrors.join(', ')}.`);
-    }
-
-    // Data de nascimento e validação de idade (mínimo 12 anos)
-    const birthDate = cleanText(body.birthDate, 'Data de nascimento', { min: 10, max: 10, required: true });
-    const age = ageFromBirthDate(birthDate);
-    if (age === null) throw new HttpError(400, 'Data de nascimento inválida.');
-    if (age < 12) throw new HttpError(403, 'É necessário ter pelo menos 12 anos para criar uma conta.');
-
-    // Gênero (opcional)
-    const validGenders = ['cis_man', 'cis_woman', 'trans_man', 'trans_woman', 'non_binary', 'genderfluid', 'agender', 'other'];
-    const gender = body.gender && validGenders.includes(body.gender) ? body.gender : null;
-
-    // País e Estado (opcionais)
-    const country = body.country ? cleanText(body.country, 'País', { min: 2, max: 3, required: false }).toUpperCase() : null;
-    const state = body.state ? cleanText(body.state, 'Estado', { min: 1, max: 10, required: false }).toUpperCase() : null;
-
-    // Verificar se username já existe
-    if (db.prepare('SELECT 1 AS ok FROM users WHERE username = ?').get(username)) {
-      throw new HttpError(409, 'Esse usuário já está em uso. Tente outro.');
-    }
-
-    const result = db
-      .prepare(
-        'INSERT INTO users (username, name, bio, avatar, password_hash, created_at, birth_date, email, gender, country, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      )
-      .run(username, name, '', null, hashPassword(password), now(), birthDate, email, gender, country, state);
-
-    const id = Number(result.lastInsertRowid);
-    const token = createSession(id, req.headers['user-agent']);
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
-    return json(res, 201, { user: selfDTO(user), stats: statsFor(id) }, { 'Set-Cookie': sessionCookie(token) });
+    // Forward to Better Auth sign-up endpoint
+    req.url = '/api/auth/sign-up/email';
+    return betterAuthHandler(req, res);
   }
 
   if (method === 'POST' && pathname === '/api/login') {
-    rateLimit(req, 'login', 30, 15 * 60 * 1000);
-    const body = await readBody(req);
-    const username = cleanText(body.username, 'Usuário', { min: 1, max: 40, required: true }).toLowerCase();
-    const password = cleanText(body.password, 'Senha', { min: 1, max: 100, required: true });
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-    if (!user || !checkPassword(password, user.password_hash)) {
-      throw new HttpError(401, 'Usuário ou senha incorretos.');
-    }
-    db.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').run(now(), user.id);
-    const token = createSession(user.id, req.headers['user-agent']);
-    return json(res, 200, { user: selfDTO(user), stats: statsFor(user.id) }, { 'Set-Cookie': sessionCookie(token) });
+    // Forward to Better Auth sign-in endpoint
+    req.url = '/api/auth/sign-in/email';
+    return betterAuthHandler(req, res);
   }
 
   if (method === 'POST' && pathname === '/api/logout') {
-    const token = cookieValue(req, SESSION_COOKIE);
-    const session = token
-      ? db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token)
-      : null;
-    if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
-    if (session) sseHub.disconnectUser(session.user_id);
-    return json(res, 200, { ok: true }, { 'Set-Cookie': `${SESSION_COOKIE}=; ${cookieAttributes()}; Max-Age=0` });
+    // Forward to Better Auth sign-out endpoint
+    req.url = '/api/auth/sign-out';
+    return betterAuthHandler(req, res);
   }
 
-  // POST /api/auth/forgot-password - Request password reset
   if (method === 'POST' && pathname === '/api/auth/forgot-password') {
-    rateLimit(req, 'forgot-password', 5, 60 * 60 * 1000);
-    const body = await readBody(req);
-    const email = cleanText(body.email, 'E-mail', { min: 5, max: 120, required: true }).toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new HttpError(400, 'E-mail inválido.');
-    }
-    const user = db.prepare('SELECT id, username, email FROM users WHERE email = ?').get(email);
-    // Always return success to prevent email enumeration
-    if (user) {
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const expiresAt = now() + 60 * 60 * 1000; // 1 hour
-      db.prepare(
-        'INSERT INTO password_reset_tokens (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)'
-      ).run(resetToken, user.id, now(), expiresAt);
-
-      // In production, send email here. For dev, log the token.
-      if (IS_PRODUCTION) {
-        // TODO: Integrate with email service (SendGrid, Resend, etc.)
-        console.log(`[Password Reset] Email would be sent to ${email} with token ${resetToken}`);
-      } else {
-        console.log(`[DEV] Password reset token for ${user.username} (${email}): ${resetToken}`);
-        console.log(`[DEV] Reset URL: /redefinir-senha?token=${resetToken}`);
-      }
-    }
-    return json(res, 200, { ok: true, message: 'Se o e-mail existir, você receberá instruções para redefinir a senha.' });
+    // Forward to Better Auth forget-password endpoint
+    req.url = '/api/auth/forget-password';
+    return betterAuthHandler(req, res);
   }
 
-  // POST /api/auth/reset-password - Reset password with token
-  if (method === 'POST' && pathname === '/api/auth/reset-password') {
-    rateLimit(req, 'reset-password', 10, 60 * 60 * 1000);
-    const body = await readBody(req);
-    const token = cleanText(body.token, 'Token', { min: 1, max: 64, required: true });
-    const password = cleanText(body.password, 'Nova senha', { min: 8, max: 100, required: true });
-    const confirmPassword = cleanText(body.confirmPassword, 'Confirmar senha', { min: 8, max: 100, required: true });
-
-    if (password !== confirmPassword) {
-      throw new HttpError(400, 'As senhas não coincidem.');
-    }
-    const passwordErrors = [];
-    if (!/[A-Z]/.test(password)) passwordErrors.push('pelo menos 1 letra maiúscula');
-    if (!/[0-9]/.test(password)) passwordErrors.push('pelo menos 1 número');
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) passwordErrors.push('pelo menos 1 caractere especial');
-    if (passwordErrors.length > 0) {
-      throw new HttpError(400, `A senha deve conter: ${passwordErrors.join(', ')}.`);
-    }
-
-    const resetRecord = db.prepare(
-      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > ?'
-    ).get(token, now());
-    if (!resetRecord) {
-      throw new HttpError(400, 'Token inválido ou expirado.');
-    }
-
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), resetRecord.user_id);
-    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE token = ?').run(token);
-    // Invalidate all sessions for this user
-    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(resetRecord.user_id);
-
-    return json(res, 200, { ok: true, message: 'Senha redefinida com sucesso. Faça login com a nova senha.' });
-  }
+  // /api/auth/reset-password is handled by Better Auth directly (same path)
 
   // Verificação de disponibilidade de username (pública, sem autenticação)
   if (method === 'GET' && pathname === '/api/username-available') {

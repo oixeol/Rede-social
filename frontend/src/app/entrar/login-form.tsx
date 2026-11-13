@@ -7,7 +7,8 @@ import Link from 'next/link';
 import type { FormEvent } from 'react';
 import { useId, useRef, useState } from 'react';
 
-import { ApiError, apiRequest } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { signIn } from '@/lib/auth-client';
 
 interface LoginResponse {
   user: unknown;
@@ -67,13 +68,11 @@ export function LoginForm() {
     setInvalidField(null);
 
     try {
-      await apiRequest<LoginResponse>('/api/login', {
-        method: 'POST',
-        body: { username: trimmedUsername, password },
+      await signIn.email({
+        email: trimmedUsername,
+        password,
+        callbackURL: '/inicio',
       });
-      // A sessão é mantida em cookie httpOnly pelo servidor; nenhum token é
-      // persistido no navegador. O cast é necessário porque `/inicio` ainda
-      // não consta das rotas tipadas geradas pelo Next.js.
       router.push('/inicio' as Route);
       router.refresh();
     } catch (caught) {

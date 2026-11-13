@@ -6,7 +6,8 @@ import { Lock, LoaderCircle, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucid
 import type { FormEvent } from 'react';
 import { useId, useRef, useState, useEffect } from 'react';
 
-import { ApiError, apiRequest, resetPassword } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { resetPassword } from '@/lib/auth-client';
 import { OrbitLogo } from '@/components/shell/orbit-logo';
 
 export default function RedefinirSenhaPage() {
@@ -77,7 +78,10 @@ export default function RedefinirSenhaPage() {
     setError(null);
 
     try {
-      await resetPassword(token, password, confirmPassword);
+      await resetPassword({
+        token,
+        newPassword: password,
+      });
       setSuccess(true);
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 400) {

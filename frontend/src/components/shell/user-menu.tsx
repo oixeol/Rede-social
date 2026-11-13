@@ -21,6 +21,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { isFeatureEnabled } from '@/lib/feature-flags';
+import { signOut } from '@/lib/auth-client';
 import {
   PRESENCE_COLOR,
   PRESENCE_DESCRIPTION,
@@ -102,16 +103,20 @@ export function UserMenu({
 
   async function handleLogout() {
     try {
-      await apiRequest('/api/logout', { method: 'POST' });
+      await signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            router.push('/entrar' as Route);
+          },
+        },
+      });
     } catch {
-      // Sessão encerrada ou indisponível: redirecionamento continua.
+      router.push('/entrar' as Route);
     }
     setOpen(false);
     if (onLogout) {
       onLogout();
-      return;
     }
-    router.push('/entrar' as Route);
   }
 
   function navigate(href: Route) {

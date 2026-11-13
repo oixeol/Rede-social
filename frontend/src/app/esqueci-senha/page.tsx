@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import type { FormEvent } from 'react';
 import { useId, useRef, useState } from 'react';
 
-import { ApiError, apiRequest, forgotPassword } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { forgetPassword } from '@/lib/auth-client';
 import { OrbitLogo } from '@/components/shell/orbit-logo';
 
 export default function EsqueciSenhaPage() {
@@ -50,7 +51,10 @@ export default function EsqueciSenhaPage() {
     setError(null);
 
     try {
-      await forgotPassword(trimmedEmail);
+      await forgetPassword({
+        email: trimmedEmail,
+        redirectTo: '/redefinir-senha',
+      });
       setSuccess(true);
     } catch (caught) {
       setError(messageFromError(caught));
