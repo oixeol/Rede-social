@@ -13,7 +13,7 @@ for (const key of required) {
 const optionalWithDefaults = {
   COOKIE_SECURE: '1',
   SESSION_TTL: String(30 * 24 * 60 * 60 * 1000),
-  IDENTITY_PROVIDER: 'webhook',
+  IDENTITY_PROVIDER: 'dev',
   IDENTITY_WEBHOOK_SECRET: '',
   ADMIN_TOKEN: '',
   NODE_ENV: 'production',
