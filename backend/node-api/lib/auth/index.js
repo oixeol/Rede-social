@@ -154,34 +154,48 @@ function getAuth() {
 async function betterAuthHandler(req, res) {
   try {
     const auth = await getAuth();
-    // Wrap Node.js req with proper URL for Better Auth
+    // Convert Node.js req to standard Fetch Request object
     const apiOrigin = env.API_ORIGIN || 'https://rede-social-attz.onrender.com';
     const fullUrl = `${apiOrigin}${req.url}`;
-    const wrappedReq = {
-      ...req,
-      url: fullUrl,
-      method: req.method,
-      headers: req.headers,
-    };
-    console.log('[BetterAuth] Calling auth.handler for:', req.url, 'headersSent:', res.headersSent);
-    const response = await auth.handler(wrappedReq, res);
-    console.log('[BetterAuth] Handler returned:', response ? 'Response object' : 'undefined', response?.status, 'headersSent:', res.headersSent);
-    // Handle Response object returned by Better Auth
-    if (response && typeof response === 'object' && 'status' in response) {
-      console.log('[BetterAuth] Sending Response:', response.status);
-      const body = await response.text();
-      console.log('[BetterAuth] Response body length:', body.length);
-      if (!res.headersSent) {
-        res.statusCode = response.status;
-        response.headers.forEach((value, key) => {
-          res.setHeader(key, value);
-        });
-        res.end(body);
-      } else {
-        console.log('[BetterAuth] Headers already sent, skipping');
+    
+    // Read request body for non-GET/HEAD methods
+    let body = null;
+    if (!['GET', 'HEAD'].includes(req.method)) {
+      body = await new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', reject);
+      });
+    }
+
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (Array.isArray(value)) {
+        value.forEach(v => headers.append(key, v));
+      } else if (value !== undefined) {
+        headers.set(key, value);
       }
+    }
+
+    const request = new Request(fullUrl, {
+      method: req.method,
+      headers,
+      body: body && body.length > 0 ? body : undefined,
+    });
+
+    console.log('[BetterAuth] Calling auth.handler for:', req.method, fullUrl);
+    const response = await auth.handler(request);
+    console.log('[BetterAuth] Handler returned status:', response?.status);
+
+    if (response) {
+      const responseBody = await response.text();
+      res.statusCode = response.status;
+      response.headers.forEach((value, key) => {
+        res.setHeader(key, value);
+      });
+      res.end(responseBody);
     } else if (!res.headersSent) {
-      console.log('[BetterAuth] No Response object and headers not sent, sending 404');
       res.statusCode = 404;
       res.end('Not found');
     }
