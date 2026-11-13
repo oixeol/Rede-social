@@ -55,12 +55,13 @@ export function LoginForm() {
         },
         body: JSON.stringify({
           provider,
-          callbackURL: `${window.location.origin}/inicio`,
+          callbackURL: '/inicio',
         }),
       });
 
       if (!res.ok) {
-        throw new Error('Falha ao conectar com serviço de autenticação.');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Falha ao conectar com serviço de autenticação.');
       }
 
       const data = await res.json();
