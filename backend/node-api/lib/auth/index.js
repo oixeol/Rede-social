@@ -153,7 +153,16 @@ function getAuth() {
 async function betterAuthHandler(req, res) {
   try {
     const auth = await getAuth();
-    await auth.handler(req, res);
+    // Wrap Node.js req with proper URL for Better Auth
+    const apiOrigin = env.API_ORIGIN || 'https://rede-social-attz.onrender.com';
+    const fullUrl = `${apiOrigin}${req.url}`;
+    const wrappedReq = {
+      ...req,
+      url: fullUrl,
+      method: req.method,
+      headers: req.headers,
+    };
+    await auth.handler(wrappedReq, res);
   } catch (err) {
     console.error('[BetterAuth] Handler error:', err);
     console.error('[BetterAuth] Handler error stack:', err.stack);
