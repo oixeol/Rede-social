@@ -70,10 +70,9 @@ function loadRepoEnv() {
 loadRepoEnv();
 
 const { auth } = require('./lib/auth');
-const { toNodeHandler } = require('better-auth/node');
 
-/** Better Auth handler for /api/auth/* routes */
-const betterAuthHandler = toNodeHandler(auth);
+/** Better Auth handler for /api/auth/* routes (lazy initialization) */
+const betterAuthHandler = auth.handler;
 
 /* ------------------------------------------------------------------ */
 /* Configuração e inicialização                                        */
