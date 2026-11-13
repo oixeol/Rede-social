@@ -1,14 +1,14 @@
-import { betterAuth } from 'better-auth';
-import { postgresAdapter } from 'better-auth/adapters/postgres';
-import { pg } from 'pg';
-import { env } from '../env.js';
+const { betterAuth } = require('better-auth');
+const { postgresAdapter } = require('better-auth/adapters/postgres');
+const { Pool } = require('pg');
+const { env } = require('../env.js');
 
-const pool = new pg.Pool({
+const pool = new Pool({
   connectionString: env.DATABASE_URL,
   ssl: env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
 });
 
-export const auth = betterAuth({
+const auth = betterAuth({
   database: postgresAdapter(pool, {
     provider: 'postgresql',
     schema: 'public',
@@ -159,4 +159,4 @@ export const auth = betterAuth({
   plugins: [],
 });
 
-export { auth };
+module.exports = { auth };
