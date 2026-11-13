@@ -81,27 +81,7 @@ function createAuth() {
       },
     },
 
-    user: {
-      additionalFields: {
-        username: { type: 'string', required: false, unique: true, input: true },
-        name: { type: 'string', required: true, input: true },
-        bio: { type: 'string', required: false, defaultValue: '', input: true },
-        avatar: { type: 'string', required: false, input: true },
-        banner: { type: 'string', required: false, input: true },
-        birthDate: { type: 'date', required: false, input: true },
-        gender: { type: 'string', required: false, input: true },
-        country: { type: 'string', required: false, input: true },
-        state: { type: 'string', required: false, input: true },
-        isPrivate: { type: 'boolean', required: false, defaultValue: false, input: true },
-        messagePolicy: { type: 'string', required: false, defaultValue: 'connections', input: true },
-        points: { type: 'number', required: false, defaultValue: 0, input: false },
-        subscriptionStatus: { type: 'string', required: false, defaultValue: 'none', input: false },
-        subscriptionEndsAt: { type: 'date', required: false, input: false },
-        themePalette: { type: 'string', required: false, defaultValue: 'default', input: false },
-        preferences: { type: 'object', required: false, defaultValue: {}, input: false },
-        externalLink: { type: 'string', required: false, input: true },
-      },
-    },
+    user: {},
 
     advanced: {
       crossSubDomainCookies: { enabled: false },
