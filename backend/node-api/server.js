@@ -69,6 +69,16 @@ function loadRepoEnv() {
 }
 loadRepoEnv();
 
+// Global error handlers to prevent container crashes
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err);
+  // Don't exit in production, let the container restart
+  if (!IS_PRODUCTION) process.exit(1);
+});
+
 const { auth } = require('./lib/auth');
 
 /** Better Auth handler for /api/auth/* routes (lazy initialization) */
