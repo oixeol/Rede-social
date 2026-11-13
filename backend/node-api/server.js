@@ -2943,16 +2943,42 @@ async function handleApi(req, res, pathname, url) {
       const auth = await getAuth();
       // Get the database adapter
       const db = auth.options?.database;
-      if (db) {
-        // Try to query the user table
-        const user = await db.findOne({
-          model: 'user',
-          where: [{ field: 'email', operator: 'eq', value: 'test@test.com' }],
-        });
-        return json(res, 200, { user });
-      }
-      return json(res, 500, { error: 'No database adapter' });
+      return json(res, 200, { 
+        hasDb: !!db,
+        dbKeys: db ? Object.keys(db) : [],
+        adapterType: db?.constructor?.name
+      });
     } catch (err) {
+      return json(res, 500, { 
+        error: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+    }
+  }
+
+  // TESTE: rota para testar query direta no pool
+  if (pathname === '/api/auth/debug-pool') {
+    const env = require('./lib/env');
+    const { Pool } = require('pg');
+    const databaseUrl = env.supabase || env.DATABASE_URL || env.SUPABASE_URL || '';
+    
+    if (!databaseUrl) {
+      return json(res, 500, { error: 'No database URL' });
+    }
+    
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      ssl: { rejectUnauthorized: false },
+      family: 4,
+    });
+    
+    try {
+      const result = await pool.query('SELECT 1 as test');
+      await pool.end();
+      return json(res, 200, { result: result.rows });
+    } catch (err) {
+      await pool.end();
       return json(res, 500, { 
         error: err.message,
         stack: err.stack,
