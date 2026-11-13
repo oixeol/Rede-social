@@ -4,7 +4,9 @@ const { Kysely, PostgresDialect } = require('kysely');
 const env = require('../env.js');
 
 // Prefer pooler connection for Supabase (more reliable for external connections)
-const databaseUrl = env.DATABASE_URL || env.SUPABASE_URL || '';
+// Check both SUPABASE_URL and supabase (Render env var names vary)
+const supabasePoolerUrl = env.SUPABASE_URL || env.supabase || '';
+const databaseUrl = env.DATABASE_URL || supabasePoolerUrl || '';
 const pool = new Pool({
   connectionString: databaseUrl,
   ssl: databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: false },
