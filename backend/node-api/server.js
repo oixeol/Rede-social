@@ -3044,11 +3044,25 @@ async function handleApi(req, res, pathname, url) {
       } else if (handler && handler.router) {
         console.log('[DEBUG] Router keys:', Object.keys(handler.router));
       }
+      
+      // Test if handler can handle a social sign-in request
+      const testRequest = new Request('https://rede-social-attz.onrender.com/api/auth/sign-in/social/google', {
+        method: 'GET',
+        headers: { 'Accept': 'text/html' },
+      });
+      const testResponse = await handler(testRequest);
+      const testBody = await testResponse.text();
+      
       return json(res, 200, { 
         routes, 
         handlerKeys: Object.keys(handler || {}),
         socialProvidersConfig: authOptions?.socialProviders,
         baseURL: authOptions?.baseURL,
+        testSignInSocial: {
+          status: testResponse.status,
+          headers: [...testResponse.headers.entries()],
+          body: testBody.substring(0, 500)
+        }
       });
     } catch (err) {
       return json(res, 500, { 
