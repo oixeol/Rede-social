@@ -141,8 +141,15 @@ function getAuth() {
 
 // Export handler that lazily initializes auth
 async function betterAuthHandler(req, res) {
-  const auth = await getAuth();
-  return auth.handler(req, res);
+  try {
+    const auth = await getAuth();
+    return auth.handler(req, res);
+  } catch (err) {
+    console.error('[BetterAuth] Handler error:', err.message);
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Authentication service unavailable', details: err.message }));
+  }
 }
 
 module.exports = { auth: { handler: betterAuthHandler }, getAuth };
