@@ -23,4 +23,5 @@ module.exports = {
   get GOOGLE_CLIENT_ID() { return getEnv('GOOGLE_CLIENT_ID', ''); },
   get GOOGLE_CLIENT_SECRET() { return getEnv('GOOGLE_CLIENT_SECRET', ''); },
   get API_ORIGIN() { return getEnv('API_ORIGIN', ''); },
+  get BETTER_AUTH_SECRET() { return getEnv('BETTER_AUTH_SECRET', ''); },
 };
