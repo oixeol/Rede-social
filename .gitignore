@@ -33,3 +33,5 @@ backend/node-api/qa/*.png
 
 .DS_Store
 Thumbs.db
+
+.vercel

@@ -2,9 +2,17 @@
 
 import { createAuthClient } from 'better-auth/client';
 
+const getBaseURL = () => {
+  if (typeof window !== 'undefined') {
+    // Use relative URL to go through Next.js rewrites (/api/* -> backend)
+    return '';
+  }
+  // Server-side: use the actual API origin
+  return process.env.NEXT_PUBLIC_API_ORIGIN || 'http://127.0.0.1:4173';
+};
+
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_API_ORIGIN || 
-    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'),
+  baseURL: getBaseURL(),
   fetchOptions: {
     credentials: 'include',
   },
