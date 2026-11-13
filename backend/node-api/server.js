@@ -2847,6 +2847,18 @@ async function handleApi(req, res, pathname, url) {
     }
   }
 
+  // TESTE: rota para verificar env vars do banco
+  if (pathname === '/api/auth/debug-db') {
+    const env = require('./lib/env');
+    return json(res, 200, {
+      DATABASE_URL: env.DATABASE_URL?.replace(/:[^:@]*@/, ':****@') || 'NOT SET',
+      SUPABASE_URL: env.SUPABASE_URL?.replace(/:[^:@]*@/, ':****@') || 'NOT SET',
+      supabase: env.supabase?.replace(/:[^:@]*@/, ':****@') || 'NOT SET',
+      NODE_ENV: env.NODE_ENV,
+      BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET ? 'SET' : 'NOT SET',
+    });
+  }
+
   // Better Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
     console.log('[DEBUG] Better Auth route:', pathname);
