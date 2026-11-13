@@ -41,10 +41,16 @@ function createAuth() {
 
   const isProduction = env.NODE_ENV === 'production';
   const apiOrigin = env.API_ORIGIN || (isProduction ? 'https://rede-social-attz.onrender.com' : 'http://localhost:4173');
+  const authSecret = env.BETTER_AUTH_SECRET || (isProduction ? '' : 'dev-secret-change-in-production');
+
+  if (isProduction && !env.BETTER_AUTH_SECRET) {
+    throw new Error('BETTER_AUTH_SECRET env var is required in production');
+  }
 
   return betterAuth({
     baseURL: apiOrigin,
     database: kyselyAdapter(db),
+    secret: authSecret,
 
     emailAndPassword: {
       enabled: true,
