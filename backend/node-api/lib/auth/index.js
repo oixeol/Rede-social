@@ -164,11 +164,12 @@ async function betterAuthHandler(req, res) {
     };
     console.log('[BetterAuth] Calling auth.handler for:', req.url);
     const response = await auth.handler(wrappedReq, res);
-    console.log('[BetterAuth] Handler returned:', response ? 'Response object' : 'undefined');
+    console.log('[BetterAuth] Handler returned:', response ? 'Response object' : 'undefined', response?.status);
     // Handle Response object returned by Better Auth
     if (response && typeof response === 'object' && 'status' in response) {
       console.log('[BetterAuth] Sending Response:', response.status);
       const body = await response.text();
+      console.log('[BetterAuth] Response body length:', body.length);
       res.statusCode = response.status;
       response.headers.forEach((value, key) => {
         res.setHeader(key, value);
