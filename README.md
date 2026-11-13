@@ -279,6 +279,43 @@ Os tokens ficam em `frontend/src/app/globals.css`. Paletas de assinatura dispon�
 
 ---
 
+## Configuração do Google OAuth
+
+### Render (Backend)
+1. Acesse o [painel do Render](https://dashboard.render.com)
+2. Em "Environment" → adicione:
+   - `GOOGLE_CLIENT_ID` = ID do cliente OAuth do Google
+   - `GOOGLE_CLIENT_SECRET` = Secret do cliente OAuth do Google
+
+### Google Cloud Console
+1. Acesse: https://console.cloud.google.com/apis/credentials
+2. Em "OAuth 2.0 Client IDs" → Configure:
+   - **Authorized redirect URIs**: `https://rede-social-attz.onrender.com/api/auth/callback/google`
+3. Copie o `Client ID` e `Client Secret`
+
+### Vercel (Frontend)
+1. Acesse o [dashboard da Vercel](https://vercel.com/dashboard)
+2. Em "Settings" → "Environment Variables" → adicione:
+   - `NEXT_PUBLIC_API_ORIGIN=https://rede-social-attz.onrender.com`
+3. Reinicie o deploy
+
+### Teste
+```bash
+curl -X POST https://rede-social-attz.onrender.com/api/auth/sign-in/social \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"google","callbackURL":"https://rede-social-attz.onrender.com/auth/callback"}'
+```
+
+Deverá retornar:
+```json
+{
+  "url": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "redirect": true
+}
+```
+
+---
+
 ## Limitações
 
 - Projeto local para um único computador. O padrão escuta só em `127.0.0.1` e não está pronto para exposição direta na internet. Produção ainda exige HTTPS, proxy reverso, backups e banco gerenciado.
