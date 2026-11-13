@@ -16,6 +16,8 @@ function createAuth() {
     throw new Error('DATABASE_URL or SUPABASE_URL/supabase env var is required');
   }
 
+  console.log('[BetterAuth] Initializing with database:', databaseUrl.replace(/:[^:@]*@/, ':****@'));
+
   const pool = new Pool({
     connectionString: databaseUrl,
     ssl: databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: false },
@@ -23,6 +25,11 @@ function createAuth() {
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
+  });
+
+  // Test connection immediately
+  pool.on('error', (err) => {
+    console.error('[BetterAuth] Pool error:', err.message);
   });
 
   const db = new Kysely({
@@ -120,8 +127,10 @@ function getAuth() {
   initPromise = (async () => {
     try {
       authInstance = createAuth();
+      console.log('[BetterAuth] Initialized successfully');
       return authInstance;
     } catch (err) {
+      console.error('[BetterAuth] Initialization failed:', err.message);
       initPromise = null;
       throw err;
     }
