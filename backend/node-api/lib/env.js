@@ -27,4 +27,6 @@ export const env = {
   HOST: process.env.HOST || '0.0.0.0',
   VIBRA_DATA_DIR: process.env.VIBRA_DATA_DIR,
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'http://localhost:3000',
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
 };
