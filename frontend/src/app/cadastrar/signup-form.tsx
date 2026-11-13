@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, LoaderCircle, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { AlertCircle, LoaderCircle, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
 import type { FormEvent, ChangeEvent } from 'react';
@@ -19,56 +19,19 @@ interface SignupResponse {
 }
 
 type FieldName =
-  | 'firstName'
-  | 'lastName'
+  | 'fullName'
   | 'username'
   | 'email'
-  | 'birthDate'
-  | 'gender'
   | 'country'
-  | 'state'
   | 'password'
   | 'confirmPassword';
 
-export const GENDER_OPTIONS = [
-  { value: 'cis_man', label: 'Homem Cis' },
-  { value: 'cis_woman', label: 'Mulher Cis' },
-  { value: 'trans_man', label: 'Homem Trans' },
-  { value: 'trans_woman', label: 'Mulher Trans' },
-  { value: 'non_binary', label: 'Não-binário' },
-  { value: 'genderfluid', label: 'Gênero-fluido' },
-  { value: 'agender', label: 'Agênero' },
-  { value: 'other', label: 'Outros / Prefiro não informar' },
-] as const;
-
-export type GenderValue = (typeof GENDER_OPTIONS)[number]['value'];
-
-function calculateAge(birthDate: string): number | null {
-  const today = new Date();
-  const birth = new Date(birthDate);
-  if (isNaN(birth.getTime())) return null;
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  return age;
-}
-
 function validatePassword(password: string): string[] {
   const errors: string[] = [];
-  if (password.length < 8) {
-    errors.push('Pelo menos 8 caracteres');
-  }
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Pelo menos 1 letra maiúscula');
-  }
-  if (!/[0-9]/.test(password)) {
-    errors.push('Pelo menos 1 número');
-  }
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    errors.push('Pelo menos 1 caractere especial (!@#$%^&*...)');
-  }
+  if (password.length < 8) errors.push('Pelo menos 8 caracteres');
+  if (!/[A-Z]/.test(password)) errors.push('Pelo menos 1 letra maiúscula');
+  if (!/[0-9]/.test(password)) errors.push('Pelo menos 1 número');
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) errors.push('Pelo menos 1 caractere especial (!@#$%^&*...)');
   return errors;
 }
 
@@ -84,27 +47,18 @@ export function SignupForm() {
   const router = useRouter();
   const countriesList = getCountries();
 
-  // Refs para foco
-  const firstNameRef = useRef<HTMLInputElement>(null);
-  const lastNameRef = useRef<HTMLInputElement>(null);
+  // Refs
+  const fullNameRef = useRef<HTMLInputElement>(null);
   const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
-  const birthDateRef = useRef<HTMLInputElement>(null);
-  const genderRef = useRef<HTMLSelectElement>(null);
-  const countryRef = useRef<HTMLSelectElement>(null);
-  const stateRef = useRef<HTMLSelectElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
-  // Estados do formulário
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  // States
+  const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [gender, setGender] = useState<GenderValue | ''>('');
   const [country, setCountry] = useState('');
-  const [state, setState] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -115,12 +69,7 @@ export function SignupForm() {
   const [submittingRef, setSubmittingRef] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<'idle'|'checking'|'available'|'unavailable'>('idle');
 
-  // Estados/regiões derivados do país selecionado (sem efeito colateral)
-  const states = useMemo<State[]>(
-    () => (country ? getStatesByCountry(country) : []),
-    [country]
-  );
-
+  // Username validation
   useEffect(() => {
     const normalized = username.trim().toLowerCase();
     if (!validateUsername(normalized)) return;
@@ -152,9 +101,7 @@ export function SignupForm() {
 
   function messageFromError(caught: unknown): string {
     if (caught instanceof ApiError) {
-      if (caught.status >= 400 && caught.status < 500) {
-        return caught.message;
-      }
+      if (caught.status >= 400 && caught.status < 500) return caught.message;
       return 'Não foi possível criar sua conta agora. Tente novamente em instantes.';
     }
     return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
@@ -162,24 +109,14 @@ export function SignupForm() {
 
   function validateField(field: FieldName, value: string): boolean {
     switch (field) {
-      case 'firstName':
-        return value.trim().length >= 1;
-      case 'lastName':
-        return value.trim().length >= 1;
+      case 'fullName':
+        return value.trim().split(' ').filter(Boolean).length >= 1;
       case 'username':
         return validateUsername(value.trim().toLowerCase());
       case 'email':
         return validateEmail(value);
-      case 'birthDate': {
-        const age = calculateAge(value);
-        return age !== null && age >= 12;
-      }
-      case 'gender':
-        return GENDER_OPTIONS.some((g) => g.value === value);
       case 'country':
         return countriesList.some((c) => c.code === value);
-      case 'state':
-        return states.some((s) => s.code === value);
       case 'password':
         return validatePassword(value).length === 0;
       case 'confirmPassword':
@@ -191,26 +128,14 @@ export function SignupForm() {
 
   function getFieldErrorMessage(field: FieldName, value: string): string {
     switch (field) {
-      case 'firstName':
-        return 'Informe seu primeiro nome.';
-      case 'lastName':
-        return 'Informe seu sobrenome.';
+      case 'fullName':
+        return 'Informe seu nome completo.';
       case 'username':
         return 'Use de 3 a 24 caracteres: letras minúsculas, números, ponto ou underline.';
       case 'email':
         return 'Informe um e-mail válido.';
-      case 'birthDate': {
-        const age = calculateAge(value);
-        if (age === null) return 'Data de nascimento inválida.';
-        if (age < 12) return 'Você deve ter pelo menos 12 anos para se cadastrar.';
-        return '';
-      }
-      case 'gender':
-        return 'Selecione seu gênero.';
       case 'country':
         return 'Selecione seu país.';
-      case 'state':
-        return 'Selecione seu estado/região.';
       case 'password': {
         const errors = validatePassword(value);
         if (errors.length > 0) return errors.join(', ');
@@ -259,22 +184,13 @@ export function SignupForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submittingRef) return;
+    if (submittingRef.current) return;
 
-    // Validar todos os campos
-    const fields: {
-      field: FieldName;
-      value: string;
-      ref: React.RefObject<HTMLInputElement | HTMLSelectElement | null>;
-    }[] = [
-      { field: 'firstName', value: firstName, ref: firstNameRef },
-      { field: 'lastName', value: lastName, ref: lastNameRef },
+    const fields: { field: FieldName; value: string; ref: React.RefObject<HTMLInputElement | HTMLSelectElement | null> }[] = [
+      { field: 'fullName', value: fullName, ref: fullNameRef },
       { field: 'username', value: username, ref: usernameRef },
       { field: 'email', value: email, ref: emailRef },
-      { field: 'birthDate', value: birthDate, ref: birthDateRef },
-      { field: 'gender', value: gender, ref: genderRef },
       { field: 'country', value: country, ref: countryRef },
-      { field: 'state', value: state, ref: stateRef },
       { field: 'password', value: password, ref: passwordRef },
       { field: 'confirmPassword', value: confirmPassword, ref: confirmPasswordRef },
     ];
@@ -295,7 +211,6 @@ export function SignupForm() {
       return;
     }
 
-    // Verificar senhas conferem
     if (password !== confirmPassword) {
       setInvalidField('confirmPassword');
       setError('As senhas não conferem.');
@@ -308,16 +223,17 @@ export function SignupForm() {
     setError(null);
     setInvalidField(null);
 
+    const names = fullName.trim().split(' ');
+    const firstName = names[0] || '';
+    const lastName = names.slice(1).join(' ') || firstName;
+
     try {
       await signUp.email({
         email: email.trim().toLowerCase(),
         password,
-        name: `${firstName.trim()} ${lastName.trim()}`,
+        name: fullName.trim(),
         username: username.trim().toLowerCase(),
-        birthDate,
-        gender,
         country,
-        state,
         callbackURL: '/inicio',
       } as any);
       router.push('/inicio' as Route);
@@ -351,51 +267,27 @@ export function SignupForm() {
     <Card className="p-6">
       <form onSubmit={handleSubmit} noValidate aria-busy={pending}>
         <div className="space-y-4">
-          {/* Nome e Sobrenome */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label htmlFor="firstName" className={labelClass}>
-                Primeiro nome <span className="text-danger" aria-hidden="true">*</span>
-              </label>
-              <input
-                id="firstName"
-                ref={firstNameRef}
-                type="text"
-                name="firstName"
-                autoComplete="given-name"
-                value={firstName}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setFirstName(e.target.value)}
-                onBlur={(e) => handleBlur('firstName', e.target.value)}
-                placeholder="João"
-                required
-                disabled={pending}
-                aria-invalid={invalidField === 'firstName'}
-                aria-describedby={error && invalidField === 'firstName' ? 'form-error' : undefined}
-                className={invalidField === 'firstName' ? fieldErrorClass : inputClass}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="lastName" className={labelClass}>
-                Sobrenome <span className="text-danger" aria-hidden="true">*</span>
-              </label>
-              <input
-                id="lastName"
-                ref={lastNameRef}
-                type="text"
-                name="lastName"
-                autoComplete="family-name"
-                value={lastName}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setLastName(e.target.value)}
-                onBlur={(e) => handleBlur('lastName', e.target.value)}
-                placeholder="Silva"
-                required
-                disabled={pending}
-                aria-invalid={invalidField === 'lastName'}
-                aria-describedby={error && invalidField === 'lastName' ? 'form-error' : undefined}
-                className={invalidField === 'lastName' ? fieldErrorClass : inputClass}
-              />
-            </div>
+          {/* Nome Completo */}
+          <div className="space-y-1.5">
+            <label htmlFor="fullName" className={labelClass}>
+              Nome completo <span className="text-danger" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="fullName"
+              ref={fullNameRef}
+              type="text"
+              name="fullName"
+              autoComplete="name"
+              value={fullName}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFullName(e.target.value)}
+              onBlur={(e) => handleBlur('fullName', e.target.value)}
+              placeholder="João Silva"
+              required
+              disabled={pending}
+              aria-invalid={invalidField === 'fullName'}
+              aria-describedby={error && invalidField === 'fullName' ? 'form-error' : undefined}
+              className={invalidField === 'fullName' ? fieldErrorClass : inputClass}
+            />
           </div>
 
           {/* Nome de usuário */}
@@ -441,31 +333,20 @@ export function SignupForm() {
                 )}
               />
               {usernameStatus === 'checking' ? (
-                <span
-                  className="absolute inset-y-0 right-4 flex items-center text-xs text-muted"
-                  id="username-status"
-                >
+                <span className="absolute inset-y-0 right-4 flex items-center text-xs text-muted" id="username-status">
                   verificando…
                 </span>
               ) : usernameStatus === 'available' ? (
-                <span
-                  className="absolute inset-y-0 right-4 flex items-center text-xs text-success"
-                  id="username-status"
-                >
+                <span className="absolute inset-y-0 right-4 flex items-center text-xs text-success" id="username-status">
                   disponível ✓
                 </span>
               ) : usernameStatus === 'unavailable' ? (
-                <span
-                  className="absolute inset-y-0 right-4 flex items-center text-xs text-danger"
-                  id="username-status"
-                >
+                <span className="absolute inset-y-0 right-4 flex items-center text-xs text-danger" id="username-status">
                   já está em uso
                 </span>
               ) : null}
             </div>
-            <p className="text-xs text-muted">
-              3–24 caracteres. Apenas letras minúsculas, números, ponto e underline.
-            </p>
+            <p className="text-xs text-muted">3–24 caracteres. Apenas letras minúsculas, números, ponto e underline.</p>
           </div>
 
           {/* E-mail */}
@@ -491,116 +372,31 @@ export function SignupForm() {
             />
           </div>
 
-          {/* Data de nascimento */}
+          {/* País */}
           <div className="space-y-1.5">
-            <label htmlFor="birthDate" className={labelClass}>
-              Data de nascimento <span className="text-danger" aria-hidden="true">*</span>
-            </label>
-            <input
-              id="birthDate"
-              ref={birthDateRef}
-              type="date"
-              name="birthDate"
-              value={birthDate}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setBirthDate(e.target.value)}
-              onBlur={(e) => handleBlur('birthDate', e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
-              required
-              disabled={pending}
-              aria-invalid={invalidField === 'birthDate'}
-              aria-describedby={error && invalidField === 'birthDate' ? 'form-error' : undefined}
-              className={invalidField === 'birthDate' ? fieldErrorClass : inputClass}
-            />
-            <p className="text-xs text-muted">Você deve ter pelo menos 12 anos para se cadastrar.</p>
-          </div>
-
-          {/* Gênero */}
-          <div className="space-y-1.5">
-            <label htmlFor="gender" className={labelClass}>
-              Gênero <span className="text-danger" aria-hidden="true">*</span>
+            <label htmlFor="country" className={labelClass}>
+              País <span className="text-danger" aria-hidden="true">*</span>
             </label>
             <select
-              id="gender"
-              ref={genderRef}
-              name="gender"
-              value={gender}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setGender(e.target.value as GenderValue)}
-              onBlur={(e) => handleBlur('gender', e.target.value)}
+              id="country"
+              ref={countryRef}
+              name="country"
+              value={country}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setCountry(e.target.value)}
+              onBlur={(e) => handleBlur('country', e.target.value)}
               required
               disabled={pending}
-              aria-invalid={invalidField === 'gender'}
-              aria-describedby={error && invalidField === 'gender' ? 'form-error' : undefined}
-              className={cn(selectClass, invalidField === 'gender' && 'border-danger focus:border-danger focus:ring-danger/20')}
+              aria-invalid={invalidField === 'country'}
+              aria-describedby={error && invalidField === 'country' ? 'form-error' : undefined}
+              className={cn(selectClass, invalidField === 'country' && 'border-danger focus:border-danger focus:ring-danger/20')}
             >
-              <option value="" className="bg-[#0D0D0D] text-white">Selecione</option>
-              {GENDER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value} className="bg-[#0D0D0D] text-white">
-                  {option.label}
+              <option value="" className="bg-[#0D0D0D] text-white">Selecione seu país</option>
+              {countriesList.map((c) => (
+                <option key={c.code} value={c.code} className="bg-[#0D0D0D] text-white">
+                  {c.name}
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Localização - País e Estado */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label htmlFor="country" className={labelClass}>
-                País <span className="text-danger" aria-hidden="true">*</span>
-              </label>
-              <select
-                id="country"
-                ref={countryRef}
-                name="country"
-                value={country}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => {
-                  setCountry(e.target.value);
-                  setState(''); // Estado não é válido para outro país
-                }}
-                onBlur={(e) => handleBlur('country', e.target.value)}
-                required
-                disabled={pending}
-                aria-invalid={invalidField === 'country'}
-                aria-describedby={error && invalidField === 'country' ? 'form-error' : undefined}
-                className={cn(selectClass, invalidField === 'country' && 'border-danger focus:border-danger focus:ring-danger/20')}
-              >
-                <option value="" className="bg-[#0D0D0D] text-white">Selecione seu país</option>
-                {countriesList.map((c) => (
-                  <option key={c.code} value={c.code} className="bg-[#0D0D0D] text-white">
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="state" className={labelClass}>
-                Estado / Região <span className="text-danger" aria-hidden="true">*</span>
-              </label>
-              <select
-                id="state"
-                ref={stateRef}
-                name="state"
-                value={state}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setState(e.target.value)}
-                onBlur={(e) => handleBlur('state', e.target.value)}
-                required
-                disabled={pending || states.length === 0}
-                aria-invalid={invalidField === 'state'}
-                aria-describedby={error && invalidField === 'state' ? 'form-error' : undefined}
-                className={cn(
-                  selectClass,
-                  invalidField === 'state' && 'border-danger focus:border-danger focus:ring-danger/20',
-                  states.length === 0 && 'opacity-50 cursor-not-allowed'
-                )}
-              >
-                <option value="" className="bg-[#0D0D0D] text-white">Selecione o país primeiro</option>
-                {states.map((s) => (
-                  <option key={s.code} value={s.code} className="bg-[#0D0D0D] text-white">
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
 
           {/* Senha */}

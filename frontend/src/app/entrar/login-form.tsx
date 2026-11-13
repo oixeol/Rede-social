@@ -44,6 +44,21 @@ export function LoginForm() {
     return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
   }
 
+  async function handleSubmitSocial(provider: 'google'): Promise<void> {
+    try {
+      const result = await signIn.social({
+        provider,
+        callbackURL: '/inicio',
+      });
+      if (result?.url) {
+        window.location.href = result.url;
+      }
+    } catch (caught) {
+      setError(messageFromError(caught));
+      setPending(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submittingRef.current) return;
@@ -205,12 +220,7 @@ export function LoginForm() {
         <div className="grid gap-2.5">
           <button
             type="button"
-            onClick={async () => {
-              await signIn.social({
-                provider: 'google',
-                callbackURL: '/inicio',
-              });
-            }}
+            onClick={() => handleSubmitSocial('google')}
             className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-[#2E2E2E] bg-transparent text-[13.5px] font-semibold text-white transition-colors hover:border-[#FF6A00]/50 hover:bg-white/[0.03]"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[17px]">
