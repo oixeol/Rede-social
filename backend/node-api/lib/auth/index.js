@@ -54,7 +54,11 @@ function createAuth() {
 
   return betterAuth({
     baseURL: baseURL,
-    database: kyselyAdapter(db),
+    database: kyselyAdapter(db, {
+      type: 'postgres',
+      usePlural: false,
+      debugLogs: true,
+    }),
     secret: authSecret,
 
     emailAndPassword: {
