@@ -2875,6 +2875,32 @@ async function handleApi(req, res, pathname, url) {
       ssl: { rejectUnauthorized: false },
       family: 4,
     });
+
+  // TESTE: rota para testar chamada direta do auth handler
+  if (pathname === '/api/auth/debug-handler') {
+    const { getAuth } = require('./lib/auth');
+    try {
+      const auth = await getAuth();
+      // Create a simple test request
+      const request = new Request('https://rede-social-attz.onrender.com/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'test@test.com', password: 'test1234' }),
+      });
+      const response = await auth.handler(request);
+      const body = await response.text();
+      return json(res, response.status, { 
+        status: response.status,
+        body: body.substring(0, 500),
+        headers: [...response.headers.entries()]
+      });
+    } catch (err) {
+      return json(res, 500, { 
+        error: err.message,
+        stack: err.stack
+      });
+    }
+  }
     
     try {
       const tables = await pool.query(`
