@@ -2935,6 +2935,32 @@ async function handleApi(req, res, pathname, url) {
     }
   }
 
+  // TESTE: rota para testar database adapter diretamente
+  if (pathname === '/api/auth/debug-adapter') {
+    const { getAuth } = require('./lib/auth');
+    const env = require('./lib/env');
+    try {
+      const auth = await getAuth();
+      // Get the database adapter
+      const db = auth.options?.database;
+      if (db) {
+        // Try to query the user table
+        const user = await db.findOne({
+          model: 'user',
+          where: [{ field: 'email', operator: 'eq', value: 'test@test.com' }],
+        });
+        return json(res, 200, { user });
+      }
+      return json(res, 500, { error: 'No database adapter' });
+    } catch (err) {
+      return json(res, 500, { 
+        error: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+    }
+  }
+
   // Better Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
     console.log('[DEBUG] Better Auth route:', pathname);
