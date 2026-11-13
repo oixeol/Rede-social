@@ -2919,7 +2919,17 @@ async function handleApi(req, res, pathname, url) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'test@test.com', password: 'test1234' }),
       });
-      const response = await auth.handler(request);
+      let response;
+      try {
+        response = await auth.handler(request);
+      } catch (handlerErr) {
+        return json(res, 500, { 
+          error: 'Handler threw error',
+          message: handlerErr.message,
+          stack: handlerErr.stack,
+          name: handlerErr.name
+        });
+      }
       const body = await response.text();
       return json(res, response.status, { 
         status: response.status,
