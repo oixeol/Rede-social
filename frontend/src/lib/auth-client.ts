@@ -3,7 +3,7 @@
 import { createAuthClient } from 'better-auth/client';
 
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_API_ORIGIN || '',
+  baseURL: process.env.NEXT_PUBLIC_API_ORIGIN || window.location.origin,
   fetchOptions: {
     credentials: 'include',
   },
