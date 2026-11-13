@@ -76,9 +76,8 @@ function createAuth() {
       cookieOptions: {
         httpOnly: true,
         secure: true,
-        sameSite: 'none',
+        sameSite: 'lax',
         path: '/',
-        domain: isProduction ? '.onrender.com' : undefined,
       },
     },
 
@@ -105,13 +104,12 @@ function createAuth() {
     },
 
     advanced: {
-      crossSubDomainCookies: { enabled: isProduction },
+      crossSubDomainCookies: { enabled: false },
       defaultCookieAttributes: {
         httpOnly: true,
         secure: true,
-        sameSite: 'none',
+        sameSite: 'lax',
         path: '/',
-        domain: isProduction ? '.onrender.com' : undefined,
       },
       database: {
         generateId: () => crypto.randomUUID(),
