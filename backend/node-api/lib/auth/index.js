@@ -2,6 +2,7 @@ const { betterAuth } = require('better-auth');
 const { kyselyAdapter } = require('@better-auth/kysely-adapter');
 const { Pool } = require('pg');
 const { Kysely, PostgresDialect } = require('kysely');
+const { CamelCasePlugin } = require('kysely');
 const env = require('../env.js');
 
 let authInstance = null;
@@ -38,6 +39,7 @@ function createAuth() {
     dialect: new PostgresDialect({
       pool,
     }),
+    plugins: [new CamelCasePlugin()],
   });
 
   const isProduction = env.NODE_ENV === 'production';
