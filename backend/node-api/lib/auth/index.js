@@ -143,12 +143,14 @@ function getAuth() {
 async function betterAuthHandler(req, res) {
   try {
     const auth = await getAuth();
-    return auth.handler(req, res);
+    await auth.handler(req, res);
   } catch (err) {
     console.error('[BetterAuth] Handler error:', err.message);
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Authentication service unavailable', details: err.message }));
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Authentication service unavailable', details: err.message }));
+    }
   }
 }
 
