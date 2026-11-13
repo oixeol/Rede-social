@@ -43,11 +43,6 @@ const { enqueueTranscode, startTranscodeWorker, getHLSManifestUrl, deleteHLS } =
 const APP = require('./app.config');
 const APP_VERSION = require('./package.json').version;
 const dating = require('./lib/dating');
-const { auth } = require('./lib/auth');
-const { toNodeHandler } = require('better-auth/node');
-
-/** Better Auth handler for /api/auth/* routes */
-const betterAuthHandler = toNodeHandler(auth);
 
 /* Carrega .env da raiz do repositório (sem dependência externa). */
 function loadRepoEnv() {
@@ -73,6 +68,12 @@ function loadRepoEnv() {
   }
 }
 loadRepoEnv();
+
+const { auth } = require('./lib/auth');
+const { toNodeHandler } = require('better-auth/node');
+
+/** Better Auth handler for /api/auth/* routes */
+const betterAuthHandler = toNodeHandler(auth);
 
 /* ------------------------------------------------------------------ */
 /* Configuração e inicialização                                        */
