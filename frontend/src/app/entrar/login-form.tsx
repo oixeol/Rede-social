@@ -8,7 +8,7 @@ import type { FormEvent } from 'react';
 import { useId, useRef, useState } from 'react';
 
 import { ApiError } from '@/lib/api';
-import { signIn } from '@/lib/auth-client';
+import { signIn, authClient } from '@/lib/auth-client';
 
 interface LoginResponse {
   user: unknown;
@@ -72,6 +72,22 @@ export function LoginForm() {
       }
     } catch (caught) {
       setError(messageFromError(caught));
+      setPending(false);
+    }
+  }
+
+  async function handlePasskeySignIn(): Promise<void> {
+    try {
+      setPending(true);
+      setError(null);
+      const res = await authClient.signIn.passkey();
+      if (res?.error) {
+        throw new Error(res.error.message || 'Falha ao autenticar com Passkey.');
+      }
+      router.push('/inicio' as Route);
+      router.refresh();
+    } catch (caught: any) {
+      setError(caught?.message || 'Erro ao usar Passkey.');
       setPending(false);
     }
   }
@@ -263,18 +279,8 @@ export function LoginForm() {
 
           <button
             type="button"
-            onClick={() => setNotice('Login com Apple chega em breve.')}
-            className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-[#2E2E2E] bg-transparent text-[13.5px] font-semibold text-white transition-colors hover:border-[#FF6A00]/50 hover:bg-white/[0.03]"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[17px] fill-current">
-              <path d="M16.36 1.43c0 1.14-.47 2.21-1.34 3.04-.97.95-2.16 1.51-3.12 1.41-.02-.11-.03-.23-.03-.34 0-1.09.6-2.23 1.35-3.02.46-.49 1.05-.91 1.72-1.16.67-.25 1.32-.36 1.87-.36.02.13.03.26.03.4Zm5.62 15.18c-.56 1.29-.82 1.86-1.53 3-.99 1.58-2.39 3.54-4.11 3.55-1.53.03-1.89-1-4.1-1-2.2 0-2.61.98-4.08 1.03-1.64.05-2.9-1.71-3.89-3.29-2.67-4.22-2.95-9.68-1.21-12.45 1.28-2.06 3.31-3.27 5.22-3.27 1.95 0 3.17 1.01 4.79 1.01 1.57 0 2.52-1.01 4.79-1.01 1.71 0 3.52.93 4.8 2.53-4.22 1.84-3.54 7.61.74 8.89Z" />
-            </svg>
-            Continuar com Apple
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setNotice('Login com Passkey chega em breve.')}
+            onClick={handlePasskeySignIn}
+            disabled={pending}
             className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-[#2E2E2E] bg-transparent text-[13.5px] font-semibold text-white transition-colors hover:border-[#FF6A00]/50 hover:bg-white/[0.03]"
           >
             <svg
@@ -288,7 +294,25 @@ export function LoginForm() {
               <path d="M12.5 12v4.5a2 2 0 0 0 4 0V12a4.5 4.5 0 0 0-9 0v2" />
               <path d="M15.5 16.5V18" />
             </svg>
-            Entrar com Passkey
+            Entrar com Passkey (Face ID / Touch ID)
+          </button>
+
+          <button
+            type="button"
+            disabled
+            className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-[#2E2E2E] bg-transparent text-[13.5px] font-semibold text-[#71717A] cursor-not-allowed opacity-50"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="size-[17px] fill-none stroke-current"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M12 8v8M8 12h8" />
+            </svg>
+            Login com QR Code — Em breve
           </button>
         </div>
 

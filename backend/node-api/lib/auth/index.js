@@ -3,6 +3,7 @@ const { kyselyAdapter } = require('@better-auth/kysely-adapter');
 const { Pool } = require('pg');
 const { Kysely, PostgresDialect } = require('kysely');
 const { CamelCasePlugin } = require('kysely');
+const { passkey } = require('@better-auth/passkey');
 const env = require('../env.js');
 
 let authInstance = null;
@@ -119,7 +120,9 @@ function createAuth() {
       },
     },
 
-    plugins: [],
+    plugins: [
+    passkey()
+  ],
     socialProviders: {
       google: {
         clientId: env.GOOGLE_CLIENT_ID,

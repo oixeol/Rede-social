@@ -20,6 +20,7 @@
     "node": ">=22.5"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.7.23",
     "better-auth": "^1.7.22",
     "bull": "^4.16.5",
     "kysely": "^0.29.9",

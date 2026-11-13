@@ -1,10 +1,10 @@
 'use client';
 
 import { createAuthClient } from 'better-auth/client';
+import { passkeyClient } from '@better-auth/passkey/client';
 
 const getBaseURL = () => {
   if (typeof window !== 'undefined') {
-    // Return explicit origin for Better Auth requests
     return window.location.origin;
   }
   return process.env.NEXT_PUBLIC_API_ORIGIN || 'http://127.0.0.1:4173';
@@ -15,6 +15,7 @@ export const authClient = createAuthClient({
   fetchOptions: {
     credentials: 'include',
   },
+  plugins: [passkeyClient()]
 });
 
 export const {
