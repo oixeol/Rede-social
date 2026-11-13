@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { headers } from 'next/headers';
 import { connection } from 'next/server';
+import { Analytics } from '@vercel/analytics/next';
 
 import { inter } from '@/lib/fonts';
 
@@ -38,6 +39,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           Pular para o conteúdo
         </a>
         {children}
+        <Analytics />
       </body>
     </html>
   );
