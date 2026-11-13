@@ -6290,7 +6290,7 @@ function seedIfEmpty() {
 }
 
 const seededDemo = seedIfEmpty();
-cleanupRetention();
+try { cleanupRetention(); } catch (e) { console.warn('cleanupRetention skipped:', e.message); }
 cleanupStagingDirectory(true);
 
 if (SEED_ONLY) {
