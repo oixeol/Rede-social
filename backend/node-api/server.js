@@ -2997,6 +2997,30 @@ async function handleApi(req, res, pathname, url) {
     }
   }
 
+  // TESTE: rota para verificar config do Better Auth
+  if (pathname === '/api/auth/debug-config') {
+    const { getAuth } = require('./lib/auth');
+    const env = require('./lib/env');
+    try {
+      const auth = await getAuth();
+      return json(res, 200, { 
+        baseURL: auth.options?.baseURL,
+        hasGoogle: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
+        googleClientId: env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET',
+        googleClientSecret: env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET',
+        socialProviders: Object.keys(auth.options?.socialProviders || {}),
+        emailAndPasswordEnabled: auth.options?.emailAndPassword?.enabled,
+        sessionCookieName: auth.options?.session?.cookieName,
+      });
+    } catch (err) {
+      return json(res, 500, { 
+        error: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+    }
+  }
+
   // Better Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
     console.log('[DEBUG] Better Auth route:', pathname);
