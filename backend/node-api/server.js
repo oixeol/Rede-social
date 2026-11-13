@@ -2923,13 +2923,14 @@ async function handleApi(req, res, pathname, url) {
       const body = await response.text();
       return json(res, response.status, { 
         status: response.status,
-        body: body.substring(0, 500),
+        body: body,
         headers: [...response.headers.entries()]
       });
     } catch (err) {
       return json(res, 500, { 
         error: err.message,
-        stack: err.stack
+        stack: err.stack,
+        name: err.name
       });
     }
   }
