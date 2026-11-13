@@ -48,7 +48,6 @@ export function SignupForm() {
   const countriesList = getCountries();
 
   // Refs
-  const fullNameRef = useRef<HTMLInputElement>(null);
   const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -66,7 +65,7 @@ export function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [invalidField, setInvalidField] = useState<FieldName | null>(null);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
-  const [submittingRef, setSubmittingRef] = useState(false);
+  const submittingRef = useRef(false);
   const [usernameStatus, setUsernameStatus] = useState<'idle'|'checking'|'available'|'unavailable'>('idle');
 
   // Username validation
@@ -184,22 +183,21 @@ export function SignupForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submittingRef.current) return;
+    if (submittingRef) return;
 
-    const fields: { field: FieldName; value: string; ref: React.RefObject<HTMLInputElement | HTMLSelectElement | null> }[] = [
-      { field: 'fullName', value: fullName, ref: fullNameRef },
-      { field: 'username', value: username, ref: usernameRef },
-      { field: 'email', value: email, ref: emailRef },
-      { field: 'country', value: country, ref: countryRef },
-      { field: 'password', value: password, ref: passwordRef },
-      { field: 'confirmPassword', value: confirmPassword, ref: confirmPasswordRef },
+    const fields: { field: FieldName; value: string }[] = [
+      { field: 'fullName', value: fullName },
+      { field: 'username', value: username },
+      { field: 'email', value: email },
+      { field: 'country', value: country },
+      { field: 'password', value: password },
+      { field: 'confirmPassword', value: confirmPassword },
     ];
 
-    for (const { field, value, ref } of fields) {
+    for (const { field, value } of fields) {
       if (!validateField(field, value)) {
         setInvalidField(field);
         setError(getFieldErrorMessage(field, value));
-        ref.current?.focus();
         return;
       }
     }
@@ -241,7 +239,6 @@ export function SignupForm() {
     } catch (caught) {
       setError(messageFromError(caught));
       setPending(false);
-      setSubmittingRef(false);
     }
   }
 
@@ -379,7 +376,6 @@ export function SignupForm() {
             </label>
             <select
               id="country"
-              ref={countryRef}
               name="country"
               value={country}
               onChange={(e: ChangeEvent<HTMLSelectElement>) => setCountry(e.target.value)}
