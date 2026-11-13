@@ -1,11 +1,12 @@
 const { betterAuth } = require('better-auth');
 const { Pool } = require('pg');
 const { Kysely, PostgresDialect } = require('kysely');
-const { env } = require('../env.js');
+const env = require('../env.js');
 
+const databaseUrl = env.DATABASE_URL;
 const pool = new Pool({
-  connectionString: env.DATABASE_URL,
-  ssl: env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+  connectionString: databaseUrl,
+  ssl: databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: false },
 });
 
 const db = new Kysely({

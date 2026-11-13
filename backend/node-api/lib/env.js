@@ -1,50 +1,25 @@
-const required = [
-  'DATABASE_URL',
-];
-
-for (const key of required) {
-  if (!(key in process.env)) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error(`Missing required env var: ${key}`);
-    }
-  }
+function getEnv(key, defaultValue = '') {
+  return process.env[key] ?? defaultValue;
 }
 
-const optionalWithDefaults = {
-  COOKIE_SECURE: '1',
-  SESSION_TTL: String(30 * 24 * 60 * 60 * 1000),
-  IDENTITY_PROVIDER: 'dev',
-  IDENTITY_WEBHOOK_SECRET: '',
-  ADMIN_TOKEN: '',
-  NODE_ENV: 'production',
-  PORT: '4173',
-  HOST: '0.0.0.0',
-  VIBRA_DATA_DIR: '',
-  ALLOWED_ORIGINS: '',
-  GOOGLE_CLIENT_ID: '',
-  GOOGLE_CLIENT_SECRET: '',
-  API_ORIGIN: '',
-};
-
-for (const [key, defaultValue] of Object.entries(optionalWithDefaults)) {
-  if (!(key in process.env)) {
-    process.env[key] = defaultValue;
-  }
+function getEnvNumber(key, defaultValue = 0) {
+  const val = process.env[key];
+  return val ? Number(val) : defaultValue;
 }
 
-export const env = {
-  DATABASE_URL: process.env.DATABASE_URL,
-  COOKIE_SECURE: process.env.COOKIE_SECURE,
-  SESSION_TTL: Number(process.env.SESSION_TTL),
-  IDENTITY_PROVIDER: process.env.IDENTITY_PROVIDER,
-  IDENTITY_WEBHOOK_SECRET: process.env.IDENTITY_WEBHOOK_SECRET,
-  ADMIN_TOKEN: process.env.ADMIN_TOKEN,
-  NODE_ENV: process.env.NODE_ENV,
-  PORT: Number(process.env.PORT),
-  HOST: process.env.HOST,
-  VIBRA_DATA_DIR: process.env.VIBRA_DATA_DIR,
-  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-  API_ORIGIN: process.env.API_ORIGIN,
+module.exports = {
+  get DATABASE_URL() { return getEnv('DATABASE_URL'); },
+  get COOKIE_SECURE() { return getEnv('COOKIE_SECURE', '1'); },
+  get SESSION_TTL() { return getEnvNumber('SESSION_TTL', 30 * 24 * 60 * 60 * 1000); },
+  get IDENTITY_PROVIDER() { return getEnv('IDENTITY_PROVIDER', 'dev'); },
+  get IDENTITY_WEBHOOK_SECRET() { return getEnv('IDENTITY_WEBHOOK_SECRET', ''); },
+  get ADMIN_TOKEN() { return getEnv('ADMIN_TOKEN', ''); },
+  get NODE_ENV() { return getEnv('NODE_ENV', 'production'); },
+  get PORT() { return getEnvNumber('PORT', 4173); },
+  get HOST() { return getEnv('HOST', '0.0.0.0'); },
+  get VIBRA_DATA_DIR() { return getEnv('VIBRA_DATA_DIR', ''); },
+  get ALLOWED_ORIGINS() { return getEnv('ALLOWED_ORIGINS', ''); },
+  get GOOGLE_CLIENT_ID() { return getEnv('GOOGLE_CLIENT_ID', ''); },
+  get GOOGLE_CLIENT_SECRET() { return getEnv('GOOGLE_CLIENT_SECRET', ''); },
+  get API_ORIGIN() { return getEnv('API_ORIGIN', ''); },
 };
