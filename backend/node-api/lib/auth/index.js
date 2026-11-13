@@ -1,4 +1,5 @@
 const { betterAuth } = require('better-auth');
+const { kyselyAdapter } = require('@better-auth/kysely-adapter');
 const { Pool } = require('pg');
 const { Kysely, PostgresDialect } = require('kysely');
 const env = require('../env.js');
@@ -43,7 +44,7 @@ function createAuth() {
 
   return betterAuth({
     baseURL: apiOrigin,
-    database: db,
+    database: kyselyAdapter(db),
 
     emailAndPassword: {
       enabled: true,
