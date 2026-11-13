@@ -2856,6 +2856,7 @@ async function handleApi(req, res, pathname, url) {
       supabase: env.supabase?.replace(/:[^:@]*@/, ':****@') || 'NOT SET',
       NODE_ENV: env.NODE_ENV,
       BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET ? 'SET' : 'NOT SET',
+      API_ORIGIN: env.API_ORIGIN || 'NOT SET',
     });
   }
 
