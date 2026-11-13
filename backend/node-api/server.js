@@ -2812,8 +2812,11 @@ async function handleApi(req, res, pathname, url) {
 
   // Better Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
+    console.log('[DEBUG] Better Auth route:', pathname);
     return betterAuthHandler(req, res);
   }
+
+  console.log('[DEBUG] Legacy route:', pathname);
 
   if (method === 'GET' && pathname === '/api/config') {
     return json(res, 200, {
