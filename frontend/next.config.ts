@@ -1,6 +1,6 @@
 import type { NextConfig } from 'next';
 
-const apiOrigin = (process.env.VIBRA_API_ORIGIN ?? 'http://127.0.0.1:4173').replace(/\/$/, '');
+const apiOrigin = (process.env.NEXT_PUBLIC_API_ORIGIN ?? process.env.VIBRA_API_ORIGIN ?? 'http://127.0.0.1:4173').replace(/\/$/, '');
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
