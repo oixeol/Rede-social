@@ -159,4 +159,4 @@ export const auth = betterAuth({
   plugins: [],
 });
 
-export type Auth = typeof auth;
+export { auth };
