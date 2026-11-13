@@ -3,10 +3,15 @@ const { Pool } = require('pg');
 const { Kysely, PostgresDialect } = require('kysely');
 const env = require('../env.js');
 
-const databaseUrl = env.DATABASE_URL;
+// Prefer pooler connection for Supabase (more reliable for external connections)
+const databaseUrl = env.DATABASE_URL || env.SUPABASE_URL || '';
 const pool = new Pool({
   connectionString: databaseUrl,
   ssl: databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: false },
+  // Connection pool settings for stability
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 const db = new Kysely({
