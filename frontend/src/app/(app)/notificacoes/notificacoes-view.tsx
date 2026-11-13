@@ -37,15 +37,17 @@ function resolveNotificationHref(link: string | null | undefined): string | null
     const search = new URL(link, 'http://localhost').searchParams;
     const profile = search.get('profile');
     if (profile) return `/perfil/${encodeURIComponent(profile)}`;
-    if (search.has('conversation')) return '/mensagens';
+    const conversation = search.get('conversation');
+    if (conversation) return `/mensagens?conversa=${encodeURIComponent(conversation)}`;
     const postId = search.get('post');
     if (postId) return `/publicacoes/${postId}`;
   } catch {
     return null;
   }
 
-  // Link direto para /publicacoes/[id] já no formato novo
+  // Links diretos já no formato novo
   if (link.startsWith('/publicacoes/')) return link;
+  if (link.startsWith('/perfil/')) return link;
 
   return null;
 }

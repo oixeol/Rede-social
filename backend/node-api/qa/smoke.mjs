@@ -69,7 +69,7 @@ ok('paleta arbitrária é rejeitada', invalidPalette.status === 400, `status ${i
 
 const freePaletteAttempt = await api('/api/me/theme-palette', {
   method: 'PATCH',
-  body: JSON.stringify({ palette: 'blue' }),
+  body: JSON.stringify({ palette: 'black' }),
 });
 ok('usuário free não altera a paleta', freePaletteAttempt.status === 403, `status ${freePaletteAttempt.status}`);
 
@@ -114,17 +114,17 @@ if (canMutateIsolatedUser) {
 
     const subscriberPalette = await api('/api/me/theme-palette', {
       method: 'PATCH',
-      body: JSON.stringify({ palette: 'blue' }),
+      body: JSON.stringify({ palette: 'black' }),
     });
     ok(
       'assinatura ativa persiste paleta allow-listed',
       subscriberPalette.status === 200 &&
-        subscriberPalette.data.user.themePalette === 'blue' &&
-        subscriberPalette.data.themePalette === 'blue'
+        subscriberPalette.data.user.themePalette === 'black' &&
+        subscriberPalette.data.themePalette === 'black'
     );
 
     testDb
-      .prepare("UPDATE users SET subscription_status = 'active', subscription_ends_at = ?, theme_palette = 'blue' WHERE id = ?")
+      .prepare("UPDATE users SET subscription_status = 'active', subscription_ends_at = ?, theme_palette = 'black' WHERE id = ?")
       .run(Date.now() - 1000, userId);
 
     const expiredMe = await api('/api/me');
@@ -138,7 +138,7 @@ if (canMutateIsolatedUser) {
 
     const expiredPalette = await api('/api/me/theme-palette', {
       method: 'PATCH',
-      body: JSON.stringify({ palette: 'green' }),
+      body: JSON.stringify({ palette: 'white' }),
     });
     ok('assinatura expirada não altera a paleta', expiredPalette.status === 403, `status ${expiredPalette.status}`);
 
@@ -261,6 +261,20 @@ ok('feed com autor e contagem', feed.data.posts.every((post) => post.user && typ
 
 const explore = await api('/api/explore');
 ok('descobrir carregado', explore.status === 200 && explore.data.posts.length >= 9);
+const explorePeople = explore.data.people || [];
+const explorePeopleOrdered = explorePeople.every(
+  (person, index) =>
+    index === 0 ||
+    explorePeople[index - 1].followers > person.followers ||
+    (explorePeople[index - 1].followers === person.followers && explorePeople[index - 1].id < person.id),
+);
+ok(
+  'pessoas do explorar ordenadas por seguidores',
+  explorePeople.length >= 1 &&
+    explorePeople.every((person) => Number.isInteger(person.followers) && person.followers >= 0) &&
+    explorePeopleOrdered,
+  explorePeople.map((person) => `${person.name}:${person.followers}`).join(', '),
+);
 
 const stories = await api('/api/stories');
 ok('stories carregados', stories.status === 200 && stories.data.groups.length >= 3);
@@ -280,6 +294,17 @@ await api('/api/users/ana.souza/follow', { method: 'POST' });
 
 const postId = feed.data.posts.find((post) => post.user.id !== 1)?.id || feed.data.posts[0].id;
 const postBefore = await api(`/api/posts/${postId}`);
+const shareBefore = postBefore.data.post.shares ?? 0;
+const firstShare = await api(`/api/posts/${postId}/share`, { method: 'POST' });
+const repeatedShare = await api(`/api/posts/${postId}/share`, { method: 'POST' });
+ok(
+  'compartilhamento único por usuário',
+  firstShare.status === 200 &&
+    repeatedShare.status === 200 &&
+    repeatedShare.data.shares === firstShare.data.shares &&
+    firstShare.data.shares >= shareBefore,
+  `${shareBefore} → ${firstShare.data?.shares}`,
+);
 const like = await api(`/api/posts/${postId}/like`, { method: 'POST' });
 ok('curtir publicação', like.status === 200 && like.data.liked !== postBefore.data.post.liked);
 

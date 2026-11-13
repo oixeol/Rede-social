@@ -1,0 +1,73 @@
+services:
+  # Frontend - Next.js (Static Site ou Web Service)
+  - type: web
+    name: orbit-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    buildContext: ./frontend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VIBRA_API_ORIGIN
+        fromService:
+          name: orbit-api
+          type: web
+          property: hostport
+    # Render injeta PORT automaticamente
+    healthCheckPath: /
+
+  # Backend API - Node.js (Web Service)
+  - type: web
+    name: orbit-api
+    runtime: docker
+    dockerfilePath: ./backend/node-api/Dockerfile
+    buildContext: ./backend/node-api
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "4173"
+      # Banco de dados (Supabase/PostgreSQL)
+      - key: DATABASE_URL
+        sync: false
+      # Sessões / Cookies
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: SESSION_TTL
+        value: "2592000000"  # 30 dias em ms
+      # Webhook de identidade (se usar)
+      - key: IDENTITY_PROVIDER
+        value: "webhook"
+      - key: IDENTITY_WEBHOOK_SECRET
+        generateValue: true
+      # Admin
+      - key: ADMIN_TOKEN
+        generateValue: true
+      # CORS / Origem do frontend
+      - key: ALLOWED_ORIGINS
+        fromService:
+          name: orbit-frontend
+          type: web
+          property: host
+    healthCheckPath: /api/me
+    # Scaling
+    numInstances: 1
+
+  # Opcional: Python FastAPI (se necessário)
+  # - type: web
+  #   name: orbit-python-api
+  #   runtime: docker
+  #   dockerfilePath: ./backend/Dockerfile
+  #   buildContext: ./backend
+  #   envVars:
+  #     - key: PORT
+  #       value: "8000"
+
+databases:
+  # Se quiser PostgreSQL gerenciado no Render (alternativa ao Supabase)
+  # - name: orbit-db
+  #   databaseName: orbit
+  #   user: orbit
+  #   plan: free

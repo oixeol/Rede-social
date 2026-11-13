@@ -184,7 +184,7 @@ export function getMe(): Promise<MeResponse> {
 }
 
 /** GET /api/feed */
-export function getFeed(options: { limit?: number; before?: number } = {}): Promise<FeedResponse> {
+export function getFeed(options: { limit?: number; before?: number; mediaType?: 'video' | 'image' | 'image,video' } = {}): Promise<FeedResponse> {
   const query = new URLSearchParams();
 
   if (options.limit !== undefined) {
@@ -195,19 +195,24 @@ export function getFeed(options: { limit?: number; before?: number } = {}): Prom
     query.set('before', String(options.before));
   }
 
+  if (options.mediaType !== undefined) {
+    query.set('mediaType', options.mediaType);
+  }
+
   const queryString = query.toString();
   const suffix = queryString.length > 0 ? `?${queryString}` : '';
   return serverApiRequest<FeedResponse>(`/api/feed${suffix}`);
 }
 
 /** GET /api/explore */
-export function getExplore(options: { limit?: number; before?: number; topic?: string; q?: string } = {}): Promise<ExploreResponse> {
+export function getExplore(options: { limit?: number; before?: number; topic?: string; q?: string; mediaType?: 'video' | 'image' | 'image,video' } = {}): Promise<ExploreResponse> {
   const query = new URLSearchParams();
 
   if (options.limit !== undefined) query.set('limit', String(options.limit));
   if (options.before !== undefined) query.set('before', String(options.before));
   if (options.topic) query.set('topic', options.topic);
   if (options.q) query.set('q', options.q);
+  if (options.mediaType) query.set('mediaType', options.mediaType);
 
   const queryString = query.toString();
   return serverApiRequest<ExploreResponse>(`/api/explore${queryString ? `?${queryString}` : ''}`);

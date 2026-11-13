@@ -62,11 +62,12 @@ export function Composer({ user }: ComposerProps) {
     event.preventDefault();
     if (submitting) return;
 
-    const caption = text.trim();
-    if (!caption && !media) {
-      setError('Escreva algo ou adicione uma mídia antes de publicar.');
+    if (!media) {
+      setError('Adicione uma foto ou vídeo antes de publicar.');
       return;
     }
+
+    const caption = text.trim();
 
     setSubmitting(true);
     setError(null);
@@ -141,7 +142,7 @@ export function Composer({ user }: ComposerProps) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  const canSubmit = Boolean(text.trim() || media) && !submitting;
+  const canSubmit = Boolean(media) && !submitting;
 
   return (
     <div
@@ -178,7 +179,7 @@ export function Composer({ user }: ComposerProps) {
                     muted
                     playsInline
                     controls
-                    className="max-h-[420px] w-full bg-black object-contain"
+                    className="max-h-[420px] w-full bg-background object-contain"
                   >
                     <track kind="captions" />
                   </video>

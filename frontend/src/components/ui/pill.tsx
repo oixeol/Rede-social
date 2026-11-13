@@ -13,7 +13,7 @@ const toneClasses: Record<PillTone, string> = {
   neutral: 'border border-border bg-surface-subtle text-muted',
   brand: 'border border-brand/15 bg-brand-soft text-brand',
   accent: 'border border-accent/20 bg-accent-soft text-foreground',
-  dark: 'border border-white/10 bg-navy text-on-dark',
+  dark: 'border border-border bg-surface-raised text-foreground',
 };
 
 export function Pill({ children, tone = 'neutral', className, ...props }: PillProps) {

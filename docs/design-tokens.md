@@ -1,215 +1,170 @@
-# Design Tokens – Vibra (Etapa 3)
+# Design Tokens — Vibra
 
-> **Nota**: A **Etapa 2** exibia uma página de preview de fundação ("Etapa 2 · Base visual pronta") com tokens/tipografia/componentes na rota `/`. Esta foi **removida** e substituída pela **Landing Page (Etapa 3)** em `frontend/src/components/landing/landing-page.tsx`. A rota `/` agora renderiza a landing; o CTA "Entrar" leva a `/entrar` (login) e, após autenticar, ao app em `/inicio`.
+Tokens compartilhados pelo frontend React/Next.js. Fonte: `frontend/src/app/globals.css`.
 
-## Referências visuais
-- **Perfil**: `docs/reference/perfil.png` — captura 1536 × 1024 (aguarda materialização dos bytes do anexo).
-- **Início**: `docs/reference/inicio.png` — captura 1586 × 992 (aguarda materialização dos bytes do anexo).
+## Paleta
 
-> **Nota**: os anexos foram exibidos no contexto da conversa, mas ainda não persistem no repositório. Os bytes PNG ainda não estão disponíveis em `docs/reference/`; este documento registra os valores extraídos visualmente, e a comparação pixel a pixel será feita quando os arquivos estiverem materializados.
+Interface restrita a **laranja, preto, branco e cinza-escuro**. Cores semânticas de status permanecem específicas para indicação funcional.
 
----
+| Papel | Token | Modo escuro | Modo claro |
+| --- | --- | --- | --- |
+| Fundo | `--vibra-background` | `#050505` | `#FAFAFA` |
+| Fundo secundário | `--vibra-background-secondary` | `#0B0B0B` | `#F4F4F5` |
+| Superfície | `--vibra-surface` | `#101010` | `#FFFFFF` |
+| Superfície elevada | `--vibra-surface-raised` | `#101010` | `#FFFFFF` |
+| Superfície sutil | `--vibra-surface-subtle` | `#181818` | `#F4F4F5` |
+| Texto principal | `--vibra-foreground` | `#FFFFFF` | `#111111` |
+| Texto secundário | `--vibra-muted` | `#A1A1AA` | `#52525B` |
+| Texto discreto | `--vibra-subtle` | `#71717A` | `#71717A` |
+| Borda | `--vibra-border` | `#242424` | `#E4E4E7` |
+| Borda forte | `--vibra-border-strong` | `#3F3F46` | `#D4D4D8` |
 
-## Status das capturas (Etapa 3)
+### Laranja
 
-### Capturas geradas (próprias)
-| Página | Resolução | Arquivo | Página (scroll) | Observações |
-|--------|-----------|---------|-----------------|-------------|
-| Início | 1536 × 1024 | `backend/node-api/qa/inicio-1536x1024-final.png` | 9693 px | Visualmente correta; sidebar expandida, topbar completa, composer, feed com tabs "Para você"/"Seguindo", rail com "Quem seguir" e "Assuntos em alta". |
-| Início | 1586 × 992  | `backend/node-api/qa/inicio-1586x992-final.png`  | 9693 px | Visualmente correta; mesma estrutura. |
-| Perfil | 1536 × 1024 | `backend/node-api/qa/perfil-1536x1024-final.png` | 1091 px | Visualmente correta; banner, avatar com anel, ações, stats, 4 tabs (Publicações/Reels/Fotos/Destaques), grid 2 colunas, "Sobre mim", "Destaques", "Sugestões". |
-| Perfil | 1586 × 992  | `backend/node-api/qa/perfil-1586x992-final.png`  | 1091 px | Visualmente correta; mesma estrutura. |
-| Início (mobile) | 390 × 844 | `backend/node-api/qa/inicio-390x844-twmerge.png` | 2121 px | Bottom nav visível, sidebar oculta, "Publicar" oculto (corrigido via `tailwind-merge`), busca por ícone. |
-| Perfil (mobile) | 390 × 844 | `backend/node-api/qa/perfil-390x844.png` | 993 px | Bottom nav visível, sem "Publicar". |
+| Token | Valor |
+| --- | --- |
+| `--vibra-brand` | `#FF6A00` |
+| `--vibra-brand-hover` | `#FF8C00` |
+| `--vibra-brand-fill` | `#FF6A00` |
+| `--vibra-brand-fill-hover` | `#FF4500` |
+| `--vibra-brand-soft` | `#3A1600` |
+| `--vibra-on-brand` | `#0A0A0A` |
+| `--vibra-accent` | `#FF8C00` |
+| `--vibra-accent-soft` | `#3A1600` |
+| `--vibra-premium-from` / `--vibra-premium-to` | `#FF8C00` / `#FF4500` |
+| `--vibra-wave-from` / `--vibra-wave-to` | `#FF6A00` / `#FF8C00` |
 
-### Comparação com referências
-- **Impossível** até que `docs/reference/perfil.png` e `docs/reference/inicio.png` sejam materializados no disco (bytes ausentes).
-- Quando materializados, rodar comparação pixel a pixel (ex.: `pixelmatch` ou `resemble.js`) e registrar diferenças honestas aqui.
+### Status e superfícies auxiliares
 
----
+| Token | Função |
+| --- | --- |
+| `--vibra-success` | Indicador online e feedback positivo |
+| `--vibra-danger` | Exclusão e notificação de erro |
+| `--vibra-danger-soft` | Fundo de alertas destrutivos |
+| `--vibra-follow-bg` / `--vibra-follow-text` | Botão "Seguir" da referência |
+| `--vibra-nav-active-bg` | Fundo do item de navegação ativo |
+| `--vibra-nav-active-border` | Borda do item de navegação ativo |
+| `--vibra-nav-active-text` | Texto do item de navegação ativo |
 
-## Tipografia
-| Papel          | Fonte            | Via `next/font` | Fallback                          |
-|----------------|------------------|-----------------|-----------------------------------|
-| Interface (UI) | **Inter**        | `localFont`     | `system-ui`, `sans-serif`         |
-| Títulos/Marca  | **Lora**         | `localFont`     | `Georgia`, `serif`                |
-
-Arquivos WOFF2 copiados para `frontend/src/assets/fonts/`.
-Variáveis CSS: `--font-inter`, `--font-lora`.
-Em `globals.css` o `@theme inline` mapeia:
-- `--font-sans: var(--font-inter);`
-- `--font-display: var(--font-lora);`
-
----
-
-## Cores (modo claro)
-
-Tokens CSS expostos no `:root` (valor hex + classe Tailwind gerada via `@theme inline`):
-
-| Token (CSS)                | Valor hex  | Tailwind (`bg-…`, `text-…`, `border-…`) |
-|----------------------------|-----------|------------------------------------------|
-| `--vibra-background`       | `#fffaf2` | `bg-background`                          |
-| `--vibra-surface`          | `#fffdf8` | `bg-surface`                             |
-| `--vibra-surface-raised`   | `#ffffff` | `bg-surface-raised`                      |
-| `--vibra-surface-subtle`   | `#f5ede3` | `bg-surface-subtle`                      |
-| `--vibra-foreground`       | `#111111` | `text-foreground`                        |
-| `--vibra-muted`            | `#625b54` | `text-muted`                             |
-| `--vibra-subtle`           | `#6b645d` | `text-subtle`                            |
-| `--vibra-border`           | `#eadfd2` | `border-border`                          |
-| `--vibra-border-strong`    | `#d7c8b7` | `border-border-strong`                   |
-| `--vibra-brand`            | `#a83f00` | `bg-brand`, `text-brand`, `border-brand` |
-| `--vibra-brand-hover`      | `#8f3500` | `hover:bg-brand-hover`                   |
-| `--vibra-brand-fill`       | `#f97316` | `bg-brand-fill`                          |
-| `--vibra-brand-fill-hover` | `#ea580c` | `hover:bg-brand-fill-hover`              |
-| `--vibra-brand-soft`       | `#ffead4` | `bg-brand-soft`                          |
-| `--vibra-on-brand`         | `#111111` | `text-on-brand`                          |
-| `--vibra-accent`           | `#8a3d00` | `bg-accent`, `text-accent`               |
-| `--vibra-accent-soft`      | `#ffefdc` | `bg-accent-soft`                         |
-| `--vibra-navy`             | `#000000` | `bg-navy`, `text-navy`                   |
-| `--vibra-gold`             | `#b45309` | `bg-gold`, `text-gold`                   |
-| `--vibra-lilac`            | `#9a3412` | `bg-lilac`, `text-lilac`                 |
-| `--vibra-success`          | `#176b4c` | `bg-success`, `text-success`             |
-| `--vibra-danger`           | `#b42318` | `bg-danger`, `text-danger`               |
-| `--vibra-danger-soft`      | `#fee4e2` | `bg-danger-soft`                         |
-
-### Modo escuro (`[data-theme="dark"]`)
-
-O tema claro é o padrão de `:root` (`color-scheme: light`); o tema escuro é ativado por `[data-theme="dark"]` (`color-scheme: dark`). A preferência é aplicada ao `<html>` pelo tema da aplicação e respeita `prefers-reduced-motion`.
-
-| Token (CSS)                | Valor hex  |
-|----------------------------|-----------|
-| `--vibra-background`       | `#080808` |
-| `--vibra-surface`          | `#111111` |
-| `--vibra-surface-raised`   | `#171717` |
-| `--vibra-surface-subtle`   | `#202020` |
-| `--vibra-foreground`       | `#f7f5f2` |
-| `--vibra-muted`            | `#bdb8b0` |
-| `--vibra-subtle`           | `#a59f97` |
-| `--vibra-border`           | `#2c2c2c` |
-| `--vibra-border-strong`    | `#3d3d3d` |
-| `--vibra-brand`            | `#ff8a1f` |
-| `--vibra-brand-hover`      | `#ffa04a` |
-| `--vibra-brand-fill`       | `#f97316` |
-| `--vibra-brand-fill-hover` | `#fb923c` |
-| `--vibra-brand-soft`       | `#3a1e08` |
-| `--vibra-on-brand`         | `#111111` |
-| `--vibra-accent`           | `#ffb15c` |
-| `--vibra-accent-soft`      | `#35230f` |
-| `--vibra-navy`             | `#000000` |
-| `--vibra-gold`             | `#f59e0b` |
-| `--vibra-lilac`            | `#c2410c` |
-| `--vibra-success`          | `#55c79a` |
-| `--vibra-danger`           | `#f97066` |
-| `--vibra-danger-soft`      | `#411916` |
-
----
+Variáveis Tailwind são expostas em `@theme inline`. Exemplos: `bg-background`, `bg-background-secondary`, `bg-surface`, `text-foreground`, `text-muted`, `border-border`, `bg-brand-fill`, `text-on-brand`, `bg-success` e `bg-danger`.
 
 ## Paletas de assinatura
 
-O backend limita `theme_palette` à lista allow-list **orange, blue, green, purple** e restaura `orange` quando a assinatura expira ou quando um valor inválido é recebido. Esses seletores são a única fonte de verdade para a personalização; alterações/manipulação no DOM não ampliam o entitlement, que continua sendo validado no servidor.
+Backend limita `theme_palette` à allow-list **`orange`, `black`, `white`**. Valor padrão: `orange`. Assinatura expirada ou valor inválido volta ao padrão.
 
-### Paleta **orange** (padrão)
-São os valores do `:root` / `[data-theme="dark"]` listados acima.
+### `orange` — padrão
 
-### Paleta **blue**
-| Modo      | `--vibra-brand` | `--vibra-brand-hover` | `--vibra-brand-fill` | `--vibra-brand-fill-hover` | `--vibra-brand-soft` | `--vibra-on-brand` | `--vibra-accent` | `--vibra-accent-soft` | `--vibra-gold` | `--vibra-lilac` |
-|-----------|----------------|----------------------|----------------------|----------------------------|----------------------|-------------------|------------------|----------------------|---------------|----------------|
-| Claro     | `#1d4ed8`      | `#1e40af`            | `#2563eb`            | `#1d4ed8`                  | `#dbeafe`            | `#ffffff`         | `#1e3a8a`        | `#e0e7ff`            | `#a16207`     | `#6d28d9`      |
-| Escuro    | `#93c5fd`      | `#bfdbfe`            | `#3b82f6`            | `#60a5fa`                  | `#172554`            | `#ffffff`         | `#bfdbfe`        | `#172554`            | `#fbbf24`     | `#c084fc`      |
+Usa tokens laranja da tabela principal.
 
-### Paleta **green**
-| Modo      | `--vibra-brand` | `--vibra-brand-hover` | `--vibra-brand-fill` | `--vibra-brand-fill-hover` | `--vibra-brand-soft` | `--vibra-on-brand` | `--vibra-accent` | `--vibra-accent-soft` | `--vibra-gold` | `--vibra-lilac` |
-|-----------|----------------|----------------------|----------------------|----------------------------|----------------------|-------------------|------------------|----------------------|---------------|----------------|
-| Claro     | `#166534`      | `#14532d`            | `#16a34a`            | `#15803d`                  | `#dcfce7`            | `#ffffff`         | `#14532d`        | `#dcfce7`            | `#a16207`     | `#7e22ce`      |
-| Escuro    | `#86efac`      | `#bbf7d0`            | `#22c55e`            | `#4ade80`                  | `#052e16`            | `#052e16`         | `#bbf7d0`        | `#052e16`            | `#fbbf24`     | `#c084fc`      |
+### `black`
 
-### Paleta **purple**
-| Modo      | `--vibra-brand` | `--vibra-brand-hover` | `--vibra-brand-fill` | `--vibra-brand-fill-hover` | `--vibra-brand-soft` | `--vibra-on-brand` | `--vibra-accent` | `--vibra-accent-soft` | `--vibra-gold` | `--vibra-lilac` |
-|-----------|----------------|----------------------|----------------------|----------------------------|----------------------|-------------------|------------------|----------------------|---------------|----------------|
-| Claro     | `#6b21a8`      | `#581c87`            | `#9333ea`            | `#7e22ce`                  | `#f3e8ff`            | `#ffffff`         | `#581c87`        | `#f3e8ff`            | `#a16207`     | `#7e22ce`      |
-| Escuro    | `#d8b4fe`      | `#e9d5ff`            | `#a855f7`            | `#9333ea`                  | `#2e1065`            | `#ffffff`         | `#e9d5ff`        | `#2e1065`            | `#fbbf24`     | `#c084fc`      |
+| Token | Modo escuro | Modo claro |
+| --- | --- | --- |
+| `--vibra-brand` | `#F5F5F5` | `#111111` |
+| `--vibra-brand-hover` | `#FFFFFF` | `#242424` |
+| `--vibra-brand-fill` | `#101010` | `#111111` |
+| `--vibra-brand-fill-hover` | `#242424` | `#242424` |
+| `--vibra-brand-soft` | `#242424` | `#E4E4E7` |
+| `--vibra-on-brand` | `#FFFFFF` | `#FFFFFF` |
+| `--vibra-accent` | `#FFFFFF` | `#111111` |
+| `--vibra-accent-soft` | `#242424` | `#E4E4E7` |
 
----
+### `white`
+
+| Token | Modo escuro | Modo claro |
+| --- | --- | --- |
+| `--vibra-brand` | `#FFFFFF` | `#52525B` |
+| `--vibra-brand-hover` | `#E4E4E7` | `#242424` |
+| `--vibra-brand-fill` | `#FFFFFF` | `#FFFFFF` |
+| `--vibra-brand-fill-hover` | `#E4E4E7` | `#E4E4E7` |
+| `--vibra-brand-soft` | `#242424` | `#E4E4E7` |
+| `--vibra-on-brand` | `#111111` | `#111111` |
+| `--vibra-accent` | `#FFFFFF` | `#52525B` |
+| `--vibra-accent-soft` | `#242424` | `#E4E4E7` |
+
+Seletores ficam em `frontend/src/app/globals.css`. Frontend aplica valor via `data-palette`; manipulação do DOM não amplia entitlement, validado no backend.
+
+## Tema claro/escuro
+
+- `data-theme="dark"` é padrão.
+- `data-theme="light"` ativa superfícies brancas e texto preto.
+- `frontend/public/theme-init.js` restaura preferência `vibra-theme` sem depender de JavaScript no React.
+- Toggle fica no topbar: sol no modo escuro, lua no modo claro.
+
+## Tipografia
+
+| Papel | Fonte | Via `next/font` | Fallback |
+| --- | --- | --- | --- |
+| Interface | **Inter** | `localFont` | `system-ui`, `sans-serif` |
+| Títulos/marca | **Lora** | `localFont` | `Georgia`, `serif` |
+
+Variáveis CSS: `--font-inter`, `--font-lora`. `@theme inline` mapeia `--font-sans` e `--font-display`.
 
 ## Raio
-| Token         | Valor        | Classe Tailwind |
-|---------------|--------------|-----------------|
-| `--radius-pill`  | `999px`       | `rounded-pill`   |
-| `--radius-card`  | `1.25rem`     | `rounded-card`   |
-| `--radius-panel` | `1.5rem`      | `rounded-panel`  |
 
----
+| Token | Valor | Classe Tailwind |
+| --- | --- | --- |
+| `--radius-pill` | `999px` | `rounded-pill` |
+| `--radius-card` | `1rem` | `rounded-card` |
+| `--radius-panel` | `1.25rem` | `rounded-panel` |
 
 ## Sombras
-| Token          | Valor CSS                                                    |
-|----------------|--------------------------------------------------------------|
-| `--shadow-card` | `0 14px 34px rgb(0 0 0 / 0.08)`                             |
-| `--shadow-float`| `0 18px 50px rgb(0 0 0 / 0.16)`                             |
 
----
+| Token | Valor |
+| --- | --- |
+| `--shadow-card` | `0 14px 34px rgb(0 0 0 / 0.08)` |
+| `--shadow-float` | `0 18px 50px rgb(0 0 0 / 0.16)` |
+| `--shadow-brand` | `0 10px 30px rgb(255 106 0 / 0.22)` |
 
 ## Movimento
-- `html { scroll-behavior: smooth; }` (preferência nativa).
-- Skip link `.skip-link` com `transition: transform 160ms ease;`.
-- Skeleton usa `animate-pulse` (Tailwind). Em `prefers-reduced-motion: reduce` todas as animações/transições são desativadas (`duration: 0.01ms`, `iteration-count: 1`).
-- `html` em modo reduzido passa a `scroll-behavior: auto`.
 
----
+- `html { scroll-behavior: smooth; }`.
+- Skip link `.skip-link` usa `transition: transform 160ms ease`.
+- Skeleton usa `animate-pulse`.
+- `prefers-reduced-motion: reduce` reduz animações e transições para `0.01ms`.
 
 ## Acessibilidade
-- **Contraste**: Alvo WCAG AA (4.5:1) para texto normal. Pares verificados:
-  - Claro: foreground/background 18.2:1, muted 6.4:1, subtle 5.6:1, on-brand/brand-fill 6.7:1, blue on-brand/fill 5.2:1, purple on-brand/fill 5.4:1.
-  - **Atenção**: green on-brand/fill 3.3:1 e dark blue on-brand/fill 3.7:1, dark purple on-brand/fill 4.0:1 **não atingem** 4.5:1. Esses pares são usados em botões primários; considerar ajustes futuros.
-  - Escuro: foreground/background 18.4:1, muted 10.2:1, on-brand/brand-fill 6.7:1, green on-brand/fill 6.5:1.
-- `:focus-visible` anel de 3 px `color-mix(in srgb, var(--vibra-brand-fill) 68%, transparent)` com `outline-offset: 3px`.
-- `prefers-reduced-motion` desativa `scroll-behavior`, animações e transições (duração `0.01ms`, iteração `1`).
+
+- Anel `:focus-visible`: 3 px com `color-mix(in srgb, var(--vibra-brand-fill) 68%, transparent)` e `outline-offset: 3px`.
 - Utilitário `.sr-only` disponível.
-- Skip link fixo no topo (`skip-link`).
-- Todos os componentes expõem `aria-label`, `role` e `aria-*` apropriados.
-- Teclado: `Tab`, setas (menus/abas), `Home`/`End` (abas), `Escape` (fecha menus), `Enter`/`Space` (ação).
+- Skip link fixo no topo.
+- Controles só por ícone usam `aria-label`.
+- Estados de foco, hover, disabled e erro preservam contraste entre texto, superfície e accent.
 
----
+## Backend — regras de entitlement
 
-## Backend – Regras de Entitlement de Tema
-1. **Allow-list**: `orange`, `blue`, `green`, `purple`. Valor padrão: `orange`.
-2. **Assinaturas ativas**: status `active` ou `subscribed`. Se `subscription_ends_at` for `null`/`undefined` a assinatura não expira; caso contrário deve ser timestamp futuro.
-3. **canCustomizeTheme**: verdadeiro apenas quando o usuário tem assinatura ativa **e** não expirou.
-4. **themeStateFor(user)** retorna a paleta armazenada **somente** se `canCustomizeTheme === true` **e** a paleta estiver na allow-list; caso contrário devolve `orange`.
-5. **resetInvalidThemePalette(user)** é invocado em `/api/me` e em `PATCH /api/me/theme-palette`: se não houver entitlement ou a paleta persistida for inválida, o servidor força `orange` no banco.
-6. **Endpoint `PATCH /api/me/theme-palette`**: aceita apenas `{ palette: string }`; valida presença na allow-list; se usuário não tiver entitlement → 403; caso contrário persiste e retorna novo estado.
-7. Front-end aplica a paleta via `data-palette` no elemento raiz do `AppShell`; os seletores CSS em `globals.css` são a única manifestação visual. Manipulações no DOM não alteram a validação server-side.
+1. Allow-list: `orange`, `black`, `white`. Padrão: `orange`.
+2. Assinaturas ativas: status `active` ou `subscribed`.
+3. `canCustomizeTheme`: assinatura ativa e não expirada.
+4. `themeStateFor(user)` devolve paleta armazenada somente com entitlement válido e valor allow-listed.
+5. `resetInvalidThemePalette(user)` força `orange` quando entitlement termina ou valor persistido é inválido.
+6. `PATCH /api/me/theme-palette` aceita somente `{ palette: string }`; valor fora da allow-list retorna `400`; usuário sem entitlement recebe `403`.
 
----
+## Segurança
 
-## Segurança (checklist da etapa)
-- ✅ **Sem `dangerouslySetInnerHTML`** em nenhum componente.
-- ✅ **Imagens**: apenas caminhos relativos `/uploads/…` (validados em `Avatar`); nenhum `data:` ou URL externa não confiável.
-- ✅ **CSP**: headers CSP a serem configurados no `next.config.ts` na próxima etapa.
-- ✅ **Autenticação**: cookies `HttpOnly; SameSite=Lax` vindos do backend; frontend não toca em `localStorage` para tokens — apenas preferência de tema (`vibra-theme`).
-- ✅ **API**: `fetch` com `credentials: 'same-origin'`, `cache: 'no-store'`, validação de caminho `/api/*`.
-- ✅ **Evita envios duplicados**: botões desabilitam durante `pending` (a ser conectado na camada de ações).
+- Sem `dangerouslySetInnerHTML`.
+- Frontend não acessa chave secreta do Supabase.
+- Sessão usa cookie `HttpOnly; SameSite=Lax`; frontend não guarda token em `localStorage`.
+- API usa `fetch` com `credentials: 'same-origin'`, `cache: 'no-store'` e validação de caminho `/api/*`.
+- RLS e `users_public` ficam versionados em `supabase/migrations/`.
 
----
+## Layout do perfil
 
-## Validação final da Etapa 3
-| Check | Resultado |
-|-------|-----------|
-| `npm run frontend:lint` | 0 erros, 4 warnings (`@next/next/no-img-element` em avatares de usuário — aceitável) |
-| `npm run frontend:typecheck` | 0 erros |
-| `npm run frontend:build` | ✅ OK (Next.js 16.4.4) |
-| `npm test` (root) | ✅ TODOS OS TESTES PASSARAM (218 testes) |
-| `node --check backend/node-api/server.js` | ✅ OK |
-| `git diff --check` | ✅ Limpo |
-| Capturas desktop (1536×1024, 1586×992) | ✅ Geradas (`backend/node-api/qa/*-final.png`) |
-| Capturas mobile (390×844) | ✅ Geradas |
-| Bug SSR `window is not defined` | ✅ Corrigido (`getCanonicalUrl()` sob demanda) |
-| Bug hydration `nonce` | ✅ Corrigido (`headers().get('x-nonce')` no root layout) |
-| Bug `topics` undefined em `/explorar` | ✅ Corrigido (defaults defensivos + API atualizada) |
-| Bug mobile "Publicar" visível | ✅ Corrigido (`tailwind-merge` no `cn()` resolve `hidden sm:inline-flex` vs `inline-flex` base) |
+Tokens e medidas do shell responsivo:
 
----
+| Medida | Token / valor | Uso |
+| --- | --- | --- |
+| Sidebar desktop | `248px` | Fixa à esquerda em telas largas |
+| Coluna central | `872px` | Conteúdo principal do perfil |
+| Coluna direita | `354px` | Sobre, destaques e sugestões |
+| Gap entre colunas | `22px` | Grade do perfil |
+| Banner | `207px` desktop | Raio `22px` |
+| Avatar | `166px` desktop | Anel laranja `3px`, glow e ponto verde |
+| Abas | Pill natural | Ativa com fundo elevado e sublinhado laranja |
+| Grade | 2 colunas, proporção `2:1` | Gap `16px`; uma coluna no mobile |
 
-## Próximos passos
-1. Materializar `docs/reference/perfil.png` e `docs/reference/inicio.png` no disco.
-2. Rodar comparação pixel a pixel e registrar diferenças honestas neste documento.
-3. Aprovação da Etapa 3; **não** criar commit sem confirmação.
+Regras: coluna direita some abaixo de `1280px`; sidebar vira icon rail no tablet; mobile usa bottom nav e busca por ícone. Nenhuma área cria rolagem horizontal.
+
+## Referência visual
+
+Perfil principal usa dados reais de `/api/users/:username`. A comparação visual usa imagens materializadas em `docs/reference/`, captura em 1536 × 1024 e medidas acima. Dados e arte da referência não entram no produto.

@@ -1,29 +1,23 @@
-import type { Route } from 'next';
 import Link from 'next/link';
+import { Home, Compass, MessageSquare, Bell, Users, Settings, ChevronDown } from 'lucide-react';
 
-/**
- * Landing page do Vibra.
- *
- * Réplica em React da página de apresentação estática (`docs/landing/index.html`),
- * mantendo o visual escuro, o mock da interface e as mesmas seções.
- * A única saída é o CTA "Entrar", que leva ao login e daí para o app.
- */
+import { OrbitLogo } from '@/components/shell/orbit-logo';
 
 const NAV_LINKS = [
   { href: '#inicio', label: 'Início' },
   { href: '#comunidade', label: 'Comunidades' },
   { href: '#explorar', label: 'Explorar' },
-  { href: '#recursos', label: 'Recursos⌄' },
+  { href: '#recursos', label: 'Recursos' },
   { href: '#sobre', label: 'Sobre' },
 ] as const;
 
 const MOCK_NAV = [
-  { icon: '⌂', label: 'Início', active: true },
-  { icon: '⌕', label: 'Explorar', active: false },
-  { icon: '✉', label: 'Mensagens', active: false },
-  { icon: '♡', label: 'Conexões', active: false },
-  { icon: '▦', label: 'Comunidades', active: false },
-  { icon: '⚙', label: 'Ajustes', active: false },
+  { icon: Home, label: 'Início', active: true },
+  { icon: Compass, label: 'Explorar', active: false },
+  { icon: MessageSquare, label: 'Mensagens', active: false },
+  { icon: Bell, label: 'Conexões', active: false },
+  { icon: Users, label: 'Comunidades', active: false },
+  { icon: Settings, label: 'Ajustes', active: false },
 ] as const;
 
 const TRENDS = [
@@ -34,38 +28,29 @@ const TRENDS = [
 
 export function LandingPage() {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#090909] text-[#fffaf6]">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-[190px] top-[90px] size-[680px] rounded-full bg-[radial-gradient(circle,rgba(255,105,26,.22),rgba(255,105,26,.04)_48%,transparent_70%)] blur-[10px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(#ff9a60_1px,transparent_1px),radial-gradient(#ffffff_1px,transparent_1px)] bg-[length:83px_83px,137px_137px] bg-[position:0_0,37px_21px] opacity-20" />
-      </div>
+    <div className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
+      <header className="relative z-20 flex h-16 items-center justify-between border-b border-border px-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <Link href="/" aria-label="Orbit — página inicial" className="shrink-0">
+            <OrbitLogo size="lg" />
+          </Link>
 
-      <header className="relative z-20 flex h-[86px] items-center justify-between border-b border-white/6 px-[clamp(22px,5vw,82px)]">
-        <div className="flex items-center gap-[11px] text-[25px] font-extrabold tracking-[-1.2px]">
-          <span
-            aria-hidden="true"
-            className="grid size-[35px] place-items-center rounded-[12px] bg-[linear-gradient(145deg,#ff9a50,#f04a0a)] text-[21px] font-black text-[#1a0d07] shadow-[0_5px_22px_#ff681a55]"
-          >
-            v.
-          </span>
-          vibra
+          <nav className="hidden md:flex items-center gap-1" aria-label="Navegação principal">
+            {NAV_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-muted transition-colors hover:text-foreground px-3 py-2 rounded-md"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
         </div>
 
-        <nav aria-label="Navegação principal" className="hidden items-center gap-[clamp(15px,2.2vw,35px)] lg:flex">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="text-[13px] font-semibold text-[#e8ded8] transition-colors hover:text-[#ff8b4c]"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-
         <Link
-          href={'/entrar' as Route}
-          className="rounded-full bg-[#fff8f3] px-5 py-3 text-[13px] font-extrabold text-[#1a0d07] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-[#ff8a4b]"
+          href="/entrar"
+          className="btn btn-primary hidden sm:inline-flex h-10 px-4"
         >
           Entrar
         </Link>
@@ -73,157 +58,172 @@ export function LandingPage() {
 
       <main
         id="conteudo"
-        className="relative z-10 mx-auto grid min-h-[650px] max-w-[1320px] grid-cols-1 items-center gap-[25px] px-[5vw] pb-[100px] pt-[65px] lg:grid-cols-[.85fr_1.15fr]"
+        className="relative z-10 mx-auto grid min-h-[calc(100vh-4rem)] max-w-[1200px] grid-cols-1 items-center gap-12 px-4 sm:px-6 pb-20 pt-16 lg:grid-cols-[1.1fr_0.9fr]"
       >
-        <div className="max-w-[510px] pb-[15px]">
-          <p className="mb-6 inline-flex items-center gap-[9px] text-[11px] font-extrabold uppercase tracking-[2px] text-[#ff9864]">
-            <span aria-hidden="true" className="h-0.5 w-6 bg-[#ff6a1a]" />
+        <div className="max-w-xl">
+          <p className="mb-4 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-brand">
+            <span aria-hidden="true" className="h-0.5 w-5 bg-brand" />
             Sua conexão começa aqui
           </p>
 
-          <h1 className="mb-[25px] max-w-[570px] font-sans text-[clamp(48px,5.7vw,78px)] font-black uppercase leading-[.91] tracking-[-4px]">
+          <h1 className="mb-6 max-w-[540px] text-[clamp(40px,5vw,64px)] font-bold uppercase leading-[1.05] tracking-[-0.03em] text-foreground">
             Gente que
             <br />
             combina.
             <br />
-            <span className="text-[#ff742b]">Ideias que</span>
+            <span className="text-brand">Ideias que</span>
             <br />
             vibram.
           </h1>
 
-          <p className="mb-8 max-w-[440px] text-[16px] leading-[1.75] text-[#d2c5bd]">
+          <p className="mb-8 max-w-[420px] text-base leading-relaxed text-muted">
             Um espaço para compartilhar o que você pensa, descobrir novos interesses e encontrar pessoas
             que têm tudo a ver com você. Do seu jeito, no seu ritmo.
           </p>
 
-          <div className="flex flex-wrap gap-[13px]">
+          <div className="flex flex-wrap gap-3">
             <Link
-              href={'/entrar' as Route}
-              className="inline-flex items-center justify-center gap-[10px] rounded-[12px] bg-[linear-gradient(135deg,#ff9b59,#ff6418)] px-[22px] py-4 text-[14px] font-extrabold text-[#1a0b04] shadow-[0_12px_35px_#ff641833] transition-[transform,filter] hover:-translate-y-[3px] hover:brightness-110"
+              href="/entrar"
+              className="btn btn-primary h-11 px-6"
             >
-              Entrar no Vibra
+              Entrar no Orbit
             </Link>
             <a
               href="#comunidade"
-              className="inline-flex items-center justify-center gap-[10px] rounded-[12px] border border-white/20 bg-white/4 px-[22px] py-4 text-[14px] font-extrabold text-[#fff4ed] transition-[transform,filter] hover:-translate-y-[3px] hover:brightness-110"
+              className="btn btn-secondary h-11 px-6"
             >
-              Ver a comunidade ↗
+              Ver a comunidade
+              <ChevronDown className="size-4" aria-hidden="true" />
             </a>
           </div>
 
-          <p id="sobre" className="mt-[18px] text-[11px] text-[#887b73]">
+          <p id="sobre" className="mt-6 text-sm text-subtle">
             Conexões reais. Conversas sem roteiro. Um novo jeito de socializar.
           </p>
         </div>
 
         <div
           id="comunidade"
-          aria-label="Prévia ilustrativa da interface do Vibra"
-          className="relative flex min-h-[490px] items-center justify-center"
+          aria-label="Prévia ilustrativa da interface do Orbit"
+          className="relative flex min-h-[420px] items-center justify-center"
         >
-          <div aria-hidden="true" className="absolute size-[440px] rounded-full bg-[#f45c1740] blur-[75px]" />
+          <div className="relative w-full max-w-[640px]">
+            <div className="card overflow-hidden">
+              <div className="flex h-11 items-center gap-2 border-b border-border px-3 text-xs text-muted">
+                <span className="size-2 rounded-full bg-brand" />
+                <span className="size-2 rounded-full bg-muted/30" />
+                <span className="size-2 rounded-full bg-muted/30" />
+                <span className="ml-2">orbit.social / comunidade</span>
+              </div>
 
-          <div className="relative h-[280px] w-full max-w-[650px] rounded-[15px] border border-white/17 bg-[linear-gradient(145deg,#27211e,#100e0d_65%)] p-[9px] shadow-[0_35px_90px_#000a,0_0_0_8px_#ffffff08] sm:h-[370px] sm:rounded-[24px] sm:p-[15px] lg:h-[420px] lg:[transform:perspective(1100px)_rotateY(-8deg)_rotateX(3deg)]">
-            <div className="flex h-[30px] items-center gap-[6px] border-b border-white/10 px-2 pb-3 text-[10px] text-[#9e9189]">
-              <span className="size-[7px] rounded-full bg-[#ff7040]" />
-              <span className="size-[7px] rounded-full bg-[#e9a24e]" />
-              <span className="size-[7px] rounded-full bg-[#6e9a63]" />
-              <span className="ml-2">vibra.social / comunidade</span>
-            </div>
-
-            <div className="grid h-[calc(100%-30px)] grid-cols-[85px_1fr_0] gap-[6px] pt-3 sm:gap-3 lg:grid-cols-[145px_1fr_130px]">
-              <aside className="border-r border-white/7 px-1 py-[5px] sm:px-2">
-                <div className="mb-3 text-[12px] font-black sm:mb-5 sm:text-[16px]">
-                  vibra<span className="text-[#ff762d]">.</span>
-                </div>
-                {MOCK_NAV.map((item) => (
-                  <div
-                    key={item.label}
-                    className={`my-1 rounded-[7px] px-1 py-[7px] text-[7px] sm:px-2 sm:py-[9px] sm:text-[10px] ${
-                      item.active
-                        ? 'border border-[#ff6a1a35] bg-[#ff6a1a25] text-white'
-                        : 'text-[#b6aaa2]'
-                    }`}
-                  >
-                    <span aria-hidden="true">{item.icon}</span> &nbsp;{item.label}
+              <div className="grid h-[360px] grid-cols-[72px_1fr_0] gap-3 p-3 sm:grid-cols-[120px_1fr_100px]">
+                <aside className="border-r border-border px-1 py-2 sm:px-2">
+                  <div className="mb-3 text-sm font-bold sm:mb-4 sm:text-base">
+                    orbit<span className="text-brand">.</span>
                   </div>
-                ))}
-              </aside>
+                  {MOCK_NAV.map((item) => (
+                    <button
+                      key={item.label}
+                      type="button"
+                      className={`w-full flex items-center gap-2 rounded-md px-2 py-2 text-xs sm:px-3 sm:py-2 sm:text-sm transition-colors ${
+                        item.active
+                          ? 'bg-brand-soft text-foreground border border-brand/30'
+                          : 'text-muted hover:bg-surface-subtle hover:text-foreground'
+                      }`}
+                    >
+                      <item.icon className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </aside>
 
-              <section className="px-[5px] py-1">
-                <div className="mb-3 text-[12px] font-extrabold sm:mb-[14px] sm:text-[15px]">Seu universo</div>
-                <div className="mb-3 rounded-[10px] border border-white/9 bg-white/5 p-2 text-[8px] text-[#9c8e86] sm:mb-3 sm:p-3 sm:text-[10px]">
-                  O que está passando pela sua cabeça?
-                </div>
-
-                <article className="flex gap-[9px] border-b border-white/8 px-[3px] py-2 sm:py-3">
-                  <div className="size-[27px] shrink-0 rounded-full bg-[linear-gradient(140deg,#ff9b59,#79351e)]" />
-                  <div>
-                    <strong className="text-[10px]">marina.lima</strong>{' '}
-                    <small className="text-[8px] text-[#84776f]">· há 12 min</small>
-                    <p className="my-1.5 text-[7px] leading-[1.5] text-[#d2c5bd] sm:text-[9px]">
-                      Finalmente encontrei uma galera que curte os mesmos jogos que eu. ✨
-                    </p>
-                    <div className="text-[9px] text-[#ff9a62]">♡ 128 &nbsp;&nbsp; ◌ 24 comentários &nbsp;&nbsp; ↗</div>
+                <section className="px-2 py-1 overflow-y-auto">
+                  <div className="mb-3 text-sm font-bold sm:mb-4">Seu universo</div>
+                  <div className="mb-3 rounded-md border border-border bg-surface-subtle/50 p-2 text-xs text-muted sm:mb-3 sm:p-3 sm:text-sm">
+                    O que está passando pela sua cabeça?
                   </div>
-                </article>
 
-                <article className="flex gap-[9px] border-b border-white/8 px-[3px] py-2 sm:py-3">
-                  <div className="size-[27px] shrink-0 rounded-full bg-[linear-gradient(140deg,#f7b8a0,#7346a1)]" />
-                  <div>
-                    <strong className="text-[10px]">caio.dev</strong>{' '}
-                    <small className="text-[8px] text-[#84776f]">· há 35 min</small>
-                    <p className="my-1.5 text-[7px] leading-[1.5] text-[#d2c5bd] sm:text-[9px]">
-                      Qual foi a última música que ficou presa na sua cabeça?
-                    </p>
-                    <div className="mt-2 grid h-[52px] place-items-center rounded-[8px] bg-[linear-gradient(130deg,#442014,#ff742b_48%,#1d1110)] text-[25px] text-white sm:h-[90px]">
-                      ♫
+                  <article className="flex gap-3 border-b border-border px-1 py-3 sm:py-4">
+                    <div className="size-10 shrink-0 rounded-full bg-brand-soft" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <strong className="truncate text-sm text-foreground">marina.lima</strong>
+                        <span className="shrink-0 text-xs text-subtle">· 12 min</span>
+                      </div>
+                      <p className="mt-1 text-sm leading-relaxed text-foreground">
+                        Finalmente encontrei uma galera que curte os mesmos jogos que eu.
+                      </p>
+                      <div className="mt-2 flex items-center gap-4 text-xs text-muted">
+                        <span>♡ 128</span>
+                        <span>◌ 24 comentários</span>
+                        <span>↗</span>
+                      </div>
                     </div>
-                    <div className="mt-[7px] text-[9px] text-[#ff9a62]">♡ 86 &nbsp;&nbsp; ◌ 19 comentários &nbsp;&nbsp; ↗</div>
-                  </div>
-                </article>
-              </section>
+                  </article>
 
-              <aside id="explorar" className="hidden border-l border-white/7 py-1.5 pl-2.5 lg:block">
-                {TRENDS.map((trend) => (
-                  <div key={trend.label} className="mb-[14px] text-[9px] text-[#8d8179]">
-                    {trend.label}
-                    <b className="mt-1 block text-[10px] text-[#eee2db]">{trend.value}</b>
-                  </div>
-                ))}
-              </aside>
+                  <article className="flex gap-3 border-b border-border px-1 py-3 sm:py-4">
+                    <div className="size-10 shrink-0 rounded-full bg-muted/10" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <strong className="truncate text-sm text-foreground">caio.dev</strong>
+                        <span className="shrink-0 text-xs text-subtle">· 35 min</span>
+                      </div>
+                      <p className="mt-1 text-sm leading-relaxed text-foreground">
+                        Qual foi a última música que ficou presa na sua cabeça?
+                      </p>
+                      <div className="mt-2 flex h-24 min-w-[120px] items-center justify-center gap-4 rounded-lg bg-surface-subtle border border-border text-lg text-muted sm:h-32">
+                        <span aria-hidden="true">♪</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-4 text-xs text-muted">
+                        <span>♡ 86</span>
+                        <span>◌ 19 comentários</span>
+                        <span>↗</span>
+                      </div>
+                    </div>
+                  </article>
+                </section>
+
+                <aside className="hidden border-l border-border py-2 pl-3 lg:block">
+                  {TRENDS.map((trend) => (
+                    <div key={trend.label} className="mb-4 text-xs text-subtle">
+                      {trend.label}
+                      <span className="mt-1 block text-sm text-foreground">{trend.value}</span>
+                    </div>
+                  ))}
+                </aside>
+              </div>
             </div>
-          </div>
 
-          <div className="absolute right-[-3px] top-3 z-20 rounded-[14px] border border-white/15 bg-[#211a17ed] px-[10px] py-[9px] shadow-[0_15px_35px_#0008] backdrop-blur-[12px] sm:right-[-5px] sm:top-[50px] sm:px-4 sm:py-[13px]">
-            <strong className="block text-[10px] sm:text-[12px]">
-              <span className="mr-1.5 text-[19px] text-[#ff8b4b]">✦</span>
-              Novas conexões
-            </strong>
-            <span className="text-[10px] text-[#b5a69d]">Pessoas com seus interesses</span>
-          </div>
+            <div className="absolute -right-2 top-4 z-10 card px-3 py-2.5 shadow-popover sm:-right-4 sm:top-10 sm:px-4 sm:py-3 lg:-right-6">
+              <strong className="flex items-center gap-1.5 text-sm sm:text-base">
+                <span className="size-5 text-brand" aria-hidden="true">●</span>
+                Novas conexões
+              </strong>
+              <p className="text-xs text-muted">Pessoas com seus interesses</p>
+            </div>
 
-          <div className="absolute bottom-2 left-[-2px] z-20 rounded-[14px] border border-white/15 bg-[#211a17ed] px-[10px] py-[9px] shadow-[0_15px_35px_#0008] backdrop-blur-[12px] sm:bottom-[35px] sm:left-[-5px] sm:px-4 sm:py-[13px]">
-            <strong className="block text-[10px] sm:text-[12px]">+ 2,4 mil</strong>
-            <span className="text-[10px] text-[#b5a69d]">conversas acontecendo agora</span>
+            <div className="absolute -left-2 bottom-4 z-10 card px-3 py-2.5 shadow-popover sm:-left-4 sm:bottom-8 sm:px-4 sm:py-3 lg:-left-6">
+              <strong className="text-sm sm:text-base">+ 2,4 mil</strong>
+              <p className="text-xs text-muted">conversas acontecendo agora</p>
+            </div>
           </div>
         </div>
       </main>
 
       <section
         id="recursos"
-        className="relative z-10 mx-auto -mt-5 flex max-w-[1050px] flex-wrap justify-center gap-[45px] px-[25px] pb-10 text-[12px] text-[#a99a91] max-sm:justify-start max-sm:gap-[25px]"
+        className="relative z-10 mx-auto -mt-10 flex max-w-[1000px] flex-wrap justify-center gap-10 px-4 pb-16 text-sm text-muted sm:justify-start sm:gap-6"
       >
-        <div>
-          <b className="mb-[3px] block text-[17px] text-[#fff0e8]">Seu espaço</b>
+        <div className="min-w-[200px]">
+          <strong className="mb-1 block text-lg text-foreground">Seu espaço</strong>
           Perfil com a sua identidade
         </div>
-        <div>
-          <b className="mb-[3px] block text-[17px] text-[#fff0e8]">Seus interesses</b>
+        <div className="min-w-[200px]">
+          <strong className="mb-1 block text-lg text-foreground">Seus interesses</strong>
           Descubra novas comunidades
         </div>
-        <div>
-          <b className="mb-[3px] block text-[17px] text-[#fff0e8]">Suas conexões</b>
+        <div className="min-w-[200px]">
+          <strong className="mb-1 block text-lg text-foreground">Suas conexões</strong>
           Converse com quem combina
         </div>
       </section>

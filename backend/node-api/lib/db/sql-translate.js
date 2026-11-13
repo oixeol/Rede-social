@@ -25,14 +25,20 @@ const TABLES_WITHOUT_ID = new Set([
   'story_views',
   'story_reactions',
   'shares',
+  'reposts',
+  'saved_posts',
   'blocks',
   'conversation_members',
   'location_consents',
   'radar_alerts',
   'dating_profiles',
+  'dating_likes',
   'location_snapshots',
   'radar_prefs',
   'compatibility_answers',
+  'community_members',
+  'chat_space_members',
+  'chat_channel_members',
 ]);
 
 /**

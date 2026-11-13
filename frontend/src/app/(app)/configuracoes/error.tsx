@@ -15,7 +15,7 @@ export default function ConfiguracoesError({ error, retry }: ConfiguracoesErrorP
   }, [error]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-5xl">
       <ErrorState
         title="Não foi possível carregar as configurações"
         description="Tente novamente. Se o problema continuar, aguarde alguns instantes."

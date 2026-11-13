@@ -29,6 +29,12 @@ export interface DropdownMenuProps {
   trigger?: ReactNode;
   align?: 'start' | 'end';
   className?: string;
+  /** Classes extras aplicadas ao painel flutuante do menu. */
+  menuClassName?: string;
+  /** Classes extras aplicadas ao botão gatilho. */
+  triggerClassName?: string;
+  /** Desabilita o menu completamente. */
+  disabled?: boolean;
   /** Executado quando o menu é aberto; útil para carregar dados sob demanda. */
   onOpen?: () => void;
 }
@@ -39,6 +45,9 @@ export function DropdownMenu({
   trigger,
   align = 'end',
   className,
+  menuClassName,
+  triggerClassName,
+  disabled = false,
   onOpen,
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
@@ -101,12 +110,14 @@ export function DropdownMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => {
+          if (disabled) return;
           setOpen((value) => {
             if (!value) onOpen?.();
             return !value;
           });
         }}
         onKeyDown={(event) => {
+          if (disabled) return;
           if (event.key === 'ArrowDown') {
             event.preventDefault();
             if (open) {
@@ -117,7 +128,13 @@ export function DropdownMenu({
             setOpen(true);
           }
         }}
-        className="inline-flex size-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
+        disabled={disabled}
+        aria-disabled={disabled}
+        className={cn(
+          'inline-flex size-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-subtle hover:text-foreground',
+          disabled && 'cursor-not-allowed opacity-50',
+          triggerClassName,
+        )}
       >
         {trigger ?? <MoreHorizontal aria-hidden="true" className="size-5" />}
       </button>
@@ -139,6 +156,7 @@ export function DropdownMenu({
           className={cn(
             'absolute top-[calc(100%+0.4rem)] z-50 min-w-64 overflow-hidden rounded-2xl border border-border bg-surface-raised p-1.5 shadow-float',
             align === 'end' ? 'right-0' : 'left-0',
+            menuClassName,
           )}
         >
           {items.map((item) => (

@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 
 export const metadata: Metadata = {
   title: 'Favoritos',
-  description: 'Reúna as publicações que você mais gosta no Vibra.',
+  description: 'Reúna as publicações que você mais gosta no Orbit.',
 };
 
 export default function FavoritosPage() {
@@ -22,7 +22,7 @@ export default function FavoritosPage() {
       <EmptyState
         icon={<Heart className="size-5" />}
         title="Favoritos ainda não estão disponíveis"
-        description="A API do Vibra ainda não oferece uma rota para listar suas publicações favoritas. Quando essa integração existir, o conteúdo salvo aparecerá aqui."
+        description="A API do Orbit ainda não oferece uma rota para listar suas publicações favoritas. Quando essa integração existir, o conteúdo salvo aparecerá aqui."
       />
     </div>
   );

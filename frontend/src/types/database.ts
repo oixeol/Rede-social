@@ -9,6 +9,7 @@ export type Database = {
       users: {
         Row: {
           id: number;
+          auth_uid: string | null;
           username: string;
           name: string;
           bio: string;
@@ -16,7 +17,12 @@ export type Database = {
           password_hash: string;
           created_at: number;
           birth_date: string | null;
+          email: string | null;
+          gender: string | null;
+          country: string | null;
+          state: string | null;
           interests: string;
+          highlights: string;
           message_policy: string;
           is_private: number;
           last_active_at: number | null;
@@ -24,15 +30,24 @@ export type Database = {
           subscription_status: string;
           subscription_ends_at: number | null;
           theme_palette: string;
+          points: number;
         };
         Insert: {
+          id?: number;
+          auth_uid?: string | null;
           username: string;
           name: string;
           bio?: string;
           avatar?: string | null;
           password_hash: string;
+          created_at: number;
           birth_date?: string | null;
+          email?: string | null;
+          gender?: string | null;
+          country?: string | null;
+          state?: string | null;
           interests?: string;
+          highlights?: string;
           message_policy?: string;
           is_private?: number;
           last_active_at?: number | null;
@@ -40,9 +55,11 @@ export type Database = {
           subscription_status?: string;
           subscription_ends_at?: number | null;
           theme_palette?: string;
+          points?: number;
         };
         Update: Partial<{
           id: number;
+          auth_uid: string | null;
           username: string;
           name: string;
           bio: string;
@@ -50,7 +67,12 @@ export type Database = {
           password_hash: string;
           created_at: number;
           birth_date: string | null;
+          email: string | null;
+          gender: string | null;
+          country: string | null;
+          state: string | null;
           interests: string;
+          highlights: string;
           message_policy: string;
           is_private: number;
           last_active_at: number | null;
@@ -58,6 +80,7 @@ export type Database = {
           subscription_status: string;
           subscription_ends_at: number | null;
           theme_palette: string;
+          points: number;
         }>;
       };
       sessions: {
@@ -753,8 +776,92 @@ export type Database = {
         }>;
         Delete: {};
       };
+      communities: {
+        Row: {
+          id: number;
+          name: string;
+          slug: string;
+          description: string;
+          avatar: string | null;
+          created_by: number;
+          created_at: number;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          slug: string;
+          description?: string;
+          avatar?: string | null;
+          created_by: number;
+          created_at: number;
+        };
+        Update: Partial<{
+          id: number;
+          name: string;
+          slug: string;
+          description: string;
+          avatar: string | null;
+          created_by: number;
+          created_at: number;
+        }>;
+        Delete: {};
+      };
+      community_members: {
+        Row: {
+          community_id: number;
+          user_id: number;
+          role: 'owner' | 'member';
+          created_at: number;
+        };
+        Insert: {
+          community_id: number;
+          user_id: number;
+          role?: 'owner' | 'member';
+          created_at: number;
+        };
+        Update: Partial<{
+          community_id: number;
+          user_id: number;
+          role: 'owner' | 'member';
+          created_at: number;
+        }>;
+        Delete: {};
+      };
     };
-    Views: {};
+    Views: {
+      /**
+       * View pública de usuários (security_invoker = true).
+       * Projeta apenas colunas públicas; `password_hash` e `auth_uid` ficam
+       * de fora do schema. Use esta view para leituras diretas via Data API.
+       */
+      users_public: {
+        Row: {
+          id: number;
+          username: string;
+          name: string;
+          bio: string;
+          avatar: string | null;
+          banner: string | null;
+          birth_date: string | null;
+          interests: string;
+          highlights: string;
+          message_policy: string;
+          is_private: number;
+          last_active_at: number | null;
+          theme_palette: string;
+          subscription_status: string;
+          subscription_ends_at: number | null;
+          created_at: number;
+          gender: string | null;
+          country: string | null;
+          state: string | null;
+          points: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+    };
     Functions: {};
     Enums: {
       report_target_type: 'user' | 'post' | 'story' | 'message';

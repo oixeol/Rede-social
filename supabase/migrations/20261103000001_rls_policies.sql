@@ -36,6 +36,32 @@ GRANT USAGE ON SCHEMA private TO authenticated;
 GRANT EXECUTE ON FUNCTION private.current_vibra_user_id() TO authenticated;
 
 -- -----------------------------------------------------------------------------
+-- Membership helper: evita recursão entre `conversation_members` e políticas
+-- de conversas/mensagens. `SECURITY DEFINER` owned by `postgres` bypassa RLS.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_conversation_member(
+    p_conversation_id BIGINT,
+    p_vibra_user_id BIGINT
+)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, private
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.conversation_members cm
+        WHERE cm.conversation_id = p_conversation_id
+          AND cm.user_id = p_vibra_user_id
+    );
+$$;
+
+REVOKE ALL ON FUNCTION private.is_conversation_member(BIGINT, BIGINT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.is_conversation_member(BIGINT, BIGINT) FROM anon;
+GRANT EXECUTE ON FUNCTION private.is_conversation_member(BIGINT, BIGINT) TO authenticated;
+
+-- -----------------------------------------------------------------------------
 -- users
 -- -----------------------------------------------------------------------------
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
@@ -478,13 +504,7 @@ ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY conversations_select ON public.conversations
     FOR SELECT TO authenticated
-    USING (
-        EXISTS (
-            SELECT 1 FROM public.conversation_members cm
-            WHERE cm.conversation_id = conversations.id
-              AND cm.user_id = private.current_vibra_user_id()
-        )
-    );
+    USING (private.is_conversation_member(id, private.current_vibra_user_id()));
 
 CREATE POLICY conversations_insert ON public.conversations
     FOR INSERT TO authenticated
@@ -502,14 +522,8 @@ CREATE POLICY conversations_insert ON public.conversations
 
 CREATE POLICY conversations_update ON public.conversations
     FOR UPDATE TO authenticated
-    USING (
-        EXISTS (
-            SELECT 1 FROM public.conversation_members cm
-            WHERE cm.conversation_id = conversations.id
-              AND cm.user_id = private.current_vibra_user_id()
-        )
-    )
-    WITH CHECK (true);
+    USING (private.is_conversation_member(id, private.current_vibra_user_id()))
+    WITH CHECK (private.is_conversation_member(id, private.current_vibra_user_id()));
 
 -- -----------------------------------------------------------------------------
 -- conversation_members
@@ -519,10 +533,9 @@ ALTER TABLE public.conversation_members ENABLE ROW LEVEL SECURITY;
 CREATE POLICY conversation_members_select ON public.conversation_members
     FOR SELECT TO authenticated
     USING (
-        EXISTS (
-            SELECT 1 FROM public.conversation_members own
-            WHERE own.conversation_id = conversation_members.conversation_id
-              AND own.user_id = private.current_vibra_user_id()
+        private.is_conversation_member(
+            conversation_members.conversation_id,
+            private.current_vibra_user_id()
         )
     );
 
@@ -543,10 +556,9 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY messages_select ON public.messages
     FOR SELECT TO authenticated
     USING (
-        EXISTS (
-            SELECT 1 FROM public.conversation_members cm
-            WHERE cm.conversation_id = messages.conversation_id
-              AND cm.user_id = private.current_vibra_user_id()
+        private.is_conversation_member(
+            messages.conversation_id,
+            private.current_vibra_user_id()
         )
     );
 
@@ -554,10 +566,9 @@ CREATE POLICY messages_insert ON public.messages
     FOR INSERT TO authenticated
     WITH CHECK (
         sender_id = private.current_vibra_user_id()
-        AND EXISTS (
-            SELECT 1 FROM public.conversation_members cm
-            WHERE cm.conversation_id = messages.conversation_id
-              AND cm.user_id = private.current_vibra_user_id()
+        AND private.is_conversation_member(
+            messages.conversation_id,
+            private.current_vibra_user_id()
         )
     );
 

@@ -9,6 +9,8 @@
  */
 import crypto from 'node:crypto';
 
+import { pngDataUrl } from './fixtures/message-attachments.mjs';
+
 const BASE = process.env.BASE_URL || 'http://localhost:4173';
 const WEBHOOK_SECRET = process.env.IDENTITY_WEBHOOK_SECRET || '';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -18,7 +20,7 @@ const PNG =
 const SOCIAL_BIO = 'Bio social pública do teste automatizado.';
 const DATING_BIO_A = 'Bio de namoro privada e exclusiva do QA Alfa.';
 const DATING_BIO_B = 'Bio de namoro privada e exclusiva do QA Beta.';
-const PASSWORD = 'qa-senha-123';
+const PASSWORD = 'QaSenha123!';
 
 let failures = 0;
 
@@ -363,6 +365,21 @@ const message = await alfa(`/api/conversations/${conversationId}/messages`, {
   body: JSON.stringify({ text: 'Mensagem de namoro do QA.' }),
 });
 ok('mensagem de namoro permitida', message.status === 201 && message.data.message?.id > 0);
+
+const datingAttachmentMessage = await alfa(`/api/conversations/${conversationId}/messages`, {
+  method: 'POST',
+  body: JSON.stringify({
+    text: 'Anexo privado do match.',
+    media: [{ dataUrl: pngDataUrl(), fileName: 'match.png' }],
+  }),
+});
+const datingAttachmentUrl = datingAttachmentMessage.data?.message?.media?.[0]?.url || '';
+ok(
+  'anexo privado de conversa de namoro criado',
+  datingAttachmentMessage.status === 201 && datingAttachmentUrl.startsWith('/uploads/message-')
+);
+const datingAttachmentAllowed = await fetch(`${BASE}${datingAttachmentUrl}`);
+ok('anexo de namoro exige sessão', datingAttachmentAllowed.status === 404);
 
 const betaThread = await beta(`/api/conversations/${conversationId}`);
 ok(

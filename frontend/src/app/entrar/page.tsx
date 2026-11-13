@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
-import { Brand } from '@/components/ui/brand';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { LoginBackground } from '@/components/auth/login-background';
+import { LoginQrActions } from '@/components/auth/login-qr-actions';
+import { LoginQrPanel } from '@/components/auth/login-qr-panel';
+import { OrbitLogo } from '@/components/shell/orbit-logo';
 import { LoginForm } from './login-form';
 
 export const metadata: Metadata = {
@@ -10,23 +13,35 @@ export const metadata: Metadata = {
 
 export default function EntrarPage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="fixed top-0 left-0 right-0 z-40 flex h-14 items-center justify-between border-b border-border bg-surface/80 backdrop-blur-sm px-4 lg:px-8">
-        <Brand />
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-        </div>
-      </header>
+    <main className="relative min-h-screen overflow-hidden bg-[#121214]">
+      <LoginBackground />
 
-      <main id="conteudo" className="flex-1 pt-16 px-4 lg:px-8 py-10 flex items-center justify-center">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Entrar no Vibra</h1>
-            <p className="mt-2 text-sm text-muted">Acesse sua conta para continuar</p>
+      <div className="relative z-10 flex min-h-screen flex-col">
+        <header className="px-6 pt-7 sm:px-10 sm:pt-9">
+          <Link
+            href="/"
+            aria-label="Orbit – página inicial"
+            className="inline-flex items-center gap-2 transition-opacity hover:opacity-85"
+          >
+            <OrbitLogo />
+          </Link>
+        </header>
+
+        <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8">
+          <div className="w-full max-w-[880px] overflow-hidden rounded-[24px] border border-[#FF6A00]/35 bg-[#0D0D0D]/85 shadow-[0_0_70px_-12px_rgba(255,106,0,0.55),0_28px_70px_rgba(0,0,0,0.65)] backdrop-blur-md">
+            <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="px-6 py-8 sm:px-10 sm:py-10">
+                <LoginForm />
+              </div>
+
+              <div className="flex flex-col justify-center border-t border-[#1A1A1C] px-6 py-8 sm:px-10 sm:py-10 lg:border-t-0 lg:border-l">
+                <LoginQrPanel />
+                <LoginQrActions />
+              </div>
+            </div>
           </div>
-          <LoginForm />
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }

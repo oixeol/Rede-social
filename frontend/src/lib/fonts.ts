@@ -1,32 +1,9 @@
-import localFont from 'next/font/local';
+import { Inter } from 'next/font/google';
 
-export const inter = localFont({
-  src: [
-    {
-      path: '../assets/fonts/inter-latin-variable.woff2',
-      style: 'normal',
-      weight: '100 900',
-    },
-  ],
-  display: 'swap',
+export const inter = Inter({
+  subsets: ['latin'],
   variable: '--font-inter',
-  fallback: ['system-ui', 'sans-serif'],
-});
-
-export const lora = localFont({
-  src: [
-    {
-      path: '../assets/fonts/lora-latin-variable.woff2',
-      style: 'normal',
-      weight: '400 700',
-    },
-    {
-      path: '../assets/fonts/lora-latin-variable-italic.woff2',
-      style: 'italic',
-      weight: '400 700',
-    },
-  ],
   display: 'swap',
-  variable: '--font-lora',
-  fallback: ['Georgia', 'serif'],
+  weight: ['400', '500', '600'],
+  fallback: ['system-ui', 'sans-serif'],
 });

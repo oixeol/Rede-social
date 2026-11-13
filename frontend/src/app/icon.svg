@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="vibraIcon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF8C00" />
+      <stop offset="1" stop-color="#FF4500" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="#0D0D0D" />
+  <path
+    fill="url(#vibraIcon)"
+    d="M16 4c.9 5.3 2.7 7.1 8 8-5.3.9-7.1 2.7-8 8-.9-5.3-2.7-7.1-8-8 5.3-.9 7.1-2.7 8-8Z"
+  />
+  <path
+    fill="url(#vibraIcon)"
+    d="M24.5 19.5c.45 2.65 1.35 3.55 4 4-2.65.45-3.55 1.35-4 4-.45-2.65-1.35-3.55-4-4 2.65-.45 3.55-1.35 4-4Z"
+  />
+</svg>

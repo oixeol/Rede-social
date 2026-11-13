@@ -5,7 +5,7 @@ import { ConfiguracoesView } from './configuracoes-view';
 
 export const metadata: Metadata = {
   title: 'Configurações',
-  description: 'Gerencie sua conta e preferências no Vibra.',
+  description: 'Gerencie sua conta e preferências no Orbit.',
 };
 
 export default async function ConfiguracoesPage() {

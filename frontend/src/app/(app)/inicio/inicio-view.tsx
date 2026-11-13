@@ -1,17 +1,14 @@
-import { Suspense } from 'react';
-
-import { getExplore, getFeed, getMe, getSuggestions } from '@/lib/server-api';
+import { getExplore, getFeed, getMe, serverApiRequest } from '@/lib/server-api';
+import type { SpacesResponse, Space, ExploreTopic, ExplorePerson, Post } from '@/lib/types';
 
 import { InicioClient } from './inicio-client';
-import { InicioSkeleton } from './loading-skeleton';
-import { InicioRail } from './inicio-rail';
 
 export async function InicioView() {
-  const [feedResult, exploreResult, suggestionsResult, meResult] = await Promise.allSettled([
-    getFeed({ limit: 12 }),
-    getExplore({ limit: 12 }),
-    getSuggestions(),
+  const [feedResult, exploreResult, meResult, spacesResult] = await Promise.allSettled([
+    getFeed({ limit: 24, mediaType: 'image,video' }),
+    getExplore({ limit: 24, mediaType: 'image,video' }),
     getMe(),
+    serverApiRequest<SpacesResponse>('/api/spaces'),
   ]);
 
   if (feedResult.status === 'rejected') {
@@ -20,42 +17,43 @@ export async function InicioView() {
 
   const feed = feedResult.value;
   const explore = exploreResult.status === 'fulfilled' ? exploreResult.value : null;
-  const suggestions = suggestionsResult.status === 'fulfilled' ? suggestionsResult.value.users : [];
-  const me = meResult.status === 'fulfilled' ? meResult.value : null;
+  const autoplayReels =
+    meResult.status === 'fulfilled'
+      ? (meResult.value.user.preferences?.content?.autoplayReels ?? true)
+      : true;
+  const forYouError =
+    exploreResult.status === 'rejected'
+      ? 'Não foi possível carregar as publicações recomendadas.'
+      : null;
+  const spaces: Space[] = spacesResult.status === 'fulfilled' ? spacesResult.value.spaces : [];
+
+  const recommendationPosts = [...(explore?.posts ?? []), ...feed.posts].filter(
+    (post, index, posts) => posts.findIndex((candidate) => candidate.id === post.id) === index,
+  );
 
   return (
-    <div className="mx-auto w-full max-w-[1180px]">
-      <header className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold tracking-[0.18em] text-brand uppercase">Início</p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-[-0.025em] text-foreground sm:text-4xl">
-            O que está acontecendo
-          </h1>
-        </div>
-        <time className="hidden text-xs font-medium text-muted sm:block" dateTime={new Date().toISOString()}>
-          {new Intl.DateTimeFormat('pt-BR', {
-            weekday: 'long',
-            day: '2-digit',
-            month: 'long',
-          }).format(new Date())}
-        </time>
-      </header>
+    <div className="mx-auto w-full max-w-[1240px]">
+      <InicioClient
+        initialForYouPosts={explore?.posts ?? []}
+        initialForYouCursor={explore?.nextCursor ?? null}
+        initialFollowingPosts={feed.posts}
+        initialFollowingCursor={feed.nextCursor}
+        initialRecommendations={recommendationPosts}
+        initialSpaces={spaces}
+        forYouError={forYouError}
+        autoplayReels={autoplayReels}
+      />
 
-      <div className="grid items-start gap-7 xl:grid-cols-[minmax(0,700px)_minmax(280px,320px)] xl:justify-center">
-        <section aria-label="Publicações" className="min-w-0">
-          <Suspense fallback={<InicioSkeleton />}>
-            <InicioClient
-              initialForYouPosts={explore?.posts ?? feed.posts}
-              initialForYouCursor={explore?.nextCursor ?? null}
-              initialFollowingPosts={feed.posts}
-              initialFollowingCursor={feed.nextCursor}
-              meUser={me?.user ?? null}
-            />
-          </Suspense>
-        </section>
-
-        <InicioRail suggestions={suggestions} />
-      </div>
+      <time
+        className="pointer-events-none fixed right-3 bottom-20 z-20 text-[10px] font-medium tracking-wide text-muted/70 md:right-4 md:bottom-4"
+        dateTime={new Date().toISOString()}
+      >
+        {new Intl.DateTimeFormat('pt-BR', {
+          weekday: 'long',
+          day: '2-digit',
+          month: 'long',
+        }).format(new Date())}
+      </time>
     </div>
   );
 }

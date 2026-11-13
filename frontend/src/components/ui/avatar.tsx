@@ -2,6 +2,7 @@ import { BadgeCheck } from 'lucide-react';
 import Image from 'next/image';
 
 import { cn } from '@/lib/cn';
+import { isSafeMediaSource } from '@/lib/media';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -14,7 +15,8 @@ export interface AvatarProps {
   verified?: boolean;
   ring?: boolean;
   className?: string;
-  priority?: boolean;
+  /** Carrega a imagem imediatamente (use em avatares acima da dobra). */
+  eager?: boolean;
 }
 
 const sizeClasses: Record<AvatarSize, string> = {
@@ -41,15 +43,12 @@ const statusClasses: Record<AvatarSize, string> = {
   xl: 'size-5 border-[3px]',
 };
 
-function initials(name: string): string {
+/** Iniciais de um nome, usadas como fallback visual do avatar. */
+export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return '?';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts.at(-1)?.[0] ?? ''}`.toUpperCase();
-}
-
-function isSafeImageSource(src: string): boolean {
-  return src.startsWith('/uploads/') && !src.includes('..') && !src.includes('\\');
 }
 
 export function Avatar({
@@ -61,9 +60,9 @@ export function Avatar({
   verified = false,
   ring = false,
   className,
-  priority = false,
+  eager = false,
 }: AvatarProps) {
-  const safeSrc = src && isSafeImageSource(src) ? src : null;
+  const safeSrc = src && isSafeMediaSource(src) ? src : null;
   const fallback = name ? initials(name) : alt.slice(0, 2).toUpperCase();
 
   return (
@@ -82,7 +81,7 @@ export function Avatar({
             width={imageSizes[size]}
             height={imageSizes[size]}
             className="size-full object-cover"
-            priority={priority}
+            loading={eager ? 'eager' : 'lazy'}
             unoptimized
           />
         ) : (

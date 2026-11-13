@@ -5,7 +5,7 @@ import { ExplorarView } from './explorar-view';
 
 export const metadata: Metadata = {
   title: 'Explorar',
-  description: 'Descubra novas publicações, pessoas e tópicos no Vibra.',
+  description: 'Descubra novas publicações, pessoas e tópicos no Orbit.',
 };
 
 export default async function ExplorarPage() {
