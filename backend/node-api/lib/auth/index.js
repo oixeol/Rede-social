@@ -162,21 +162,27 @@ async function betterAuthHandler(req, res) {
       method: req.method,
       headers: req.headers,
     };
-    console.log('[BetterAuth] Calling auth.handler for:', req.url);
+    console.log('[BetterAuth] Calling auth.handler for:', req.url, 'headersSent:', res.headersSent);
     const response = await auth.handler(wrappedReq, res);
-    console.log('[BetterAuth] Handler returned:', response ? 'Response object' : 'undefined', response?.status);
+    console.log('[BetterAuth] Handler returned:', response ? 'Response object' : 'undefined', response?.status, 'headersSent:', res.headersSent);
     // Handle Response object returned by Better Auth
     if (response && typeof response === 'object' && 'status' in response) {
       console.log('[BetterAuth] Sending Response:', response.status);
       const body = await response.text();
       console.log('[BetterAuth] Response body length:', body.length);
-      res.statusCode = response.status;
-      response.headers.forEach((value, key) => {
-        res.setHeader(key, value);
-      });
-      res.end(body);
+      if (!res.headersSent) {
+        res.statusCode = response.status;
+        response.headers.forEach((value, key) => {
+          res.setHeader(key, value);
+        });
+        res.end(body);
+      } else {
+        console.log('[BetterAuth] Headers already sent, skipping');
+      }
     } else if (!res.headersSent) {
-      console.log('[BetterAuth] No Response object, assuming handler sent response directly');
+      console.log('[BetterAuth] No Response object and headers not sent, sending 404');
+      res.statusCode = 404;
+      res.end('Not found');
     }
   } catch (err) {
     console.error('[BetterAuth] Handler error:', err);
