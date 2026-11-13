@@ -2810,6 +2810,15 @@ async function handleApi(req, res, pathname, url) {
   const method = req.method;
   maybeCleanupRetention();
 
+  // TESTE: rota de debug
+  if (pathname === '/api/auth/debug') {
+    return json(res, 200, { 
+      msg: 'Debug route works', 
+      pathname,
+      hasBetterAuthHandler: typeof betterAuthHandler === 'function'
+    });
+  }
+
   // Better Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
     console.log('[DEBUG] Better Auth route:', pathname);
