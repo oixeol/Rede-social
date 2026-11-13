@@ -162,7 +162,16 @@ async function betterAuthHandler(req, res) {
       method: req.method,
       headers: req.headers,
     };
-    await auth.handler(wrappedReq, res);
+    const response = await auth.handler(wrappedReq, res);
+    // Handle Response object returned by Better Auth
+    if (response && typeof response === 'object' && 'status' in response) {
+      const body = await response.text();
+      res.statusCode = response.status;
+      response.headers.forEach((value, key) => {
+        res.setHeader(key, value);
+      });
+      res.end(body);
+    }
   } catch (err) {
     console.error('[BetterAuth] Handler error:', err);
     console.error('[BetterAuth] Handler error stack:', err.stack);
