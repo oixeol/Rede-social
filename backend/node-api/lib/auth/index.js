@@ -8,9 +8,9 @@ let authInstance = null;
 let initPromise = null;
 
 function createAuth() {
-  // Prefer direct DATABASE_URL (IPv4 compatible) over pooler for Render compatibility
-  // Poolers often resolve to IPv6 which Render can't reach
-  const databaseUrl = env.DATABASE_URL || env.SUPABASE_URL || env.supabase || '';
+  // Use Supabase pooler URL (has IPv4) for Render compatibility
+  // Direct Supabase URL only resolves to IPv6 which Render can't reach
+  const databaseUrl = env.supabase || env.DATABASE_URL || env.SUPABASE_URL || '';
 
   if (!databaseUrl) {
     throw new Error('DATABASE_URL or SUPABASE_URL/supabase env var is required');

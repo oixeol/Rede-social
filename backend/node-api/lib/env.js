@@ -10,6 +10,7 @@ function getEnvNumber(key, defaultValue = 0) {
 module.exports = {
   get DATABASE_URL() { return getEnv('DATABASE_URL'); },
   get SUPABASE_URL() { return getEnv('SUPABASE_URL'); },
+  get supabase() { return getEnv('supabase'); },
   get COOKIE_SECURE() { return getEnv('COOKIE_SECURE', '1'); },
   get SESSION_TTL() { return getEnvNumber('SESSION_TTL', 30 * 24 * 60 * 60 * 1000); },
   get IDENTITY_PROVIDER() { return getEnv('IDENTITY_PROVIDER', 'dev'); },
