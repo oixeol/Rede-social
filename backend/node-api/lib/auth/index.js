@@ -8,10 +8,9 @@ let authInstance = null;
 let initPromise = null;
 
 function createAuth() {
-  // Prefer pooler connection for Supabase (more reliable for external connections)
-  // Check both SUPABASE_URL and supabase (Render env var names vary)
-  const supabasePoolerUrl = env.SUPABASE_URL || env.supabase || '';
-  const databaseUrl = env.DATABASE_URL || supabasePoolerUrl || '';
+  // Prefer direct DATABASE_URL (IPv4 compatible) over pooler for Render compatibility
+  // Poolers often resolve to IPv6 which Render can't reach
+  const databaseUrl = env.DATABASE_URL || env.SUPABASE_URL || env.supabase || '';
 
   if (!databaseUrl) {
     throw new Error('DATABASE_URL or SUPABASE_URL/supabase env var is required');
@@ -22,6 +21,8 @@ function createAuth() {
   const pool = new Pool({
     connectionString: databaseUrl,
     ssl: databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: false },
+    // Force IPv4 for Render compatibility
+    family: 4,
     // Connection pool settings for stability
     max: 10,
     idleTimeoutMillis: 30000,
