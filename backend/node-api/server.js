@@ -1442,6 +1442,11 @@ function assertSameOrigin(req) {
     throw new HttpError(403, 'Origem inválida.', 'bad_origin');
   }
   const publicHost = req.headers['x-forwarded-host'] || req.headers.host;
+  
+  // Allow Better Auth endpoints (they have their own CSRF protection via trustedOrigins)
+  const pathname = req.url.split('?')[0];
+  if (pathname.startsWith('/api/auth/')) return;
+  
   if (parsed.host !== publicHost) {
     throw new HttpError(403, 'Origem não autorizada.', 'bad_origin');
   }
