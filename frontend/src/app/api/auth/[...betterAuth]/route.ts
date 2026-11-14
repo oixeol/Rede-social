@@ -16,6 +16,7 @@ export async function GET(
     headers: {
       'Accept': 'application/json',
       'Cookie': request.headers.get('cookie') || '',
+      'Origin': request.headers.get('origin') || '',
     },
     credentials: 'include',
   });
@@ -39,6 +40,7 @@ export async function POST(
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'Cookie': request.headers.get('cookie') || '',
+      'Origin': request.headers.get('origin') || '',
     },
     body: body || undefined,
     credentials: 'include',
