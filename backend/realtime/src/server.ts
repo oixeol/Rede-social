@@ -10,20 +10,21 @@ import { registerPresenceEvents, subscribeToPubSub } from './events/presence.js'
 const PORT = parseInt(process.env.PORT || '3002', 10);
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
-async function connectWithRetry(redis: any, maxRetries = 10, delayMs = 2000): Promise<void> {
+async function connectWithRetry(redis: any, name: string, maxRetries = 10, delayMs = 2000): Promise<boolean> {
   for (let i = 0; i < maxRetries; i++) {
     try {
       await redis.connect();
-      console.log('[WS] Redis connected successfully');
-      return;
+      console.log(`[WS] ${name} Redis connected successfully`);
+      return true;
     } catch (err) {
-      console.warn(`[WS] Redis connection attempt ${i + 1}/${maxRetries} failed:`, err instanceof Error ? err.message : err);
+      console.warn(`[WS] ${name} Redis connection attempt ${i + 1}/${maxRetries} failed:`, err instanceof Error ? err.message : err);
       if (i < maxRetries - 1) {
         await new Promise(r => setTimeout(r, delayMs));
       }
     }
   }
-  throw new Error('Failed to connect to Redis after retries');
+  console.error(`[WS] ${name} Failed to connect to Redis after ${maxRetries} retries`);
+  return false;
 }
 
 async function bootstrap() {
@@ -51,10 +52,24 @@ async function bootstrap() {
   const pubClient = redis.duplicate();
   const subClient = redis.duplicate();
   
-  await connectWithRetry(pubClient);
-  await connectWithRetry(subClient);
+  // Start HTTP server immediately so health check works
+  httpServer.listen(PORT, () => {
+    console.log(`[WS] Server running on port ${PORT}`);
+  });
   
-  io.adapter(createAdapter(pubClient, subClient));
+  // Connect to Redis in background, don't block startup
+  const pubConnected = connectWithRetry(pubClient, 'pub');
+  const subConnected = connectWithRetry(subClient, 'sub');
+  
+  // Wait for both connections, but don't crash if they fail
+  const [pubOk, subOk] = await Promise.all([pubConnected, subConnected]);
+  
+  if (pubOk && subOk) {
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log('[WS] Redis adapter enabled');
+  } else {
+    console.warn('[WS] Running without Redis adapter (single-instance mode)');
+  }
 
   io.use(authMiddleware);
 
