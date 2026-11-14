@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/auth/:path*',
+        destination: '/api/auth/:path*', // handled by local route handler
+      },
+      {
         source: '/api/:path*',
         destination: `${apiOrigin}/api/:path*`,
       },
