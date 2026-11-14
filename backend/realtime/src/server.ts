@@ -10,8 +10,32 @@ import { registerPresenceEvents, subscribeToPubSub } from './events/presence.js'
 const PORT = parseInt(process.env.PORT || '3002', 10);
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
+async function connectWithRetry(redis: any, maxRetries = 10, delayMs = 2000): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await redis.connect();
+      console.log('[WS] Redis connected successfully');
+      return;
+    } catch (err) {
+      console.warn(`[WS] Redis connection attempt ${i + 1}/${maxRetries} failed:`, err instanceof Error ? err.message : err);
+      if (i < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw new Error('Failed to connect to Redis after retries');
+}
+
 async function bootstrap() {
-  const httpServer = createServer();
+  const httpServer = createServer((req, res) => {
+    if (req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', timestamp: Date.now() }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
   const io = new Server<AuthenticatedSocket>(httpServer, {
     cors: {
       origin: (process.env.ALLOWED_ORIGINS || 'https://rede-social-rho-five.vercel.app').split(','),
@@ -26,8 +50,10 @@ async function bootstrap() {
   const redis = getRedis();
   const pubClient = redis.duplicate();
   const subClient = redis.duplicate();
-  await pubClient.connect();
-  await subClient.connect();
+  
+  await connectWithRetry(pubClient);
+  await connectWithRetry(subClient);
+  
   io.adapter(createAdapter(pubClient, subClient));
 
   io.use(authMiddleware);

@@ -5,9 +5,13 @@ let redis: RedisClientType | null = null;
 export function getRedis(): RedisClientType {
   if (!redis) {
     const url = process.env.REDIS_URL || 'redis://localhost:6379';
-    redis = createClient({ url });
+    redis = createClient({
+      url,
+      socket: {
+        reconnectStrategy: (retries) => Math.min(retries * 500, 5000),
+      },
+    });
     redis.on('error', (err) => console.error('[Redis] Error:', err));
-    redis.connect().catch((err) => console.error('[Redis] Connect failed:', err));
   }
   return redis;
 }
