@@ -65,8 +65,16 @@ async function bootstrap() {
   const [pubOk, subOk] = await Promise.all([pubConnected, subConnected]);
   
   if (pubOk && subOk) {
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log('[WS] Redis adapter enabled');
+    try {
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log('[WS] Redis adapter enabled');
+      
+      // Subscribe to pub/sub only if Redis is connected
+      await subscribeToPubSub(io);
+    } catch (err) {
+      console.error('[WS] Failed to setup Redis adapter:', err);
+      console.warn('[WS] Running without Redis adapter (single-instance mode)');
+    }
   } else {
     console.warn('[WS] Running without Redis adapter (single-instance mode)');
   }
@@ -92,12 +100,7 @@ async function bootstrap() {
     });
   });
 
-  await subscribeToPubSub(io);
   startPresenceHeartbeat(io);
-
-  httpServer.listen(PORT, () => {
-    console.log(`[WS] Server running on port ${PORT}`);
-  });
 
   const shutdown = async (signal: string) => {
     console.log(`[WS] ${signal} received, shutting down...`);
@@ -109,6 +112,15 @@ async function bootstrap() {
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+  
+  // Handle unhandled rejections to prevent crashes
+  process.on('unhandledRejection', (reason) => {
+    console.error('[WS] Unhandled rejection:', reason);
+  });
+  
+  process.on('uncaughtException', (err) => {
+    console.error('[WS] Uncaught exception:', err);
+  });
 }
 
 async function fetchFriendIds(userId: string): Promise<string[]> {
