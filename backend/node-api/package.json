@@ -20,8 +20,7 @@
     "node": ">=22.5"
   },
   "dependencies": {
-    "@better-auth/passkey": "^1.7.23",
-    "better-auth": "^1.7.22",
+    "@supabase/supabase-js": "^2.45.0",
     "bull": "^4.16.5",
     "kysely": "^0.29.9",
     "minio": "^8.0.7",
