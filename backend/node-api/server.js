@@ -79,10 +79,7 @@ process.on('uncaughtException', (err) => {
   if (!IS_PRODUCTION) process.exit(1);
 });
 
-const { auth } = require('./lib/auth');
-
-/** Better Auth handler for /api/auth/* routes (lazy initialization) */
-const betterAuthHandler = auth.handler;
+const { supaAuthHandler } = require('./lib/auth/supaAuthHandler');
 
 /* ------------------------------------------------------------------ */
 /* Configuração e inicialização                                        */
@@ -2829,23 +2826,23 @@ async function handleApi(req, res, pathname, url) {
     return json(res, 200, { 
       msg: 'Debug route works', 
       pathname,
-      hasBetterAuthHandler: typeof betterAuthHandler === 'function'
+      hasSupaAuthHandler: typeof supaAuthHandler === 'function'
     });
   }
 
-  // TESTE: rota para testar inicialização do Better Auth
+  // TESTE: rota para testar inicialização do Supabase Auth
   if (pathname === '/api/auth/test-init') {
     try {
-      const { getAuth } = require('./lib/auth');
-      const auth = await getAuth();
+      const { getSupabaseAdmin } = require('./lib/auth/supaAuth');
+      const admin = getSupabaseAdmin();
       return json(res, 200, { 
-        msg: 'Better Auth initialized successfully',
-        hasHandler: typeof auth.handler === 'function'
+        msg: 'Supabase Auth initialized successfully',
+        hasAdmin: !!admin
       });
     } catch (err) {
       console.error('[TEST-INIT] Error:', err);
       return json(res, 500, { 
-        error: 'Better Auth init failed',
+        error: 'Supabase Auth init failed',
         message: err.message,
         stack: err.stack
       });
@@ -2860,7 +2857,7 @@ async function handleApi(req, res, pathname, url) {
       SUPABASE_URL: env.SUPABASE_URL?.replace(/:[^:@]*@/, ':****@') || 'NOT SET',
       supabase: env.supabase?.replace(/:[^:@]*@/, ':****@') || 'NOT SET',
       NODE_ENV: env.NODE_ENV,
-      BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET ? 'SET' : 'NOT SET',
+      SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
       API_ORIGIN: env.API_ORIGIN || 'NOT SET',
     });
   }
@@ -2913,10 +2910,10 @@ async function handleApi(req, res, pathname, url) {
     }
   }
 
-  // Better Auth handles all /api/auth/* routes
+  // Supabase Auth handles all /api/auth/* routes
   if (pathname.startsWith('/api/auth/')) {
-    console.log('[DEBUG] Better Auth route:', pathname);
-    return betterAuthHandler(req, res);
+    console.log('[DEBUG] SupaAuth route:', pathname);
+    return supaAuthHandler(req, res);
   }
 
   console.log('[DEBUG] Legacy route:', pathname);
@@ -2938,32 +2935,28 @@ async function handleApi(req, res, pathname, url) {
     return handleIdentityWebhook(req, res);
   }
 
-  // --- auth (backwards compatibility proxies to Better Auth) -------------
+  // --- auth (backwards compatibility proxies to Supabase Auth) -------------
   if (method === 'POST' && pathname === '/api/register') {
-    // Forward to Better Auth sign-up endpoint
     req.url = '/api/auth/sign-up/email';
-    return betterAuthHandler(req, res);
+    return supaAuthHandler(req, res);
   }
 
   if (method === 'POST' && pathname === '/api/login') {
-    // Forward to Better Auth sign-in endpoint
     req.url = '/api/auth/sign-in/email';
-    return betterAuthHandler(req, res);
+    return supaAuthHandler(req, res);
   }
 
   if (method === 'POST' && pathname === '/api/logout') {
-    // Forward to Better Auth sign-out endpoint
     req.url = '/api/auth/sign-out';
-    return betterAuthHandler(req, res);
+    return supaAuthHandler(req, res);
   }
 
   if (method === 'POST' && pathname === '/api/auth/forgot-password') {
-    // Forward to Better Auth forget-password endpoint
     req.url = '/api/auth/forget-password';
-    return betterAuthHandler(req, res);
+    return supaAuthHandler(req, res);
   }
 
-  // /api/auth/reset-password is handled by Better Auth directly (same path)
+  // /api/auth/reset-password is handled by Supabase Auth directly (same path)
 
   // Verificação de disponibilidade de username (pública, sem autenticação)
   if (method === 'GET' && pathname === '/api/username-available') {
