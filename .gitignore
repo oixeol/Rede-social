@@ -2,6 +2,7 @@ node_modules/
 .next/
 out/
 *.tsbuildinfo
+dist/
 
 # Ferramentas de agente do OpenCode.
 .agents/
@@ -30,6 +31,7 @@ backend/media/
 # Capturas transitórias de QA. As finais (qa/final-*.png) são versionadas.
 backend/node-api/qa/*.png
 !backend/node-api/qa/final-*.png
+backend/realtime/dist/
 
 .DS_Store
 Thumbs.db
