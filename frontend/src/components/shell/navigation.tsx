@@ -1,5 +1,5 @@
 import type { Route } from 'next';
-import { Home, Compass, MessageSquare, Bell, Users, User } from 'lucide-react';
+import { Home, Compass, MessageSquare, Bell, Users, User, Bookmark, Settings, Crown } from 'lucide-react';
 import { isFeatureEnabled, type FeatureName } from '@/lib/feature-flags';
 
 export interface NavigationItem {
@@ -49,6 +49,21 @@ export function getPrimaryNavigation(
       label: 'Comunidades',
       href: '/comunidades',
       icon: <Users className="size-5" />,
+    });
+  }
+
+  // Always visible links
+  items.push(
+    { id: 'favoritos', label: 'Favoritos', href: '/favoritos', icon: <Bookmark className="size-5" /> },
+    { id: 'configuracoes', label: 'Configurações', href: '/configuracoes', icon: <Settings className="size-5" /> },
+  );
+
+  if (isFeatureEnabled('premium')) {
+    items.push({
+      id: 'vibra-premium',
+      label: 'Vibra Premium',
+      href: '/vibra-premium',
+      icon: <Crown className="size-5" />,
     });
   }
 

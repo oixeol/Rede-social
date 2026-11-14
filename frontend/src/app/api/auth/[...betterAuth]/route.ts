@@ -34,6 +34,7 @@ export async function POST(
   url.search = request.nextUrl.search;
 
   const body = await request.text();
+  console.log(`[AuthProxy] POST ${path} forwarding Origin: ${request.headers.get('origin')}`);
   const response = await fetch(url, {
     method: 'POST',
     headers: {
